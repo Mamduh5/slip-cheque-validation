@@ -12,6 +12,10 @@ export default async function UploadPage() {
           Add a bank transfer slip, deposit/payment slip, cheque, or unknown paper financial document image.
         </p>
         <div className="mt-5 rounded-lg border border-line bg-white p-4 text-sm leading-6 text-slate-600">
+          For phone photos, keep the document flat, fill most of the frame, include all corners, and avoid glare or
+          shadows. The app warns about questionable capture quality but only blocks images that are clearly unusable.
+        </div>
+        <div className="mt-5 rounded-lg border border-line bg-white p-4 text-sm leading-6 text-slate-600">
           Duplicate matching is active within your account. The app compares exact file hashes first, then uses a
           normalized image fingerprint to mark likely duplicates.
         </div>

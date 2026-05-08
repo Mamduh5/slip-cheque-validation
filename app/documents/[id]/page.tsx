@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DocumentStatusPill } from "@/components/document-status-pill";
+import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
 import { ReviewStatusPill } from "@/components/review-status-pill";
-import { formatDuplicateStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
+import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
+import { formatQualityWarning } from "@/lib/image-quality";
 import { requireUser } from "@/lib/session";
 
 function formatBytes(bytes: number) {
@@ -70,6 +72,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           <div className="flex flex-wrap gap-2">
             <DocumentStatusPill status={document.duplicateStatus} />
             <ReviewStatusPill status={document.reviewStatus} />
+            <QualityStatusPill status={document.qualityStatus} />
           </div>
         </div>
 
@@ -125,8 +128,16 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             ["File size", formatBytes(document.fileSize)],
             ["Machine status", formatDuplicateStatus(document.duplicateStatus)],
             ["Review status", formatReviewStatus(document.reviewStatus)],
+            ["Quality status", formatQualityStatus(document.qualityStatus)],
             ["Similarity", formatSimilarity(document.similarityScore)],
             ["Reviewed at", document.reviewedAt ? formatDate(document.reviewedAt) : "Not reviewed"],
+            ["Quality checked", document.qualityCheckedAt ? formatDate(document.qualityCheckedAt) : "Not checked"],
+            [
+              "Image metrics",
+              document.qualityMetrics
+                ? `${document.qualityMetrics.width}x${document.qualityMetrics.height}, sharpness ${document.qualityMetrics.sharpness}, luminance ${document.qualityMetrics.meanLuminance}`
+                : "Not available"
+            ],
             ["Perceptual hash", document.perceptualHash ?? "Not generated"],
             ["Normalized image", document.normalizedImage ? `${document.normalizedImage.width}x${document.normalizedImage.height} WebP` : "Not generated"]
           ].map(([label, value]) => (
@@ -157,6 +168,19 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             )}
           </dd>
         </div>
+
+        {document.qualityWarnings.length > 0 ? (
+          <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 p-3">
+            <dt className="text-xs font-medium uppercase tracking-wide text-orange-800">Capture quality warnings</dt>
+            <dd className="mt-2 text-sm text-orange-950">
+              <ul className="list-disc space-y-1 pl-5">
+                {document.qualityWarnings.map((warning) => (
+                  <li key={warning}>{formatQualityWarning(warning)}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        ) : null}
 
         <div className="mt-6 rounded-md border border-line bg-slate-50 p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Exact hash</dt>

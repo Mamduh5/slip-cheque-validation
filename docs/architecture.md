@@ -54,7 +54,7 @@ documents/{userId}/{documentId}/normalized.webp
 3. Server validates metadata, MIME type, and file size.
 4. Server computes a SHA-256 exact file hash.
 5. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
-6. The in-process document processing service validates the image, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
+6. The in-process document processing service decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
 7. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
 8. Original image bytes are stored unchanged in MinIO.
 9. A new document record is inserted into MongoDB for auditability.
@@ -76,6 +76,24 @@ The normalized-image stage is intentionally small and in-process. It does not us
 - dHash compares adjacent grayscale pixels after resizing the normalized image to 9x8.
 - Likely duplicate threshold is Hamming distance `<= 8`, a conservative starting point.
 - Likely duplicate `similarityScore` means `1 - hammingDistance / 64`, rounded to four decimals. Exact duplicates continue to use `1`.
+
+## Capture Quality
+
+Quality assessment is a separate machine signal from duplicate detection and human review.
+
+- `qualityStatus`: `PASS`, `WARN`, or `FAIL`.
+- `qualityWarnings`: machine-readable warnings such as `IMAGE_TOO_SMALL`, `BLURRY_IMAGE`, `TOO_DARK`, and `TOO_BRIGHT`.
+- `qualityMetrics`: image width, height, mean luminance, and a Laplacian-variance sharpness heuristic.
+- `qualityCheckedAt`: timestamp for the assessment.
+
+Warn-vs-fail behavior is conservative:
+
+- Invalid MIME type, empty file, and configured upload-size violations are rejected before image processing.
+- Clearly unusable tiny images fail quality assessment and return `422`.
+- Small-but-usable, blurry, dark, and bright images warn but continue through exact and near-duplicate detection.
+- Quality warnings do not overwrite `duplicateStatus` or `reviewStatus`.
+
+The upload UI gives mobile capture guidance: keep the document flat, include all corners, avoid glare and shadows, and retake if the image is soft. Document detail shows quality status, warning text, and basic metrics.
 
 ## Duplicate Fields
 
@@ -104,6 +122,8 @@ Machine detection and human review are intentionally separate:
 
 Pairwise review memory is stored in `duplicate_review_pairs` with canonical sorted document ids. Both confirmed duplicate and confirmed distinct pairs are remembered. Candidate selection skips already reviewed exact pairs, and reviewed records no longer appear as unresolved because their document-level `reviewStatus` is no longer `PENDING`.
 
+Skipping reviewed pairs is pair-specific, not document-wide. If a pair was marked `CONFIRMED_DISTINCT`, that exact pair is suppressed, but the document can still surface a different likely-duplicate candidate later.
+
 OCR, QR extraction, cheque field extraction, and bank verification remain later pipeline stages, not the core v1 intake path.
 
 ## Known Limitations
@@ -113,3 +133,5 @@ Concurrent uploads of identical bytes by the same user can still race: two reque
 Near-duplicate matching is intentionally conservative and image-only. dHash may miss rotated, heavily cropped, warped, occluded, or very low-quality photos, and it may still produce false positives for visually similar documents. It should be treated as a review signal, not financial verification.
 
 Pairwise review memory does not infer cluster-level decisions. If document A is distinct from B, and B is distinct from C, the app does not infer anything about A and C.
+
+Quality heuristics are lightweight and explainable, not proof that the paper document is valid. Blur detection can be fooled by graphics or blank areas, and brightness checks use simple average luminance.

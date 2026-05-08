@@ -73,6 +73,10 @@ export function buildUploadedDocumentRecord(input: {
   normalizedImage: DocumentRecord["normalizedImage"];
   exactHash: string;
   perceptualHash: string | null;
+  qualityStatus: DocumentRecord["qualityStatus"];
+  qualityWarnings: DocumentRecord["qualityWarnings"];
+  qualityMetrics: DocumentRecord["qualityMetrics"];
+  qualityCheckedAt: DocumentRecord["qualityCheckedAt"];
   duplicateDecision: DuplicateDecision;
 }): DocumentRecord {
   return {
@@ -93,6 +97,10 @@ export function buildUploadedDocumentRecord(input: {
     reviewStatus: reviewStatusForDuplicateDecision(input.duplicateDecision.duplicateStatus),
     reviewedAt: null,
     reviewedMatchDocumentId: null,
+    qualityStatus: input.qualityStatus,
+    qualityWarnings: input.qualityWarnings,
+    qualityMetrics: input.qualityMetrics,
+    qualityCheckedAt: input.qualityCheckedAt,
     exactHash: input.exactHash,
     perceptualHash: input.perceptualHash,
     notes: null,
@@ -236,6 +244,10 @@ export async function createUploadedDocument(input: {
     normalizedImage: processedImage.normalizedImage,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
+    qualityStatus: processedImage.qualityStatus,
+    qualityWarnings: processedImage.qualityWarnings,
+    qualityMetrics: processedImage.qualityMetrics,
+    qualityCheckedAt: processedImage.qualityCheckedAt,
     duplicateDecision
   });
 
@@ -253,7 +265,9 @@ export async function createUploadedDocument(input: {
     metadata: {
       exactHash,
       perceptualHash: record.perceptualHash,
-      matchedDocumentId: record.matchedDocumentId
+      matchedDocumentId: record.matchedDocumentId,
+      qualityStatus: record.qualityStatus,
+      qualityWarnings: record.qualityWarnings
     },
     createdAt: now
   });
@@ -410,6 +424,16 @@ export function formatReviewStatus(status: ReviewStatus) {
     PENDING: "Pending review",
     CONFIRMED_DUPLICATE: "Confirmed duplicate",
     CONFIRMED_DISTINCT: "Confirmed distinct"
+  };
+
+  return labels[status];
+}
+
+export function formatQualityStatus(status: DocumentRecord["qualityStatus"]) {
+  const labels: Record<DocumentRecord["qualityStatus"], string> = {
+    PASS: "Good",
+    WARN: "Needs attention",
+    FAIL: "Unusable"
   };
 
   return labels[status];

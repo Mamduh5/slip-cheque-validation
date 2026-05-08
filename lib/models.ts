@@ -29,12 +29,22 @@ export const reviewStatuses = [
 
 export const reviewPairDecisions = ["CONFIRMED_DUPLICATE", "CONFIRMED_DISTINCT"] as const;
 
+export const qualityStatuses = ["PASS", "WARN", "FAIL"] as const;
+export const qualityWarningCodes = [
+  "IMAGE_TOO_SMALL",
+  "BLURRY_IMAGE",
+  "TOO_DARK",
+  "TOO_BRIGHT"
+] as const;
+
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
 export type DuplicateStatus = (typeof duplicateStatuses)[number];
 export type ReviewStatus = (typeof reviewStatuses)[number];
 export type ReviewPairDecision = (typeof reviewPairDecisions)[number];
+export type QualityStatus = (typeof qualityStatuses)[number];
+export type QualityWarningCode = (typeof qualityWarningCodes)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -60,6 +70,13 @@ export interface NormalizedImageMetadata {
   algorithm: "normalized-webp-grayscale-v1";
 }
 
+export interface QualityMetrics {
+  width: number;
+  height: number;
+  meanLuminance: number;
+  sharpness: number;
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -78,6 +95,10 @@ export interface DocumentRecord {
   reviewStatus: ReviewStatus;
   reviewedAt: Date | null;
   reviewedMatchDocumentId: string | null;
+  qualityStatus: QualityStatus;
+  qualityWarnings: QualityWarningCode[];
+  qualityMetrics: QualityMetrics | null;
+  qualityCheckedAt: Date | null;
   exactHash: string | null;
   perceptualHash: string | null;
   notes?: string | null;

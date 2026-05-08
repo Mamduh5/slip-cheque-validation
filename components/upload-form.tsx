@@ -2,17 +2,33 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { SourceType } from "@/lib/models";
+import type { QualityStatus, QualityWarningCode, SourceType } from "@/lib/models";
+
+const qualityWarningLabels: Record<QualityWarningCode, string> = {
+  IMAGE_TOO_SMALL: "Image is small. Retake closer if possible.",
+  BLURRY_IMAGE: "Image may be blurry. Keep the camera steady.",
+  TOO_DARK: "Image is dark. Use brighter, even lighting.",
+  TOO_BRIGHT: "Image is bright. Avoid glare and direct reflections."
+};
+
+interface UploadResponse {
+  documentId?: string;
+  error?: string;
+  qualityStatus?: QualityStatus;
+  qualityWarnings?: QualityWarningCode[];
+}
 
 export function UploadForm() {
   const router = useRouter();
   const [sourceType, setSourceType] = useState<SourceType>("CAMERA");
   const [error, setError] = useState<string | null>(null);
+  const [qualityWarnings, setQualityWarnings] = useState<QualityWarningCode[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setQualityWarnings([]);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -21,15 +37,21 @@ export function UploadForm() {
       body: formData
     });
 
-    const payload = (await response.json().catch(() => null)) as
-      | { documentId?: string; error?: string }
-      | null;
+    const payload = (await response.json().catch(() => null)) as UploadResponse | null;
 
     setIsSubmitting(false);
 
     if (!response.ok || !payload?.documentId) {
       setError(payload?.error ?? "Upload failed.");
+      setQualityWarnings(payload?.qualityWarnings ?? []);
       return;
+    }
+
+    if (payload.qualityStatus === "WARN") {
+      window.sessionStorage.setItem(
+        `document-quality-${payload.documentId}`,
+        JSON.stringify(payload.qualityWarnings ?? [])
+      );
     }
 
     router.push(`/documents/${payload.documentId}`);
@@ -84,7 +106,27 @@ export function UploadForm() {
         />
         <p className="mt-2 text-xs text-slate-500">JPEG, PNG, or WebP up to the configured upload limit.</p>
       </div>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      <div className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+        <p className="font-medium text-slate-800">Capture tips</p>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          <li>Place the document on a flat surface.</li>
+          <li>Include all corners inside the image.</li>
+          <li>Avoid glare, deep shadows, and motion blur.</li>
+          <li>Retake if text or edges look soft.</li>
+        </ul>
+      </div>
+      {error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p>{error}</p>
+          {qualityWarnings.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {qualityWarnings.map((warning) => (
+                <li key={warning}>{qualityWarningLabels[warning]}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       <button
         className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"

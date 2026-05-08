@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { DocumentImageProcessingError } from "@/lib/document-processing";
 import { createUploadedDocument } from "@/lib/documents";
+import { ImageQualityFailureError } from "@/lib/image-quality";
 import { uploadFieldsSchema, validateUploadFile } from "@/lib/upload-validation";
 
 export const runtime = "nodejs";
@@ -49,6 +50,18 @@ export async function POST(request: Request) {
       buffer
     });
   } catch (error) {
+    if (error instanceof ImageQualityFailureError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          qualityStatus: error.assessment.qualityStatus,
+          qualityWarnings: error.assessment.qualityWarnings,
+          qualityMetrics: error.assessment.qualityMetrics
+        },
+        { status: 422 }
+      );
+    }
+
     if (error instanceof DocumentImageProcessingError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
@@ -62,6 +75,8 @@ export async function POST(request: Request) {
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,
     reviewStatus: record.reviewStatus,
+    qualityStatus: record.qualityStatus,
+    qualityWarnings: record.qualityWarnings,
     status: record.status
   });
 }

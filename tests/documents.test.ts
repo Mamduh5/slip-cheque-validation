@@ -43,6 +43,15 @@ describe("document helpers", () => {
       },
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
+      qualityStatus: "PASS",
+      qualityWarnings: [],
+      qualityMetrics: {
+        width: 1000,
+        height: 800,
+        meanLuminance: 128,
+        sharpness: 120
+      },
+      qualityCheckedAt: now,
       duplicateDecision: {
         duplicateStatus: "NEW",
         matchedDocumentId: null,
@@ -59,6 +68,8 @@ describe("document helpers", () => {
       reviewStatus: "NOT_REQUIRED",
       reviewedAt: null,
       reviewedMatchDocumentId: null,
+      qualityStatus: "PASS",
+      qualityWarnings: [],
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
       status: "READY"
@@ -90,6 +101,15 @@ describe("document helpers", () => {
       },
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
+      qualityStatus: "PASS",
+      qualityWarnings: [],
+      qualityMetrics: {
+        width: 1000,
+        height: 800,
+        meanLuminance: 128,
+        sharpness: 120
+      },
+      qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z"),
       duplicateDecision: {
         duplicateStatus: "EXACT_DUPLICATE",
         matchedDocumentId,
@@ -126,6 +146,15 @@ describe("document helpers", () => {
       },
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
+      qualityStatus: "WARN",
+      qualityWarnings: ["BLURRY_IMAGE"],
+      qualityMetrics: {
+        width: 1000,
+        height: 800,
+        meanLuminance: 128,
+        sharpness: 12
+      },
+      qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z"),
       duplicateDecision: {
         duplicateStatus: "LIKELY_DUPLICATE",
         matchedDocumentId,
@@ -137,5 +166,7 @@ describe("document helpers", () => {
     expect(record.reviewStatus).toBe("PENDING");
     expect(record.reviewedAt).toBeNull();
     expect(record.reviewedMatchDocumentId).toBeNull();
+    expect(record.qualityStatus).toBe("WARN");
+    expect(record.qualityWarnings).toEqual(["BLURRY_IMAGE"]);
   });
 });

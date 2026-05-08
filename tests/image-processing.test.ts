@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
+import { assessImageQuality } from "../lib/image-quality";
 import { normalizeDocumentImage, normalizedImageAlgorithm, normalizedImageMaxDimension } from "../lib/image-normalization";
 import {
   calculateDHash,
@@ -23,6 +24,20 @@ async function createTestImage(input: { width: number; height: number; left?: nu
       pixels[offset + 2] = value;
     }
   }
+
+  return sharp(pixels, {
+    raw: {
+      width: input.width,
+      height: input.height,
+      channels: 3
+    }
+  })
+    .png()
+    .toBuffer();
+}
+
+async function createSolidImage(input: { width: number; height: number; value: number }) {
+  const pixels = Buffer.alloc(input.width * input.height * 3, input.value);
 
   return sharp(pixels, {
     raw: {
@@ -113,5 +128,42 @@ describe("image normalization and perceptual hashing", () => {
     );
 
     expect(tieBreakMatch?.document._id).toEqual(newerId);
+  });
+
+  it("fails clearly unusable tiny images", async () => {
+    const tiny = await createSolidImage({ width: 120, height: 120, value: 128 });
+
+    await expect(assessImageQuality(tiny)).resolves.toMatchObject({
+      qualityStatus: "FAIL",
+      qualityWarnings: ["IMAGE_TOO_SMALL"],
+      qualityMetrics: {
+        width: 120,
+        height: 120
+      }
+    });
+  });
+
+  it("warns for dark and bright exposure", async () => {
+    const dark = await createSolidImage({ width: 1000, height: 800, value: 20 });
+    const bright = await createSolidImage({ width: 1000, height: 800, value: 240 });
+
+    await expect(assessImageQuality(dark)).resolves.toMatchObject({
+      qualityStatus: "WARN",
+      qualityWarnings: expect.arrayContaining(["TOO_DARK"])
+    });
+    await expect(assessImageQuality(bright)).resolves.toMatchObject({
+      qualityStatus: "WARN",
+      qualityWarnings: expect.arrayContaining(["TOO_BRIGHT"])
+    });
+  });
+
+  it("warns when blur reduces the sharpness heuristic", async () => {
+    const sharpSource = await createTestImage({ width: 1000, height: 800, left: 0, right: 255 });
+    const blurred = await sharp(sharpSource).blur(12).png().toBuffer();
+    const sharpAssessment = await assessImageQuality(sharpSource);
+    const blurredAssessment = await assessImageQuality(blurred);
+
+    expect(sharpAssessment.qualityMetrics.sharpness).toBeGreaterThan(blurredAssessment.qualityMetrics.sharpness);
+    expect(blurredAssessment.qualityWarnings).toContain("BLURRY_IMAGE");
   });
 });

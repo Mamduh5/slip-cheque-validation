@@ -10,13 +10,14 @@
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.
+- Capture quality warnings for photographed documents.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
 - Clear docs and Docker Compose local development.
 
 ## Next Phase
 
-- Add upload preview and clearer processing states.
+- Add upload preview with pre-submit quality warnings.
 - Add tests for registration and auth guard behavior.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
@@ -27,6 +28,7 @@
 
 - Background processing queue.
 - Stronger image normalization for skew, crop, glare, and rotation edge cases.
+- Better client-side camera guidance and preview cropping.
 - Cluster-level duplicate review behavior beyond pair memory.
 - QR extraction for bank transfer slips where available.
 - OCR-assisted field extraction.

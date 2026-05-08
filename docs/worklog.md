@@ -106,6 +106,8 @@
 - `npm run lint`
 - `npm run build`
 - `npm audit --omit=dev`
+- `npm run build`
+- `npm audit --omit=dev`
 
 ### Known Limitations
 
@@ -185,3 +187,38 @@
 - Review memory is pairwise only. It does not infer decisions across clusters or train the dHash matcher.
 - Review notes and reset/reopen review actions are not implemented.
 - OCR, QR extraction, cheque parsing, bank verification, background queues, and microservices remain out of scope.
+
+## 2026-05-09 Capture Quality Signals
+
+### Changed
+
+- Added document-level quality fields: `qualityStatus`, `qualityWarnings`, `qualityMetrics`, and `qualityCheckedAt`.
+- Added lightweight capture-quality analysis during the in-process document image processing step.
+- Added warnings for small images, blurry images, too-dark images, and too-bright images.
+- Added a narrow hard-fail path for clearly unusable tiny images; valid but questionable images continue through upload with `qualityStatus: "WARN"`.
+- Kept quality status separate from machine duplicate status and human review status.
+- Included quality status and warnings in upload and document detail API responses.
+- Added mobile-friendly capture guidance on the upload page and upload form.
+- Added quality status, warning text, and image metrics to document detail.
+- Verified reviewed-pair behavior: a confirmed-distinct pair is suppressed, but the document can still match a different candidate later.
+- Added tests for small-image failure, blur/sharpness behavior, dark/bright warnings, upload warning persistence, hard quality failure, quality API exposure, and reviewed-pair candidate behavior.
+
+### Key Decisions
+
+- Quality checks are conservative and explainable heuristics, not document verification.
+- Most quality issues are warnings, not blockers.
+- The only hard fail is a clearly unusable image below minimum usable dimensions.
+- No ML, OCR, QR parsing, cheque parsing, bank verification, queues, or microservices were added.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+
+### Known Limitations
+
+- Blur detection uses a simple Laplacian-variance heuristic and can misread blank or highly graphic documents.
+- Exposure checks use average luminance and may miss local glare or shadows.
+- There is no client-side pre-submit quality analysis yet; warnings are shown after upload on failure or on the resulting detail page.
+- The app does not detect all document corners or correct perspective skew.

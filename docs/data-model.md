@@ -46,6 +46,13 @@ Stores one registry record per uploaded document image.
 | `reviewStatus` | enum | Human review state: `NOT_REQUIRED`, `PENDING`, `CONFIRMED_DUPLICATE`, `CONFIRMED_DISTINCT`. |
 | `reviewedAt` | Date \| null | When the owner made the review decision. |
 | `reviewedMatchDocumentId` | string \| null | Matched document id that was reviewed. |
+| `qualityStatus` | enum | Capture quality signal: `PASS`, `WARN`, or `FAIL`. Persisted records are usually `PASS` or `WARN`; hard-fail uploads are rejected before insert. |
+| `qualityWarnings` | string[] | Warning codes such as `IMAGE_TOO_SMALL`, `BLURRY_IMAGE`, `TOO_DARK`, `TOO_BRIGHT`. |
+| `qualityMetrics.width` | number \| null | Decoded image width in pixels. |
+| `qualityMetrics.height` | number \| null | Decoded image height in pixels. |
+| `qualityMetrics.meanLuminance` | number \| null | Average grayscale luminance used for exposure warnings. |
+| `qualityMetrics.sharpness` | number \| null | Laplacian-variance sharpness heuristic. |
+| `qualityCheckedAt` | Date \| null | Capture quality assessment timestamp. |
 | `exactHash` | string \| null | SHA-256 of the original uploaded bytes. |
 | `perceptualHash` | string \| null | 64-bit dHash of the normalized derivative as 16 hex characters. |
 | `notes` | string \| null | Reserved for internal notes. |
@@ -106,6 +113,21 @@ V1 computes `exactHash` during upload and checks for the earliest existing docum
 - `normalizedObject` points to the generated derivative used for fingerprinting.
 - Normalized derivatives are auto-oriented, resized within 1024x1024, converted to grayscale, lightly normalized, and stored as WebP.
 - Current object key pattern is `documents/{userId}/{documentId}/normalized.webp`.
+
+## Quality Fields
+
+Quality assessment is separate from duplicate detection and human review.
+
+- `PASS`: no current capture warnings.
+- `WARN`: upload is accepted but may be harder to match or review.
+- `FAIL`: clearly unusable image. Current hard-fail uploads are rejected and are not inserted as documents.
+
+Current warning codes:
+
+- `IMAGE_TOO_SMALL`: image is below recommended dimensions, or below minimum usable dimensions for hard fail.
+- `BLURRY_IMAGE`: low Laplacian-variance sharpness heuristic.
+- `TOO_DARK`: low average luminance.
+- `TOO_BRIGHT`: high average luminance, often glare or overexposure.
 
 ## Ownership Rules
 

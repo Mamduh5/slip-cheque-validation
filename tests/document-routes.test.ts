@@ -6,6 +6,7 @@ import { GET as getOriginalDocument } from "../app/api/documents/[id]/original/r
 import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
+import { ImageQualityFailureError } from "../lib/image-quality";
 import type { DocumentRecord, DuplicateReviewPairRecord } from "../lib/models";
 
 const testState = vi.hoisted(() => ({
@@ -203,6 +204,8 @@ async function upload(bytes?: string) {
       duplicateStatus?: string;
       matchedDocumentId?: string | null;
       similarityScore?: number | null;
+      qualityStatus?: string;
+      qualityWarnings?: string[];
       error?: string;
     }
   };
@@ -227,7 +230,16 @@ describe("document API integration boundaries", () => {
         fileSize: 128,
         algorithm: "normalized-webp-grayscale-v1"
       },
-      perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000"
+      perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
+      qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
+      qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
+      qualityMetrics: {
+        width: 1000,
+        height: 800,
+        meanLuminance: 128,
+        sharpness: input.buffer.toString("utf8").includes("warn") ? 12 : 120
+      },
+      qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z")
     }));
     testState.getOriginalDocumentObject.mockReset();
     testState.getOriginalDocumentObject.mockResolvedValue(Readable.from([Buffer.from("image")]));
@@ -252,6 +264,8 @@ describe("document API integration boundaries", () => {
       matchedDocumentId: null,
       similarityScore: null,
       perceptualHash: "0000000000000000",
+      qualityStatus: "PASS",
+      qualityWarnings: [],
       normalizedObject: {
         key: expect.stringContaining("/normalized.webp")
       }
@@ -397,6 +411,38 @@ describe("document API integration boundaries", () => {
     expect(match).toBeNull();
   });
 
+  it("skips a reviewed distinct pair but can still select a different candidate", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DISTINCT" })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+    const thirdId = new ObjectId();
+    testState.documents.push({
+      ...testState.documents[0],
+      _id: thirdId,
+      originalFilename: "third-near.jpg",
+      exactHash: "different-third-hash",
+      createdAt: new Date("2026-05-08T10:00:02.000Z"),
+      updatedAt: new Date("2026-05-08T10:00:02.000Z")
+    });
+
+    const match = await findLikelyDuplicateMatchForUser({
+      userId: "user-1",
+      documentId: new ObjectId(second.body.documentId),
+      perceptualHash: "ffff0000ffff0000",
+      excludeDocumentId: new ObjectId(second.body.documentId)
+    });
+
+    expect(String(match?.document._id)).toBe(String(thirdId));
+  });
+
   it("filters documents by review status for dashboard queries", async () => {
     setSession("user-1");
 
@@ -420,6 +466,56 @@ describe("document API integration boundaries", () => {
     expect(confirmedDistinct).toHaveLength(1);
     expect(confirmedDistinct[0].reviewStatus).toBe("CONFIRMED_DISTINCT");
     expect(pending).toHaveLength(0);
+  });
+
+  it("continues uploads with quality warnings and persists the quality metadata", async () => {
+    setSession("user-1");
+
+    const { response, body } = await upload("warn image bytes");
+
+    expect(response.status).toBe(200);
+    expect(body.qualityStatus).toBe("WARN");
+    expect(body.qualityWarnings).toEqual(["BLURRY_IMAGE"]);
+    expect(testState.documents[0]).toMatchObject({
+      qualityStatus: "WARN",
+      qualityWarnings: ["BLURRY_IMAGE"],
+      qualityMetrics: {
+        sharpness: 12
+      }
+    });
+
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as { qualityStatus: string; qualityWarnings: string[] };
+
+    expect(detail.qualityStatus).toBe("WARN");
+    expect(detail.qualityWarnings).toEqual(["BLURRY_IMAGE"]);
+  });
+
+  it("rejects hard-failed quality assessment without creating a document", async () => {
+    setSession("user-1");
+    testState.processUploadedDocumentImage.mockRejectedValueOnce(
+      new ImageQualityFailureError({
+        qualityStatus: "FAIL",
+        qualityWarnings: ["IMAGE_TOO_SMALL"],
+        qualityMetrics: {
+          width: 100,
+          height: 100,
+          meanLuminance: 128,
+          sharpness: 20
+        },
+        qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z")
+      })
+    );
+
+    const { response, body } = await upload("tiny image bytes");
+
+    expect(response.status).toBe(422);
+    expect(body.error).toContain("too small");
+    expect(body.qualityStatus).toBe("FAIL");
+    expect(body.qualityWarnings).toEqual(["IMAGE_TOO_SMALL"]);
+    expect(testState.documents).toHaveLength(0);
   });
 
   it("rejects unauthenticated uploads", async () => {
