@@ -8,8 +8,9 @@
 - Protected dashboard and upload pages.
 - Original image upload storage.
 - Exact duplicate detection using SHA-256 file hashes.
+- Normalized image derivative generation and dHash near-duplicate detection.
 - Owner-only document detail and original-image access.
-- Document records with near-duplicate-ready fields.
+- Document records with exact and likely duplicate fields.
 - Clear docs and Docker Compose local development.
 
 ## Next Phase
@@ -19,12 +20,12 @@
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
+- Add review workflow affordances for `LIKELY_DUPLICATE` results.
 
 ## Later Phases
 
 - Background processing queue.
-- Image normalization and perceptual hash generation.
-- Near-duplicate similarity search.
+- Stronger image normalization for skew, crop, glare, and rotation edge cases.
 - QR extraction for bank transfer slips where available.
 - OCR-assisted field extraction.
 - Cheque-specific field extraction.

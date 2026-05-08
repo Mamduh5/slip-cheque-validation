@@ -33,6 +33,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     similarityScore: document.similarityScore,
     exactHash: document.exactHash,
     perceptualHash: document.perceptualHash,
+    normalizedObject: document.normalizedObject,
+    normalizedImage: document.normalizedImage,
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString()
   });

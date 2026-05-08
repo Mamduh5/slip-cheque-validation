@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { DocumentImageProcessingError } from "@/lib/document-processing";
 import { createUploadedDocument } from "@/lib/documents";
 import { uploadFieldsSchema, validateUploadFile } from "@/lib/upload-validation";
 
@@ -34,16 +35,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: fileError }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const record = await createUploadedDocument({
-    userId: session.user.id,
-    documentType: parsedFields.data.documentType,
-    sourceType: parsedFields.data.sourceType,
-    originalFilename: file.name || "document-image",
-    mimeType: file.type,
-    fileSize: file.size,
-    buffer
-  });
+  let record;
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    record = await createUploadedDocument({
+      userId: session.user.id,
+      documentType: parsedFields.data.documentType,
+      sourceType: parsedFields.data.sourceType,
+      originalFilename: file.name || "document-image",
+      mimeType: file.type,
+      fileSize: file.size,
+      buffer
+    });
+  } catch (error) {
+    if (error instanceof DocumentImageProcessingError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     documentId: String(record._id),

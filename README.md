@@ -1,6 +1,6 @@
 # Document Registry Checker
 
-V1 is a duplicate-document registry and checker for paper financial document images. Users sign in, upload or capture an image, and the app stores the original file plus metadata for exact duplicate detection.
+V1 is a duplicate-document registry and checker for paper financial document images. Users sign in, upload or capture an image, and the app stores the original file plus metadata for exact and likely duplicate detection.
 
 This is not real bank verification, OCR-first processing, cheque clearing, or banking integration.
 
@@ -12,8 +12,9 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Auth supports email/password and optional Google sign-in.
 - Protected dashboard, upload flow, and document result/detail page.
 - Exact duplicate detection is implemented using SHA-256 file hashes.
+- Near-duplicate detection is implemented using a normalized image derivative and 64-bit dHash.
 - Document records and original-image previews are owner-only.
-- Near-duplicate matching fields exist, but perceptual hashing and OCR are intentionally not implemented yet.
+- OCR, QR extraction, cheque parsing, and bank verification are intentionally not implemented yet.
 
 ## Run Locally With Docker
 
@@ -69,18 +70,21 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - NextAuth uses JWT sessions, with MongoDB user records created for credentials and Google auth.
 - MinIO bucket creation is lazy: the upload service creates the configured bucket if it does not exist.
 - Uploads compute an exact SHA-256 hash and compare it with existing document records owned by the same user.
+- Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
+- The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.
+- The perceptual hash is 64-bit dHash computed from the normalized derivative. dHash was chosen because it is simple, deterministic, fast, and adequate for a conservative first near-duplicate signal.
 - Every upload creates an auditable document record. Exact duplicates are marked `EXACT_DUPLICATE` and linked to the earliest matching document.
 - Exact-match selection is deterministic: oldest `createdAt` wins, with `_id` as a stable tie-breaker.
+- Likely duplicates are marked `LIKELY_DUPLICATE` when no exact match exists and an owner-owned perceptual hash is within Hamming distance `8`. `similarityScore` is `1 - distance / 64`.
 - API upload, document detail, and original-image routes require authentication. Missing or non-owned documents return `404` for owner-scoped lookups, so another user's document existence is not exposed.
 - TypeScript imports use the `@/*` `paths` alias without `baseUrl`, which avoids relying on deprecated `baseUrl` behavior.
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, unauthenticated upload rejection, and owner-only document detail/original-image access.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 ## Intentionally Not Implemented Yet
 
-- Near-duplicate image matching.
 - OCR or field extraction.
 - QR extraction for slips.
 - Cheque verification or clearing integration.

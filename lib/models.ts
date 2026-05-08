@@ -14,6 +14,7 @@ export const duplicateStatuses = [
   "PENDING",
   "NEW",
   "EXACT_DUPLICATE",
+  "LIKELY_DUPLICATE",
   "DUPLICATE",
   "POSSIBLE_DUPLICATE",
   "ERROR"
@@ -40,6 +41,14 @@ export interface StoredObjectRef {
   key: string;
 }
 
+export interface NormalizedImageMetadata {
+  width: number;
+  height: number;
+  mimeType: "image/webp";
+  fileSize: number;
+  algorithm: "normalized-webp-grayscale-v1";
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -49,6 +58,8 @@ export interface DocumentRecord {
   mimeType: string;
   fileSize: number;
   originalObject: StoredObjectRef;
+  normalizedObject: StoredObjectRef | null;
+  normalizedImage: NormalizedImageMetadata | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;

@@ -33,7 +33,16 @@ describe("document helpers", () => {
       mimeType: "image/jpeg",
       fileSize: 128,
       originalObject: { bucket: "document-images", key: "documents/user-1/id/original.jpg" },
+      normalizedObject: { bucket: "document-images", key: "documents/user-1/id/normalized.webp" },
+      normalizedImage: {
+        width: 32,
+        height: 24,
+        mimeType: "image/webp",
+        fileSize: 96,
+        algorithm: "normalized-webp-grayscale-v1"
+      },
       exactHash: "abc123",
+      perceptualHash: "0000000000000000",
       duplicateDecision: {
         duplicateStatus: "NEW",
         matchedDocumentId: null,
@@ -48,8 +57,8 @@ describe("document helpers", () => {
       matchedDocumentId: null,
       similarityScore: null,
       exactHash: "abc123",
-      perceptualHash: null,
-      status: "UPLOADED"
+      perceptualHash: "0000000000000000",
+      status: "READY"
     });
     expect(record.createdAt).toBe(now);
     expect(record.updatedAt).toBe(now);
@@ -68,7 +77,16 @@ describe("document helpers", () => {
       mimeType: "image/webp",
       fileSize: 256,
       originalObject: { bucket: "document-images", key: "documents/user-2/id/original.webp" },
+      normalizedObject: { bucket: "document-images", key: "documents/user-2/id/normalized.webp" },
+      normalizedImage: {
+        width: 32,
+        height: 24,
+        mimeType: "image/webp",
+        fileSize: 96,
+        algorithm: "normalized-webp-grayscale-v1"
+      },
       exactHash: "abc123",
+      perceptualHash: "ffffffffffffffff",
       duplicateDecision: {
         duplicateStatus: "EXACT_DUPLICATE",
         matchedDocumentId,

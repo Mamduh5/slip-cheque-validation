@@ -16,6 +16,26 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
+function formatSimilarity(score: number | null) {
+  if (score === null) {
+    return "Not available";
+  }
+
+  return `${Math.round(score * 100)}%`;
+}
+
+function matchDescription(status: string) {
+  if (status === "EXACT_DUPLICATE") {
+    return "Exact byte-level match with";
+  }
+
+  if (status === "LIKELY_DUPLICATE") {
+    return "Likely same document as";
+  }
+
+  return "Matched with";
+}
+
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
@@ -61,8 +81,9 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             ["MIME type", document.mimeType],
             ["File size", formatBytes(document.fileSize)],
             ["Duplicate status", formatDuplicateStatus(document.duplicateStatus)],
-            ["Similarity score", document.similarityScore === null ? "Not available" : String(document.similarityScore)],
-            ["Perceptual hash", document.perceptualHash ?? "Not generated"]
+            ["Similarity", formatSimilarity(document.similarityScore)],
+            ["Perceptual hash", document.perceptualHash ?? "Not generated"],
+            ["Normalized image", document.normalizedImage ? `${document.normalizedImage.width}x${document.normalizedImage.height} WebP` : "Not generated"]
           ].map(([label, value]) => (
             <div className="rounded-md border border-line p-3" key={label}>
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
@@ -76,7 +97,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           <dd className="mt-1 break-words text-sm">
             {matchedDocument ? (
               <span>
-                Exact byte-level match with{" "}
+                {matchDescription(document.duplicateStatus)}{" "}
                 <Link
                   className="font-medium text-accent hover:text-accent-dark"
                   href={`/documents/${String(matchedDocument._id)}`}
@@ -95,6 +116,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
         <div className="mt-6 rounded-md border border-line bg-slate-50 p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Exact hash</dt>
           <dd className="mt-1 break-all font-mono text-xs">{document.exactHash ?? "Not calculated"}</dd>
+        </div>
+        <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Normalized object</dt>
+          <dd className="mt-1 break-all font-mono text-xs">{document.normalizedObject?.key ?? "Not generated"}</dd>
         </div>
       </div>
     </section>

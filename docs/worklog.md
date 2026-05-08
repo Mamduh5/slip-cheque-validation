@@ -109,3 +109,41 @@
 
 - Concurrent identical uploads from the same user can still race if both requests check before either insert is visible; both could be marked `NEW`. Fixing that cleanly likely needs a per-user hash claim, transaction strategy, or reconciliation pass.
 - Perceptual hashing, OCR, QR extraction, cheque parsing, and bank verification remain intentionally out of scope.
+
+## 2026-05-08 Near Duplicate Image Stage
+
+### Changed
+
+- Added Sharp as the image-processing dependency for robust JPEG, PNG, and WebP decoding plus EXIF orientation support.
+- Added an in-process document processing boundary in `lib/document-processing.ts`.
+- Kept original uploaded files unchanged in MinIO.
+- Added normalized grayscale WebP derivatives at `documents/{userId}/{documentId}/normalized.webp`.
+- Added normalized image metadata to document records.
+- Added 64-bit dHash generation from normalized derivatives.
+- Added `LIKELY_DUPLICATE` duplicate status.
+- Implemented exact-first duplicate resolution: exact SHA-256 matches always win over near matches.
+- Implemented owner-scoped near-duplicate lookup using dHash Hamming distance.
+- Added deterministic likely match selection: lowest Hamming distance, then oldest `createdAt`, then lowest `_id`.
+- Added UI support for likely duplicate labels, matched document wording, similarity display, perceptual hash, and normalized derivative metadata.
+- Added tests for normalization, dHash helpers, exact-vs-near decision ordering, owner-scoped likely duplicate isolation, deterministic candidate selection, and upload route likely duplicate outcomes.
+
+### Key Decisions
+
+- dHash was chosen over pHash for v1 because it is simpler, deterministic, fast, and easy to explain. It is enough for a conservative first image-only near-duplicate signal.
+- The likely duplicate threshold is Hamming distance `<= 8` out of 64 bits.
+- `similarityScore` means `1 - hammingDistance / 64` for likely duplicates and remains `1` for exact duplicates.
+- Processing still runs in-process during upload; no queue, worker, microservice, ML, OCR, QR parsing, cheque parsing, or bank verification was added.
+
+### Verification
+
+- `npm install sharp`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+
+### Known Limitations
+
+- dHash is a visual similarity signal, not proof that two documents are the same financial instrument.
+- The current normalization does not correct perspective skew, heavy cropping, glare, occlusion, handwritten changes, or extreme rotations.
+- Near-duplicate matching fetches a bounded set of owner candidates and scores them in-process; this is acceptable for v1 but may need indexing or bucketing as volume grows.
+- Concurrent same-user uploads can still race before either record is visible to duplicate lookup.

@@ -10,6 +10,7 @@ const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,
   documents: [] as DocumentRecord[],
   auditLogs: [] as unknown[],
+  processUploadedDocumentImage: vi.fn(),
   getOriginalDocumentObject: vi.fn()
 }));
 
@@ -27,6 +28,11 @@ vi.mock("@/lib/object-storage", () => ({
     key: input.objectKey
   })),
   getOriginalDocumentObject: testState.getOriginalDocumentObject
+}));
+
+vi.mock("@/lib/document-processing", () => ({
+  DocumentImageProcessingError: class DocumentImageProcessingError extends Error {},
+  processUploadedDocumentImage: testState.processUploadedDocumentImage
 }));
 
 vi.mock("@/lib/mongodb", () => ({
@@ -74,6 +80,10 @@ function matchesQuery(document: DocumentRecord, query: Record<string, unknown>) 
   return Object.entries(query).every(([key, value]) => {
     if (key === "_id" && typeof value === "object" && value !== null && "$ne" in value) {
       return String(document._id) !== String((value as { $ne: ObjectId }).$ne);
+    }
+
+    if (typeof value === "object" && value !== null && "$ne" in value) {
+      return document[key as keyof DocumentRecord] !== (value as { $ne: unknown }).$ne;
     }
 
     if (key === "_id") {
@@ -147,6 +157,21 @@ describe("document API integration boundaries", () => {
     setSession(null);
     testState.documents.length = 0;
     testState.auditLogs.length = 0;
+    testState.processUploadedDocumentImage.mockReset();
+    testState.processUploadedDocumentImage.mockImplementation(async (input: { userId: string; documentId: string; buffer: Buffer }) => ({
+      normalizedObject: {
+        bucket: "document-images",
+        key: `documents/${input.userId}/${input.documentId}/normalized.webp`
+      },
+      normalizedImage: {
+        width: 32,
+        height: 24,
+        mimeType: "image/webp",
+        fileSize: 128,
+        algorithm: "normalized-webp-grayscale-v1"
+      },
+      perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000"
+    }));
     testState.getOriginalDocumentObject.mockReset();
     testState.getOriginalDocumentObject.mockResolvedValue(Readable.from([Buffer.from("image")]));
   });
@@ -164,9 +189,14 @@ describe("document API integration boundaries", () => {
     expect(testState.documents).toHaveLength(1);
     expect(testState.documents[0]).toMatchObject({
       userId: "user-1",
+      status: "READY",
       duplicateStatus: "NEW",
       matchedDocumentId: null,
-      similarityScore: null
+      similarityScore: null,
+      perceptualHash: "0000000000000000",
+      normalizedObject: {
+        key: expect.stringContaining("/normalized.webp")
+      }
     });
   });
 
@@ -192,6 +222,18 @@ describe("document API integration boundaries", () => {
     });
   });
 
+  it("creates a likely duplicate when bytes differ but the owner-scoped perceptual hash is close", async () => {
+    setSession("user-1");
+
+    const first = await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+
+    expect(second.body.documentId).not.toBe(first.body.documentId);
+    expect(second.body.duplicateStatus).toBe("LIKELY_DUPLICATE");
+    expect(second.body.matchedDocumentId).toBe(first.body.documentId);
+    expect(second.body.similarityScore).toBe(1);
+  });
+
   it("rejects unauthenticated uploads", async () => {
     setSession(null);
 
@@ -208,6 +250,17 @@ describe("document API integration boundaries", () => {
 
     setSession("user-2");
     const secondUserUpload = await upload();
+
+    expect(secondUserUpload.body.duplicateStatus).toBe("NEW");
+    expect(secondUserUpload.body.matchedDocumentId).toBeNull();
+  });
+
+  it("does not expose another user's near duplicate through perceptual matching", async () => {
+    setSession("user-1");
+    await upload("near owner image bytes");
+
+    setSession("user-2");
+    const secondUserUpload = await upload("near other owner image bytes");
 
     expect(secondUserUpload.body.duplicateStatus).toBe("NEW");
     expect(secondUserUpload.body.matchedDocumentId).toBeNull();

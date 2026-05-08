@@ -32,16 +32,17 @@ MongoDB stores application records:
 - `documents`: uploaded document registry records.
 - `audit_logs`: lightweight audit entries for early lifecycle events.
 
-The document service creates basic indexes lazily for user document listing, exact hash lookup, and duplicate status lookup.
+The document service creates basic indexes lazily for user document listing, owner-scoped exact hash lookup, owner-scoped perceptual hash candidate lookup, and duplicate status lookup.
 
 ## MinIO
 
-MinIO stores original uploaded images. The app uses a small object-storage helper in `lib/object-storage.ts`.
+MinIO stores original uploaded images and normalized derivatives. The app uses a small object-storage helper in `lib/object-storage.ts`.
 
 The configured bucket is created lazily on upload if it does not already exist. Object keys use:
 
 ```text
 documents/{userId}/{documentId}/original.{ext}
+documents/{userId}/{documentId}/normalized.webp
 ```
 
 ## Upload Flow
@@ -51,26 +52,43 @@ documents/{userId}/{documentId}/original.{ext}
 3. Server validates metadata, MIME type, and file size.
 4. Server computes a SHA-256 exact file hash.
 5. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
-6. Original image is stored in MinIO.
-7. A new document record is inserted into MongoDB for auditability.
-8. If no match exists, `duplicateStatus` is `NEW`.
-9. If a match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
-10. User is redirected to `/documents/{id}`.
+6. The in-process document processing service validates the image, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
+7. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
+8. Original image bytes are stored unchanged in MinIO.
+9. A new document record is inserted into MongoDB for auditability.
+10. If no match exists, `duplicateStatus` is `NEW`.
+11. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
+12. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
+13. User is redirected to `/documents/{id}`.
 
 Exact-match selection is deterministic: matching candidates are sorted by `createdAt ASC` and then `_id ASC`. The pending upload's generated id is excluded from the lookup, so the current upload cannot become its own match. If several exact matches already exist for the same owner, new duplicates link to the earliest record by that ordering.
 
-## Future Duplicate Pipeline
+## Normalized Image And Perceptual Hashing
 
-The current upload flow implements exact duplicate detection and prepares fields for future processing:
+The normalized-image stage is intentionally small and in-process. It does not use a queue or separate worker yet.
 
-- `exactHash`: exact byte-level duplicate lookup, active now.
-- `perceptualHash`: normalized image similarity placeholder.
-- `duplicateStatus`: exact-match state such as `NEW` or `EXACT_DUPLICATE`; future stages may use `POSSIBLE_DUPLICATE`.
+- Original uploads are stored unchanged.
+- Normalized derivatives are stored as WebP at `documents/{userId}/{documentId}/normalized.webp`.
+- Normalization uses Sharp to auto-orient, resize within 1024x1024, convert to grayscale, apply light contrast normalization, and encode as WebP.
+- The chosen perceptual hash is 64-bit dHash. It is simpler than pHash, fast to compute, deterministic, and easy to explain for this v1 stage.
+- dHash compares adjacent grayscale pixels after resizing the normalized image to 9x8.
+- Likely duplicate threshold is Hamming distance `<= 8`, a conservative starting point.
+- Likely duplicate `similarityScore` means `1 - hammingDistance / 64`, rounded to four decimals. Exact duplicates continue to use `1`.
+
+## Duplicate Fields
+
+- `exactHash`: exact byte-level duplicate lookup.
+- `perceptualHash`: dHash from the normalized derivative.
+- `duplicateStatus`: `NEW`, `EXACT_DUPLICATE`, or `LIKELY_DUPLICATE` for current v1 uploads.
 - `matchedDocumentId`: related document when a duplicate is found.
-- `similarityScore`: future near-match score.
+- `similarityScore`: `1` for exact duplicates, or dHash similarity for likely duplicates.
 
-Likely next steps are a background image normalization and perceptual-hash stage. OCR, QR extraction, and cheque field extraction should remain later pipeline stages, not the core v1 intake path.
+Near-duplicate candidate selection is deterministic: lowest Hamming distance wins, then oldest `createdAt`, then lowest `_id`. Candidates are owner-scoped and the current upload id is excluded.
+
+OCR, QR extraction, cheque field extraction, and bank verification remain later pipeline stages, not the core v1 intake path.
 
 ## Known Limitations
 
 Concurrent uploads of identical bytes by the same user can still race: two requests that both perform the duplicate lookup before either insert commits may both be marked `NEW`. A later pass can address this with a per-user hash claim, transaction strategy, or post-insert reconciliation if the product needs strong concurrent duplicate guarantees.
+
+Near-duplicate matching is intentionally conservative and image-only. dHash may miss rotated, heavily cropped, warped, occluded, or very low-quality photos, and it may still produce false positives for visually similar documents. It should be treated as a review signal, not financial verification.

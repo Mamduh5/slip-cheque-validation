@@ -39,6 +39,23 @@ export async function putOriginalDocumentObject(input: {
   };
 }
 
+export async function putNormalizedDocumentObject(input: {
+  objectKey: string;
+  buffer: Buffer;
+}) {
+  const bucket = await ensureDocumentBucket();
+
+  await minioClient.putObject(bucket, input.objectKey, input.buffer, input.buffer.length, {
+    "Content-Type": "image/webp",
+    "X-Derivative-Type": "normalized"
+  });
+
+  return {
+    bucket,
+    key: input.objectKey
+  };
+}
+
 export function getOriginalDocumentObject(bucket: string, key: string) {
   return minioClient.getObject(bucket, key);
 }
