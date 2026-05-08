@@ -33,9 +33,9 @@ Stores one registry record per uploaded document image.
 | `originalObject.bucket` | string | MinIO bucket. |
 | `originalObject.key` | string | MinIO object key. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
-| `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
-| `matchedDocumentId` | string \| null | Future duplicate match reference. |
-| `similarityScore` | number \| null | Future near-duplicate score. |
+| `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
+| `matchedDocumentId` | string \| null | Match reference for exact duplicates; null for new documents. |
+| `similarityScore` | number \| null | `1` for exact duplicates; future near-duplicate score otherwise. |
 | `exactHash` | string \| null | SHA-256 of the original uploaded bytes. |
 | `perceptualHash` | string \| null | Placeholder for future normalized image fingerprint. |
 | `notes` | string \| null | Reserved for internal notes. |
@@ -58,4 +58,10 @@ Optional lightweight audit collection.
 
 ## Duplicate-Check Fields
 
-V1 records upload data and sets `duplicateStatus` to `NOT_CHECKED`. Later phases should update this field based on exact hash, perceptual hash, and similarity search results.
+V1 computes `exactHash` during upload and checks for the earliest existing document with the same hash.
+
+- New unique uploads are stored with `duplicateStatus: "NEW"`.
+- Exact duplicate uploads still create a new document record for auditability.
+- Exact duplicate records use `duplicateStatus: "EXACT_DUPLICATE"`, set `matchedDocumentId`, and set `similarityScore` to `1`.
+- `NOT_CHECKED` remains in the enum for older or future deferred-processing records.
+- `perceptualHash` remains null until near-duplicate image matching is implemented.

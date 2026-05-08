@@ -13,6 +13,7 @@ export const duplicateStatuses = [
   "NOT_CHECKED",
   "PENDING",
   "NEW",
+  "EXACT_DUPLICATE",
   "DUPLICATE",
   "POSSIBLE_DUPLICATE",
   "ERROR"

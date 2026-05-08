@@ -7,16 +7,16 @@
 - Email/password auth and optional Google auth.
 - Protected dashboard and upload pages.
 - Original image upload storage.
-- Document records with duplicate-check-ready fields.
+- Exact duplicate detection using SHA-256 file hashes.
+- Document records with near-duplicate-ready fields.
 - Clear docs and Docker Compose local development.
 
 ## Next Phase
 
-- Add exact duplicate detection by querying `exactHash`.
-- Set `duplicateStatus` to `NEW` or `DUPLICATE` during upload.
 - Add upload preview and clearer processing states.
-- Add tests for registration, auth guard behavior, and upload validation.
+- Add tests for registration, auth guard behavior, and authenticated upload.
 - Add document list filtering by type and status.
+- Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 
 ## Later Phases
 

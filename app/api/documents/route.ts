@@ -48,6 +48,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     documentId: String(record._id),
     duplicateStatus: record.duplicateStatus,
+    matchedDocumentId: record.matchedDocumentId,
     status: record.status
   });
 }

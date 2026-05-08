@@ -1,6 +1,6 @@
 # Document Registry Checker
 
-V1 is a duplicate-document registry and checker scaffold for paper financial document images. Users sign in, upload or capture an image, and the app stores the original file plus metadata for later duplicate detection.
+V1 is a duplicate-document registry and checker for paper financial document images. Users sign in, upload or capture an image, and the app stores the original file plus metadata for exact duplicate detection.
 
 This is not real bank verification, OCR-first processing, cheque clearing, or banking integration.
 
@@ -11,7 +11,8 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - MinIO stores original uploaded document images.
 - Auth supports email/password and optional Google sign-in.
 - Protected dashboard, upload flow, and document result/detail page.
-- Duplicate detection fields exist, but matching is intentionally not implemented yet.
+- Exact duplicate detection is implemented using SHA-256 file hashes.
+- Near-duplicate matching fields exist, but perceptual hashing and OCR are intentionally not implemented yet.
 
 ## Run Locally With Docker
 
@@ -43,6 +44,7 @@ npm install
 npm run dev
 npm run typecheck
 npm run lint
+npm run test
 npm run build
 ```
 
@@ -65,11 +67,13 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - MongoDB native driver keeps data access explicit and small.
 - NextAuth uses JWT sessions, with MongoDB user records created for credentials and Google auth.
 - MinIO bucket creation is lazy: the upload service creates the configured bucket if it does not exist.
-- Uploads compute an exact SHA-256 hash now, but duplicate decisions remain `NOT_CHECKED`.
+- Uploads compute an exact SHA-256 hash and compare it with existing document records.
+- Every upload creates an auditable document record. Exact duplicates are marked `EXACT_DUPLICATE` and linked to the earliest matching document.
+- TypeScript imports use the `@/*` `paths` alias without `baseUrl`, which avoids relying on deprecated `baseUrl` behavior.
 
 ## Intentionally Not Implemented Yet
 
-- Real duplicate matching.
+- Near-duplicate image matching.
 - OCR or field extraction.
 - QR extraction for slips.
 - Cheque verification or clearing integration.

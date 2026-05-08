@@ -20,7 +20,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-semibold">Dashboard</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Recent uploads and placeholder duplicate-check state.
+            Recent uploads and exact duplicate-check state.
           </p>
         </div>
         <Link

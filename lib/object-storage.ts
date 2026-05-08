@@ -38,3 +38,7 @@ export async function putOriginalDocumentObject(input: {
     key: input.objectKey
   };
 }
+
+export function getOriginalDocumentObject(bucket: string, key: string) {
+  return minioClient.getObject(bucket, key);
+}

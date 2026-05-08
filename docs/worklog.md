@@ -19,7 +19,7 @@
 
 - V1 remains a single web app instead of split frontend/backend services.
 - Document intake is shared across transfer slips, deposit/payment slips, cheques, and unknown documents.
-- Duplicate matching is represented in the data model but not implemented yet.
+- Initial scaffold prepared duplicate matching fields; exact duplicate matching was implemented in the later pass below.
 - MinIO stores original image files; MongoDB stores metadata and processing state.
 - Google sign-in is optional and disabled in the UI when OAuth env values are missing.
 
@@ -41,6 +41,38 @@
 
 ### Pending Items
 
-- Add automated tests.
-- Implement exact duplicate lookup.
-- Add image preview and richer upload progress.
+- Add richer upload progress.
+- Add integration tests around authenticated upload.
+
+## 2026-05-08 Exact Duplicate Pass
+
+### Changed
+
+- Removed `baseUrl` from `tsconfig.json` and kept the `@/*` alias through `paths`.
+- Added exact duplicate detection using the existing SHA-256 file hash.
+- Added `EXACT_DUPLICATE` to duplicate statuses.
+- Kept one MongoDB document record per upload for auditability.
+- Exact duplicate records now link to the earliest matching document through `matchedDocumentId` and set `similarityScore` to `1`.
+- Added a protected original-image route for document previews.
+- Updated dashboard, upload guidance, and document detail UI to surface exact duplicate status and matched document references.
+- Added Vitest unit tests for duplicate decisions, document record construction, hash/key helpers, and upload validation.
+
+### Key Decisions
+
+- Exact duplicate matching is system-wide by `exactHash`, not limited to the current user.
+- Duplicate uploads create a new record instead of reusing the existing one, preserving upload history and auditability.
+- Near-duplicate, OCR, QR, and cheque parsing remain out of scope.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm audit --omit=dev`
+
+### Pending Items
+
+- Add integration coverage for authenticated multipart uploads.
+- Add old-record migration/backfill if any documents exist with `NOT_CHECKED`.
+- Add perceptual-hash near-duplicate detection in a later phase.

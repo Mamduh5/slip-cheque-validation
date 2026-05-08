@@ -34,7 +34,7 @@ export default function HomePage() {
           {[
             ["Upload", "Take a phone photo or select an existing image."],
             ["Register", "Store original image and intake metadata in MongoDB and MinIO."],
-            ["Prepare", "Create duplicate-check placeholders for later processing."]
+            ["Check", "Compare exact file hashes and show duplicate status."]
           ].map(([title, body]) => (
             <div className="rounded-md border border-line p-4" key={title}>
               <h2 className="font-semibold">{title}</h2>

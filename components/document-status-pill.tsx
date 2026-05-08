@@ -5,7 +5,7 @@ export function DocumentStatusPill({ status }: { status: DuplicateStatus }) {
   const tone =
     status === "NEW"
       ? "border-green-200 bg-green-50 text-green-800"
-      : status === "DUPLICATE" || status === "POSSIBLE_DUPLICATE"
+      : status === "EXACT_DUPLICATE" || status === "DUPLICATE" || status === "POSSIBLE_DUPLICATE"
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : "border-slate-200 bg-slate-50 text-slate-700";
 

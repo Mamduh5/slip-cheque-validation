@@ -16,13 +16,19 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-export default async function DocumentDetailPage({ params }: { params: { id: string } }) {
+export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
-  const document = await getDocumentForUser(params.id, user.id);
+  const { id } = await params;
+  const document = await getDocumentForUser(id, user.id);
 
   if (!document) {
     notFound();
   }
+
+  const matchedDocument =
+    document.matchedDocumentId === null
+      ? null
+      : await getDocumentForUser(document.matchedDocumentId, user.id);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
@@ -38,6 +44,15 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
           <DocumentStatusPill status={document.duplicateStatus} />
         </div>
 
+        <div className="mt-6 overflow-hidden rounded-md border border-line bg-slate-50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="max-h-[520px] w-full object-contain"
+            src={`/api/documents/${String(document._id)}/original`}
+            alt="Uploaded financial document preview"
+          />
+        </div>
+
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {[
             ["Document type", document.documentType.replaceAll("_", " ")],
@@ -45,7 +60,7 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
             ["Processing status", document.status],
             ["MIME type", document.mimeType],
             ["File size", formatBytes(document.fileSize)],
-            ["Matched document", document.matchedDocumentId ?? "None"],
+            ["Duplicate status", document.duplicateStatus.replaceAll("_", " ")],
             ["Similarity score", document.similarityScore === null ? "Not available" : String(document.similarityScore)],
             ["Perceptual hash", document.perceptualHash ?? "Not generated"]
           ].map(([label, value]) => (
@@ -54,6 +69,21 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
               <dd className="mt-1 break-words text-sm">{value}</dd>
             </div>
           ))}
+        </div>
+
+        <div className="mt-3 rounded-md border border-line p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Matched document</dt>
+          <dd className="mt-1 break-words text-sm">
+            {matchedDocument ? (
+              <Link className="font-medium text-accent hover:text-accent-dark" href={`/documents/${String(matchedDocument._id)}`}>
+                {matchedDocument.originalFilename}
+              </Link>
+            ) : document.matchedDocumentId ? (
+              <span>{document.matchedDocumentId}</span>
+            ) : (
+              "None"
+            )}
+          </dd>
         </div>
 
         <div className="mt-6 rounded-md border border-line bg-slate-50 p-3">

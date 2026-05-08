@@ -8,6 +8,8 @@
 - `types/`: NextAuth session type extensions.
 - `docs/`: project memory for future work.
 
+Imports use a TypeScript `paths` mapping for `@/*` without `baseUrl`. This keeps existing imports concise while avoiding deprecated `baseUrl` behavior in newer TypeScript versions.
+
 ## Auth
 
 Auth is handled by NextAuth in the same Next.js app.
@@ -46,18 +48,21 @@ documents/{userId}/{documentId}/original.{ext}
 2. Browser sends multipart form data to `POST /api/documents`.
 3. Server validates metadata, MIME type, and file size.
 4. Server computes a SHA-256 exact file hash.
-5. Original image is stored in MinIO.
-6. Document metadata is inserted into MongoDB.
-7. User is redirected to `/documents/{id}`.
+5. Server checks MongoDB for the earliest existing document with the same `exactHash`.
+6. Original image is stored in MinIO.
+7. A new document record is inserted into MongoDB for auditability.
+8. If no match exists, `duplicateStatus` is `NEW`.
+9. If a match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
+10. User is redirected to `/documents/{id}`.
 
 ## Future Duplicate Pipeline
 
-The current upload flow prepares fields for future processing:
+The current upload flow implements exact duplicate detection and prepares fields for future processing:
 
-- `exactHash`: exact byte-level duplicate lookup.
+- `exactHash`: exact byte-level duplicate lookup, active now.
 - `perceptualHash`: normalized image similarity placeholder.
-- `duplicateStatus`: result state such as `NEW`, `DUPLICATE`, or `POSSIBLE_DUPLICATE`.
+- `duplicateStatus`: exact-match state such as `NEW` or `EXACT_DUPLICATE`; future stages may use `POSSIBLE_DUPLICATE`.
 - `matchedDocumentId`: related document when a duplicate is found.
 - `similarityScore`: future near-match score.
 
-Likely next steps are an exact-hash check, then a background image normalization and perceptual-hash stage. OCR, QR extraction, and cheque field extraction should remain later pipeline stages, not the core v1 intake path.
+Likely next steps are a background image normalization and perceptual-hash stage. OCR, QR extraction, and cheque field extraction should remain later pipeline stages, not the core v1 intake path.
