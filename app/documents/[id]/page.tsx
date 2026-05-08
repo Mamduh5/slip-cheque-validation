@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DocumentStatusPill } from "@/components/document-status-pill";
-import { formatDuplicateStatus, getDocumentForUser } from "@/lib/documents";
+import { ReviewActions } from "@/components/review-actions";
+import { ReviewStatusPill } from "@/components/review-status-pill";
+import { formatDuplicateStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
 import { requireUser } from "@/lib/session";
 
 function formatBytes(bytes: number) {
@@ -49,6 +51,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     document.matchedDocumentId === null
       ? null
       : await getDocumentForUser(document.matchedDocumentId, user.id);
+  const canReview =
+    document.duplicateStatus === "LIKELY_DUPLICATE" &&
+    document.reviewStatus === "PENDING" &&
+    matchedDocument !== null;
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
@@ -61,17 +67,54 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             <h1 className="truncate text-2xl font-semibold">{document.originalFilename}</h1>
             <p className="mt-2 text-sm text-slate-600">Uploaded {formatDate(document.createdAt)}</p>
           </div>
-          <DocumentStatusPill status={document.duplicateStatus} />
+          <div className="flex flex-wrap gap-2">
+            <DocumentStatusPill status={document.duplicateStatus} />
+            <ReviewStatusPill status={document.reviewStatus} />
+          </div>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-md border border-line bg-slate-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="max-h-[520px] w-full object-contain"
-            src={`/api/documents/${String(document._id)}/original`}
-            alt="Uploaded financial document preview"
-          />
-        </div>
+        {document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
+          <div className="mt-6">
+            <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm leading-6 text-orange-950">
+              System thinks this is a likely duplicate. Your review status is{" "}
+              <strong>{formatReviewStatus(document.reviewStatus)}</strong>.
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <figure className="overflow-hidden rounded-md border border-line bg-slate-50">
+                <figcaption className="border-b border-line bg-white px-3 py-2 text-sm font-medium">
+                  Current upload
+                </figcaption>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="max-h-[460px] w-full object-contain"
+                  src={`/api/documents/${String(document._id)}/original`}
+                  alt="Current uploaded financial document preview"
+                />
+              </figure>
+              <figure className="overflow-hidden rounded-md border border-line bg-slate-50">
+                <figcaption className="border-b border-line bg-white px-3 py-2 text-sm font-medium">
+                  Matched document
+                </figcaption>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="max-h-[460px] w-full object-contain"
+                  src={`/api/documents/${String(matchedDocument._id)}/original`}
+                  alt="Matched financial document preview"
+                />
+              </figure>
+            </div>
+            {canReview ? <ReviewActions documentId={String(document._id)} /> : null}
+          </div>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-md border border-line bg-slate-50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="max-h-[520px] w-full object-contain"
+              src={`/api/documents/${String(document._id)}/original`}
+              alt="Uploaded financial document preview"
+            />
+          </div>
+        )}
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {[
@@ -80,8 +123,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             ["Processing status", document.status],
             ["MIME type", document.mimeType],
             ["File size", formatBytes(document.fileSize)],
-            ["Duplicate status", formatDuplicateStatus(document.duplicateStatus)],
+            ["Machine status", formatDuplicateStatus(document.duplicateStatus)],
+            ["Review status", formatReviewStatus(document.reviewStatus)],
             ["Similarity", formatSimilarity(document.similarityScore)],
+            ["Reviewed at", document.reviewedAt ? formatDate(document.reviewedAt) : "Not reviewed"],
             ["Perceptual hash", document.perceptualHash ?? "Not generated"],
             ["Normalized image", document.normalizedImage ? `${document.normalizedImage.width}x${document.normalizedImage.height} WebP` : "Not generated"]
           ].map(([label, value]) => (

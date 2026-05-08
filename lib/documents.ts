@@ -4,10 +4,13 @@ import { getDb } from "@/lib/mongodb";
 import { resolveDuplicateDecision } from "@/lib/duplicate-detection";
 import { processUploadedDocumentImage } from "@/lib/document-processing";
 import { selectBestPerceptualMatch } from "@/lib/perceptual-hash";
+import { filterUnreviewedCandidatePairs, upsertReviewedPair } from "@/lib/review-pairs";
 import type {
   DocumentRecord,
   DocumentType,
   DuplicateStatus,
+  ReviewPairDecision,
+  ReviewStatus,
   SourceType
 } from "@/lib/models";
 import { putOriginalDocumentObject } from "@/lib/object-storage";
@@ -35,7 +38,8 @@ async function ensureDocumentIndexes() {
       name: "documents_user_perceptual_hash_created_at_id",
       sparse: true
     },
-    { key: { duplicateStatus: 1 }, name: "documents_duplicate_status" }
+    { key: { duplicateStatus: 1 }, name: "documents_duplicate_status" },
+    { key: { userId: 1, reviewStatus: 1, createdAt: -1 }, name: "documents_user_review_status_created_at" }
   ]);
   indexesReady = true;
 }
@@ -86,6 +90,9 @@ export function buildUploadedDocumentRecord(input: {
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
     similarityScore: input.duplicateDecision.similarityScore,
+    reviewStatus: reviewStatusForDuplicateDecision(input.duplicateDecision.duplicateStatus),
+    reviewedAt: null,
+    reviewedMatchDocumentId: null,
     exactHash: input.exactHash,
     perceptualHash: input.perceptualHash,
     notes: null,
@@ -120,6 +127,7 @@ export async function findEarliestExactMatchForUser(input: {
 
 export async function findLikelyDuplicateMatchForUser(input: {
   userId: string;
+  documentId: ObjectId;
   perceptualHash: string;
   excludeDocumentId?: ObjectId;
 }) {
@@ -149,8 +157,13 @@ export async function findLikelyDuplicateMatchForUser(input: {
     .sort({ createdAt: 1, _id: 1 })
     .limit(200)
     .toArray();
+  const unreviewedCandidates = await filterUnreviewedCandidatePairs({
+    userId: input.userId,
+    documentId: String(input.documentId),
+    candidates
+  });
 
-  return selectBestPerceptualMatch(candidates, input.perceptualHash);
+  return selectBestPerceptualMatch(unreviewedCandidates, input.perceptualHash);
 }
 
 export async function createUploadedDocument(input: {
@@ -188,6 +201,7 @@ export async function createUploadedDocument(input: {
     existingExactMatch === null
       ? await findLikelyDuplicateMatchForUser({
           userId: input.userId,
+          documentId,
           perceptualHash: processedImage.perceptualHash,
           excludeDocumentId: documentId
         })
@@ -247,15 +261,37 @@ export async function createUploadedDocument(input: {
   return record;
 }
 
-export async function getRecentDocumentsForUser(userId: string, limit = 12) {
+export type DocumentReviewFilter = "all" | "pending" | "confirmed-duplicate" | "confirmed-distinct";
+
+export async function getRecentDocumentsForUser(
+  userId: string,
+  input: {
+    limit?: number;
+    reviewFilter?: DocumentReviewFilter;
+  } = {}
+) {
   await ensureDocumentIndexes();
 
   const db = await getDb();
+  const query: {
+    userId: string;
+    reviewStatus?: ReviewStatus;
+  } = { userId };
+  const reviewFilter = input.reviewFilter ?? "all";
+
+  if (reviewFilter === "pending") {
+    query.reviewStatus = "PENDING";
+  } else if (reviewFilter === "confirmed-duplicate") {
+    query.reviewStatus = "CONFIRMED_DUPLICATE";
+  } else if (reviewFilter === "confirmed-distinct") {
+    query.reviewStatus = "CONFIRMED_DISTINCT";
+  }
+
   return db
     .collection<DocumentRecord>("documents")
-    .find({ userId })
+    .find(query)
     .sort({ createdAt: -1 })
-    .limit(limit)
+    .limit(input.limit ?? 12)
     .toArray();
 }
 
@@ -271,6 +307,88 @@ export async function getDocumentForUser(id: string, userId: string) {
   });
 }
 
+export class DocumentReviewError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+    this.name = "DocumentReviewError";
+  }
+}
+
+export async function reviewLikelyDuplicateDocument(input: {
+  documentId: string;
+  userId: string;
+  decision: ReviewPairDecision;
+}) {
+  await ensureDocumentIndexes();
+
+  const document = await getDocumentForUser(input.documentId, input.userId);
+
+  if (!document) {
+    throw new DocumentReviewError("Document not found.", 404);
+  }
+
+  if (document.duplicateStatus !== "LIKELY_DUPLICATE" || document.reviewStatus !== "PENDING") {
+    throw new DocumentReviewError("Only pending likely duplicates can be reviewed.", 409);
+  }
+
+  if (!document.matchedDocumentId) {
+    throw new DocumentReviewError("Review requires a matched document.", 409);
+  }
+
+  const matchedDocument = await getDocumentForUser(document.matchedDocumentId, input.userId);
+
+  if (!matchedDocument) {
+    throw new DocumentReviewError("Matched document not found.", 409);
+  }
+
+  const now = new Date();
+  const db = await getDb();
+
+  await db.collection<DocumentRecord>("documents").updateOne(
+    {
+      _id: document._id,
+      userId: input.userId,
+      duplicateStatus: "LIKELY_DUPLICATE",
+      reviewStatus: "PENDING"
+    },
+    {
+      $set: {
+        reviewStatus: input.decision,
+        reviewedAt: now,
+        reviewedMatchDocumentId: document.matchedDocumentId,
+        updatedAt: now
+      }
+    }
+  );
+
+  await upsertReviewedPair({
+    userId: input.userId,
+    documentId: String(document._id),
+    matchedDocumentId: document.matchedDocumentId,
+    decision: input.decision,
+    reviewedByUserId: input.userId,
+    reviewedAt: now
+  });
+
+  await db.collection("audit_logs").insertOne({
+    userId: input.userId,
+    action:
+      input.decision === "CONFIRMED_DUPLICATE"
+        ? "DOCUMENT_REVIEW_CONFIRMED_DUPLICATE"
+        : "DOCUMENT_REVIEW_CONFIRMED_DISTINCT",
+    targetType: "document",
+    targetId: String(document._id),
+    metadata: {
+      matchedDocumentId: document.matchedDocumentId,
+      machineDuplicateStatus: document.duplicateStatus,
+      similarityScore: document.similarityScore
+    },
+    createdAt: now
+  });
+
+  return getDocumentForUser(input.documentId, input.userId);
+}
+
 export function formatDuplicateStatus(status: DuplicateStatus) {
   const labels: Record<DuplicateStatus, string> = {
     NOT_CHECKED: "Not checked",
@@ -284,4 +402,19 @@ export function formatDuplicateStatus(status: DuplicateStatus) {
   };
 
   return labels[status];
+}
+
+export function formatReviewStatus(status: ReviewStatus) {
+  const labels: Record<ReviewStatus, string> = {
+    NOT_REQUIRED: "Not required",
+    PENDING: "Pending review",
+    CONFIRMED_DUPLICATE: "Confirmed duplicate",
+    CONFIRMED_DISTINCT: "Confirmed distinct"
+  };
+
+  return labels[status];
+}
+
+function reviewStatusForDuplicateDecision(status: DuplicateDecision["duplicateStatus"]): ReviewStatus {
+  return status === "LIKELY_DUPLICATE" ? "PENDING" : "NOT_REQUIRED";
 }

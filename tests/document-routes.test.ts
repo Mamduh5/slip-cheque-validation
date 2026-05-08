@@ -3,12 +3,15 @@ import { ObjectId } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getDocument } from "../app/api/documents/[id]/route";
 import { GET as getOriginalDocument } from "../app/api/documents/[id]/original/route";
+import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
-import type { DocumentRecord } from "../lib/models";
+import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
+import type { DocumentRecord, DuplicateReviewPairRecord } from "../lib/models";
 
 const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,
   documents: [] as DocumentRecord[],
+  reviewPairs: [] as DuplicateReviewPairRecord[],
   auditLogs: [] as unknown[],
   processUploadedDocumentImage: vi.fn(),
   getOriginalDocumentObject: vi.fn()
@@ -58,6 +61,51 @@ vi.mock("@/lib/mongodb", () => ({
                 })
               })
             };
+          }),
+          updateOne: vi.fn(async (query: Record<string, unknown>, update: { $set?: Partial<DocumentRecord> }) => {
+            const document = testState.documents.find((candidate) => matchesQuery(candidate, query));
+
+            if (document && update.$set) {
+              Object.assign(document, update.$set);
+            }
+
+            return {
+              matchedCount: document ? 1 : 0,
+              modifiedCount: document ? 1 : 0
+            };
+          })
+        };
+      }
+
+      if (name === "duplicate_review_pairs") {
+        return {
+          createIndexes: vi.fn(async () => undefined),
+          updateOne: vi.fn(async (
+            query: Record<string, unknown>,
+            update: { $set?: Partial<DuplicateReviewPairRecord>; $setOnInsert?: Partial<DuplicateReviewPairRecord> }
+          ) => {
+            const existing = testState.reviewPairs.find((pair) => matchesQuery(pair, query));
+
+            if (existing) {
+              Object.assign(existing, update.$set);
+            } else {
+              testState.reviewPairs.push({
+                ...(update.$setOnInsert as DuplicateReviewPairRecord),
+                ...(update.$set as DuplicateReviewPairRecord)
+              });
+            }
+
+            return { matchedCount: existing ? 1 : 0, modifiedCount: 1, upsertedCount: existing ? 0 : 1 };
+          }),
+          findOne: vi.fn(async (query: Record<string, unknown>) => {
+            return testState.reviewPairs.find((pair) => matchesQuery(pair, query)) ?? null;
+          }),
+          find: vi.fn((query: Record<string, unknown>) => {
+            const matches = testState.reviewPairs.filter((pair) => matchesQuery(pair, query));
+
+            return {
+              toArray: async () => matches
+            };
           })
         };
       }
@@ -76,22 +124,30 @@ vi.mock("@/lib/mongodb", () => ({
   }))
 }));
 
-function matchesQuery(document: DocumentRecord, query: Record<string, unknown>) {
+function matchesQuery(document: object, query: Record<string, unknown>): boolean {
   return Object.entries(query).every(([key, value]) => {
+    if (key === "$or" && Array.isArray(value)) {
+      return value.some((nestedQuery) => matchesQuery(document, nestedQuery as Record<string, unknown>));
+    }
+
     if (key === "_id" && typeof value === "object" && value !== null && "$ne" in value) {
-      return String(document._id) !== String((value as { $ne: ObjectId }).$ne);
+      return String(getDocumentValue(document, "_id")) !== String((value as { $ne: ObjectId }).$ne);
     }
 
     if (typeof value === "object" && value !== null && "$ne" in value) {
-      return document[key as keyof DocumentRecord] !== (value as { $ne: unknown }).$ne;
+      return getDocumentValue(document, key) !== (value as { $ne: unknown }).$ne;
     }
 
     if (key === "_id") {
-      return String(document._id) === String(value);
+      return String(getDocumentValue(document, "_id")) === String(value);
     }
 
-    return document[key as keyof DocumentRecord] === value;
+    return getDocumentValue(document, key) === value;
   });
+}
+
+function getDocumentValue(document: object, key: string) {
+  return (document as Record<string, unknown>)[key];
 }
 
 function sortDocuments(documents: DocumentRecord[], sort?: Record<string, 1 | -1>) {
@@ -156,6 +212,7 @@ describe("document API integration boundaries", () => {
   beforeEach(() => {
     setSession(null);
     testState.documents.length = 0;
+    testState.reviewPairs.length = 0;
     testState.auditLogs.length = 0;
     testState.processUploadedDocumentImage.mockReset();
     testState.processUploadedDocumentImage.mockImplementation(async (input: { userId: string; documentId: string; buffer: Buffer }) => ({
@@ -191,6 +248,7 @@ describe("document API integration boundaries", () => {
       userId: "user-1",
       status: "READY",
       duplicateStatus: "NEW",
+      reviewStatus: "NOT_REQUIRED",
       matchedDocumentId: null,
       similarityScore: null,
       perceptualHash: "0000000000000000",
@@ -217,6 +275,7 @@ describe("document API integration boundaries", () => {
     expect(third.body.matchedDocumentId).toBe(first.body.documentId);
     expect(testState.documents[1]).toMatchObject({
       duplicateStatus: "EXACT_DUPLICATE",
+      reviewStatus: "NOT_REQUIRED",
       matchedDocumentId: first.body.documentId,
       similarityScore: 1
     });
@@ -232,6 +291,135 @@ describe("document API integration boundaries", () => {
     expect(second.body.duplicateStatus).toBe("LIKELY_DUPLICATE");
     expect(second.body.matchedDocumentId).toBe(first.body.documentId);
     expect(second.body.similarityScore).toBe(1);
+    expect(testState.documents[1]).toMatchObject({
+      reviewStatus: "PENDING",
+      reviewedAt: null,
+      reviewedMatchDocumentId: null
+    });
+  });
+
+  it("allows the owner to confirm a pending likely duplicate", async () => {
+    setSession("user-1");
+
+    const first = await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    const response = await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DUPLICATE" })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+    const body = (await response.json()) as { reviewStatus: string; reviewedMatchDocumentId: string };
+
+    expect(response.status).toBe(200);
+    expect(body.reviewStatus).toBe("CONFIRMED_DUPLICATE");
+    expect(body.reviewedMatchDocumentId).toBe(first.body.documentId);
+    expect(testState.documents[1]).toMatchObject({
+      duplicateStatus: "LIKELY_DUPLICATE",
+      reviewStatus: "CONFIRMED_DUPLICATE",
+      matchedDocumentId: first.body.documentId
+    });
+    expect(testState.reviewPairs).toHaveLength(1);
+    expect(testState.reviewPairs[0]).toMatchObject({
+      userId: "user-1",
+      decision: "CONFIRMED_DUPLICATE"
+    });
+  });
+
+  it("allows the owner to mark a pending likely duplicate as distinct", async () => {
+    setSession("user-1");
+
+    const first = await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    const response = await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DISTINCT" })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+    const body = (await response.json()) as { reviewStatus: string; reviewedMatchDocumentId: string };
+
+    expect(response.status).toBe(200);
+    expect(body.reviewStatus).toBe("CONFIRMED_DISTINCT");
+    expect(body.reviewedMatchDocumentId).toBe(first.body.documentId);
+    expect(testState.documents[1]).toMatchObject({
+      duplicateStatus: "LIKELY_DUPLICATE",
+      reviewStatus: "CONFIRMED_DISTINCT",
+      matchedDocumentId: first.body.documentId,
+      similarityScore: 1
+    });
+    expect(testState.reviewPairs[0]).toMatchObject({
+      userId: "user-1",
+      decision: "CONFIRMED_DISTINCT"
+    });
+  });
+
+  it("rejects non-owner review of another user's likely duplicate", async () => {
+    setSession("owner-user");
+    const likelyDuplicate = await upload("near original image bytes").then(async () =>
+      upload("near recompressed image bytes")
+    );
+
+    setSession("other-user");
+    const response = await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DUPLICATE" })
+      }),
+      { params: Promise.resolve({ id: likelyDuplicate.body.documentId as string }) }
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("does not return a reviewed pair as an unresolved likely duplicate candidate", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DISTINCT" })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+
+    const match = await findLikelyDuplicateMatchForUser({
+      userId: "user-1",
+      documentId: new ObjectId(second.body.documentId),
+      perceptualHash: "ffff0000ffff0000",
+      excludeDocumentId: new ObjectId(second.body.documentId)
+    });
+
+    expect(match).toBeNull();
+  });
+
+  it("filters documents by review status for dashboard queries", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({ decision: "CONFIRMED_DISTINCT" })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+
+    const confirmedDistinct = await getRecentDocumentsForUser("user-1", {
+      reviewFilter: "confirmed-distinct"
+    });
+    const pending = await getRecentDocumentsForUser("user-1", {
+      reviewFilter: "pending"
+    });
+
+    expect(confirmedDistinct).toHaveLength(1);
+    expect(confirmedDistinct[0].reviewStatus).toBe("CONFIRMED_DISTINCT");
+    expect(pending).toHaveLength(0);
   });
 
   it("rejects unauthenticated uploads", async () => {

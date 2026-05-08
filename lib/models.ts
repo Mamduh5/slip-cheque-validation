@@ -20,10 +20,21 @@ export const duplicateStatuses = [
   "ERROR"
 ] as const;
 
+export const reviewStatuses = [
+  "NOT_REQUIRED",
+  "PENDING",
+  "CONFIRMED_DUPLICATE",
+  "CONFIRMED_DISTINCT"
+] as const;
+
+export const reviewPairDecisions = ["CONFIRMED_DUPLICATE", "CONFIRMED_DISTINCT"] as const;
+
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
 export type DuplicateStatus = (typeof duplicateStatuses)[number];
+export type ReviewStatus = (typeof reviewStatuses)[number];
+export type ReviewPairDecision = (typeof reviewPairDecisions)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -64,6 +75,9 @@ export interface DocumentRecord {
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;
   similarityScore: number | null;
+  reviewStatus: ReviewStatus;
+  reviewedAt: Date | null;
+  reviewedMatchDocumentId: string | null;
   exactHash: string | null;
   perceptualHash: string | null;
   notes?: string | null;
@@ -79,4 +93,16 @@ export interface AuditLogRecord {
   targetId?: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
+}
+
+export interface DuplicateReviewPairRecord {
+  _id?: ObjectId;
+  userId: string;
+  documentAId: string;
+  documentBId: string;
+  decision: ReviewPairDecision;
+  reviewedByUserId: string;
+  reviewedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }

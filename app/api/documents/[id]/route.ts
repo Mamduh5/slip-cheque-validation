@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getDocumentForUser, formatDuplicateStatus } from "@/lib/documents";
+import { getDocumentForUser, formatDuplicateStatus, formatReviewStatus } from "@/lib/documents";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     duplicateStatusLabel: formatDuplicateStatus(document.duplicateStatus),
     matchedDocumentId: document.matchedDocumentId,
     similarityScore: document.similarityScore,
+    reviewStatus: document.reviewStatus,
+    reviewStatusLabel: formatReviewStatus(document.reviewStatus),
+    reviewedAt: document.reviewedAt?.toISOString() ?? null,
+    reviewedMatchDocumentId: document.reviewedMatchDocumentId,
     exactHash: document.exactHash,
     perceptualHash: document.perceptualHash,
     normalizedObject: document.normalizedObject,

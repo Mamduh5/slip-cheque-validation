@@ -13,6 +13,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Protected dashboard, upload flow, and document result/detail page.
 - Exact duplicate detection is implemented using SHA-256 file hashes.
 - Near-duplicate detection is implemented using a normalized image derivative and 64-bit dHash.
+- Likely duplicates have a separate human review workflow with side-by-side comparison.
 - Document records and original-image previews are owner-only.
 - OCR, QR extraction, cheque parsing, and bank verification are intentionally not implemented yet.
 
@@ -76,12 +77,15 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Every upload creates an auditable document record. Exact duplicates are marked `EXACT_DUPLICATE` and linked to the earliest matching document.
 - Exact-match selection is deterministic: oldest `createdAt` wins, with `_id` as a stable tie-breaker.
 - Likely duplicates are marked `LIKELY_DUPLICATE` when no exact match exists and an owner-owned perceptual hash is within Hamming distance `8`. `similarityScore` is `1 - distance / 64`.
+- Machine detection and human review are separate. `duplicateStatus` stores algorithm output; `reviewStatus` stores the user decision.
+- Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or mark not duplicate from the document detail page.
+- Reviewed document pairs are remembered owner-by-owner in `duplicate_review_pairs`, so the same exact pair does not keep appearing as unresolved after review.
 - API upload, document detail, and original-image routes require authentication. Missing or non-owned documents return `404` for owner-scoped lookups, so another user's document existence is not exposed.
 - TypeScript imports use the `@/*` `paths` alias without `baseUrl`, which avoids relying on deprecated `baseUrl` behavior.
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 ## Intentionally Not Implemented Yet
 

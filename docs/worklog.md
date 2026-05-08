@@ -104,6 +104,8 @@
 - `npm run test`
 - `npm run typecheck`
 - `npm run lint`
+- `npm run build`
+- `npm audit --omit=dev`
 
 ### Known Limitations
 
@@ -147,3 +149,39 @@
 - The current normalization does not correct perspective skew, heavy cropping, glare, occlusion, handwritten changes, or extreme rotations.
 - Near-duplicate matching fetches a bounded set of owner candidates and scores them in-process; this is acceptable for v1 but may need indexing or bucketing as volume grows.
 - Concurrent same-user uploads can still race before either record is visible to duplicate lookup.
+
+## 2026-05-08 Likely Duplicate Review Workflow
+
+### Changed
+
+- Added separate document-level human review fields: `reviewStatus`, `reviewedAt`, and `reviewedMatchDocumentId`.
+- Kept machine detection fields unchanged: `duplicateStatus`, `matchedDocumentId`, and `similarityScore`.
+- Made likely duplicates enter `reviewStatus: "PENDING"`.
+- Made new and exact duplicate records enter `reviewStatus: "NOT_REQUIRED"`.
+- Added owner-scoped `duplicate_review_pairs` memory for reviewed document pairs.
+- Added `POST /api/documents/{id}/review` for owner-only review decisions.
+- Added review decisions for `CONFIRMED_DUPLICATE` and `CONFIRMED_DISTINCT`.
+- Kept machine match linkage and similarity score intact after human review.
+- Updated likely duplicate candidate selection to skip already reviewed exact pairs.
+- Added dashboard review filters for all documents, pending review, confirmed duplicate, and confirmed distinct.
+- Added side-by-side original previews and review action buttons on likely duplicate detail pages.
+- Added route/service tests for pending review entry, owner review actions, non-owner rejection, pair memory, and dashboard review filtering.
+
+### Key Decisions
+
+- Machine detection and human review remain separate fields so historical algorithm output is not overwritten by review decisions.
+- Pair memory is a small dedicated collection instead of overloading document records.
+- Pair ids are stored canonically by sorting the two document ids, so review memory works regardless of pair order.
+- Exact duplicates do not enter the human review workflow in v1.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+
+### Known Limitations
+
+- Review memory is pairwise only. It does not infer decisions across clusters or train the dHash matcher.
+- Review notes and reset/reopen review actions are not implemented.
+- OCR, QR extraction, cheque parsing, bank verification, background queues, and microservices remain out of scope.

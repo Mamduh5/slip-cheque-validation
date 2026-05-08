@@ -19,8 +19,9 @@ Auth is handled by NextAuth in the same Next.js app.
 - Sessions use JWT strategy.
 - User records are stored in MongoDB in the `users` collection.
 - `proxy.ts` protects `/dashboard`, `/upload`, and `/documents/*` using NextAuth.
-- `POST /api/documents`, `GET /api/documents/{id}`, and `GET /api/documents/{id}/original` require an authenticated session.
+- `POST /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/original`, and `POST /api/documents/{id}/review` require an authenticated session.
 - Document access is owner-only in v1. Non-owned and missing documents both return `404` from owner-scoped API lookups to avoid exposing whether another user's document exists.
+- Review actions are owner-only and only apply to pending likely duplicates.
 
 Email/password registration is exposed through `POST /api/register`. Passwords are hashed with bcrypt before storage.
 
@@ -30,6 +31,7 @@ MongoDB stores application records:
 
 - `users`: auth users and optional password hashes.
 - `documents`: uploaded document registry records.
+- `duplicate_review_pairs`: owner-scoped memory of reviewed document pairs.
 - `audit_logs`: lightweight audit entries for early lifecycle events.
 
 The document service creates basic indexes lazily for user document listing, owner-scoped exact hash lookup, owner-scoped perceptual hash candidate lookup, and duplicate status lookup.
@@ -82,8 +84,25 @@ The normalized-image stage is intentionally small and in-process. It does not us
 - `duplicateStatus`: `NEW`, `EXACT_DUPLICATE`, or `LIKELY_DUPLICATE` for current v1 uploads.
 - `matchedDocumentId`: related document when a duplicate is found.
 - `similarityScore`: `1` for exact duplicates, or dHash similarity for likely duplicates.
+- `reviewStatus`: separate human review state. Likely duplicates start as `PENDING`; new and exact duplicates use `NOT_REQUIRED`.
+- `reviewedAt`: when the owner made a review decision.
+- `reviewedMatchDocumentId`: the matched document reviewed by the owner.
 
 Near-duplicate candidate selection is deterministic: lowest Hamming distance wins, then oldest `createdAt`, then lowest `_id`. Candidates are owner-scoped and the current upload id is excluded.
+
+## Review Workflow
+
+Machine detection and human review are intentionally separate:
+
+- Machine status is stored in `duplicateStatus` and remains historically true.
+- Human review is stored in `reviewStatus`.
+- `LIKELY_DUPLICATE` records enter `reviewStatus: "PENDING"`.
+- Owners can confirm the pair as `CONFIRMED_DUPLICATE` or mark it `CONFIRMED_DISTINCT`.
+- Review actions keep `matchedDocumentId` and `similarityScore` intact; a human disagreement does not erase the machine result.
+- The dashboard can filter all documents, pending review, confirmed duplicate, and confirmed distinct.
+- Document detail shows side-by-side original previews for likely duplicates.
+
+Pairwise review memory is stored in `duplicate_review_pairs` with canonical sorted document ids. Both confirmed duplicate and confirmed distinct pairs are remembered. Candidate selection skips already reviewed exact pairs, and reviewed records no longer appear as unresolved because their document-level `reviewStatus` is no longer `PENDING`.
 
 OCR, QR extraction, cheque field extraction, and bank verification remain later pipeline stages, not the core v1 intake path.
 
@@ -92,3 +111,5 @@ OCR, QR extraction, cheque field extraction, and bank verification remain later 
 Concurrent uploads of identical bytes by the same user can still race: two requests that both perform the duplicate lookup before either insert commits may both be marked `NEW`. A later pass can address this with a per-user hash claim, transaction strategy, or post-insert reconciliation if the product needs strong concurrent duplicate guarantees.
 
 Near-duplicate matching is intentionally conservative and image-only. dHash may miss rotated, heavily cropped, warped, occluded, or very low-quality photos, and it may still produce false positives for visually similar documents. It should be treated as a review signal, not financial verification.
+
+Pairwise review memory does not infer cluster-level decisions. If document A is distinct from B, and B is distinct from C, the app does not infer anything about A and C.

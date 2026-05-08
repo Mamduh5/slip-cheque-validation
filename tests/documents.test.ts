@@ -56,6 +56,9 @@ describe("document helpers", () => {
       duplicateStatus: "NEW",
       matchedDocumentId: null,
       similarityScore: null,
+      reviewStatus: "NOT_REQUIRED",
+      reviewedAt: null,
+      reviewedMatchDocumentId: null,
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
       status: "READY"
@@ -95,7 +98,44 @@ describe("document helpers", () => {
     });
 
     expect(record.duplicateStatus).toBe("EXACT_DUPLICATE");
+    expect(record.reviewStatus).toBe("NOT_REQUIRED");
     expect(record.matchedDocumentId).toBe(matchedDocumentId);
     expect(record.similarityScore).toBe(1);
+  });
+
+  it("builds a pending review state for likely duplicate records", () => {
+    const matchedDocumentId = String(new ObjectId());
+
+    const record = buildUploadedDocumentRecord({
+      documentId: new ObjectId(),
+      now: new Date("2026-05-08T10:00:00.000Z"),
+      userId: "user-2",
+      documentType: "UNKNOWN",
+      sourceType: "CAMERA",
+      originalFilename: "near.webp",
+      mimeType: "image/webp",
+      fileSize: 256,
+      originalObject: { bucket: "document-images", key: "documents/user-2/id/original.webp" },
+      normalizedObject: { bucket: "document-images", key: "documents/user-2/id/normalized.webp" },
+      normalizedImage: {
+        width: 32,
+        height: 24,
+        mimeType: "image/webp",
+        fileSize: 96,
+        algorithm: "normalized-webp-grayscale-v1"
+      },
+      exactHash: "abc123",
+      perceptualHash: "ffffffffffffffff",
+      duplicateDecision: {
+        duplicateStatus: "LIKELY_DUPLICATE",
+        matchedDocumentId,
+        similarityScore: 0.9375
+      }
+    });
+
+    expect(record.duplicateStatus).toBe("LIKELY_DUPLICATE");
+    expect(record.reviewStatus).toBe("PENDING");
+    expect(record.reviewedAt).toBeNull();
+    expect(record.reviewedMatchDocumentId).toBeNull();
   });
 });

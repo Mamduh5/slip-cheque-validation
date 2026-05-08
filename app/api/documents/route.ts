@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,
+    reviewStatus: record.reviewStatus,
     status: record.status
   });
 }
