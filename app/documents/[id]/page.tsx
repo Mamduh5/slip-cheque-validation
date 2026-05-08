@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DocumentStatusPill } from "@/components/document-status-pill";
-import { getDocumentForUser } from "@/lib/documents";
+import { formatDuplicateStatus, getDocumentForUser } from "@/lib/documents";
 import { requireUser } from "@/lib/session";
 
 function formatBytes(bytes: number) {
@@ -60,7 +60,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             ["Processing status", document.status],
             ["MIME type", document.mimeType],
             ["File size", formatBytes(document.fileSize)],
-            ["Duplicate status", document.duplicateStatus.replaceAll("_", " ")],
+            ["Duplicate status", formatDuplicateStatus(document.duplicateStatus)],
             ["Similarity score", document.similarityScore === null ? "Not available" : String(document.similarityScore)],
             ["Perceptual hash", document.perceptualHash ?? "Not generated"]
           ].map(([label, value]) => (
@@ -75,11 +75,17 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Matched document</dt>
           <dd className="mt-1 break-words text-sm">
             {matchedDocument ? (
-              <Link className="font-medium text-accent hover:text-accent-dark" href={`/documents/${String(matchedDocument._id)}`}>
-                {matchedDocument.originalFilename}
-              </Link>
+              <span>
+                Exact byte-level match with{" "}
+                <Link
+                  className="font-medium text-accent hover:text-accent-dark"
+                  href={`/documents/${String(matchedDocument._id)}`}
+                >
+                  {matchedDocument.originalFilename}
+                </Link>
+              </span>
             ) : document.matchedDocumentId ? (
-              <span>{document.matchedDocumentId}</span>
+              <span>Matched document is not available to this account.</span>
             ) : (
               "None"
             )}

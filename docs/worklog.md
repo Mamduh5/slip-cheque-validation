@@ -76,3 +76,36 @@
 - Add integration coverage for authenticated multipart uploads.
 - Add old-record migration/backfill if any documents exist with `NOT_CHECKED`.
 - Add perceptual-hash near-duplicate detection in a later phase.
+
+## 2026-05-08 Auth and Exact Duplicate Hardening Pass
+
+### Changed
+
+- Kept protected dashboard, upload, and document pages behind `requireUser` and NextAuth middleware.
+- Added `GET /api/documents/{id}` for authenticated owner-scoped document detail responses.
+- Confirmed `GET /api/documents/{id}/original` requires authentication and owner access before reading MinIO.
+- Changed exact duplicate lookup to owner-scoped matching to avoid leaking another user's document existence.
+- Made exact duplicate selection deterministic with `createdAt ASC` and `_id ASC`.
+- Excluded the pending upload id from duplicate lookup so a record cannot match itself.
+- Kept duplicate uploads auditable: every upload still creates a new document record.
+- Added upload response `similarityScore` for exact duplicate result verification.
+- Lightly clarified UI labels for `NEW` and `EXACT_DUPLICATE` and improved matched-document wording.
+- Added Vitest integration-style route coverage for authenticated new upload, authenticated exact duplicate upload, unauthenticated upload rejection, cross-user duplicate isolation, and cross-user document detail/original-image rejection.
+
+### Key Decisions
+
+- V1 document ownership is single-user owner-only. There is no admin or shared-document rule yet.
+- Non-owned documents are returned as `404` at API boundaries rather than `403` to avoid document existence disclosure.
+- Exact duplicate matching is scoped to the owner account, not system-wide.
+
+### Verification
+
+- `npm install`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+
+### Known Limitations
+
+- Concurrent identical uploads from the same user can still race if both requests check before either insert is visible; both could be marked `NEW`. Fixing that cleanly likely needs a per-user hash claim, transaction strategy, or reconciliation pass.
+- Perceptual hashing, OCR, QR extraction, cheque parsing, and bank verification remain intentionally out of scope.

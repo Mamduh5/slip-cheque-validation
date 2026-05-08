@@ -19,6 +19,8 @@ Auth is handled by NextAuth in the same Next.js app.
 - Sessions use JWT strategy.
 - User records are stored in MongoDB in the `users` collection.
 - `proxy.ts` protects `/dashboard`, `/upload`, and `/documents/*` using NextAuth.
+- `POST /api/documents`, `GET /api/documents/{id}`, and `GET /api/documents/{id}/original` require an authenticated session.
+- Document access is owner-only in v1. Non-owned and missing documents both return `404` from owner-scoped API lookups to avoid exposing whether another user's document exists.
 
 Email/password registration is exposed through `POST /api/register`. Passwords are hashed with bcrypt before storage.
 
@@ -48,12 +50,14 @@ documents/{userId}/{documentId}/original.{ext}
 2. Browser sends multipart form data to `POST /api/documents`.
 3. Server validates metadata, MIME type, and file size.
 4. Server computes a SHA-256 exact file hash.
-5. Server checks MongoDB for the earliest existing document with the same `exactHash`.
+5. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
 6. Original image is stored in MinIO.
 7. A new document record is inserted into MongoDB for auditability.
 8. If no match exists, `duplicateStatus` is `NEW`.
 9. If a match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
 10. User is redirected to `/documents/{id}`.
+
+Exact-match selection is deterministic: matching candidates are sorted by `createdAt ASC` and then `_id ASC`. The pending upload's generated id is excluded from the lookup, so the current upload cannot become its own match. If several exact matches already exist for the same owner, new duplicates link to the earliest record by that ordering.
 
 ## Future Duplicate Pipeline
 
@@ -66,3 +70,7 @@ The current upload flow implements exact duplicate detection and prepares fields
 - `similarityScore`: future near-match score.
 
 Likely next steps are a background image normalization and perceptual-hash stage. OCR, QR extraction, and cheque field extraction should remain later pipeline stages, not the core v1 intake path.
+
+## Known Limitations
+
+Concurrent uploads of identical bytes by the same user can still race: two requests that both perform the duplicate lookup before either insert commits may both be marked `NEW`. A later pass can address this with a per-user hash claim, transaction strategy, or post-insert reconciliation if the product needs strong concurrent duplicate guarantees.

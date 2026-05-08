@@ -58,10 +58,20 @@ Optional lightweight audit collection.
 
 ## Duplicate-Check Fields
 
-V1 computes `exactHash` during upload and checks for the earliest existing document with the same hash.
+V1 computes `exactHash` during upload and checks for the earliest existing document owned by the same user with the same hash.
 
 - New unique uploads are stored with `duplicateStatus: "NEW"`.
 - Exact duplicate uploads still create a new document record for auditability.
 - Exact duplicate records use `duplicateStatus: "EXACT_DUPLICATE"`, set `matchedDocumentId`, and set `similarityScore` to `1`.
+- Matching is deterministic: `createdAt ASC`, then `_id ASC`.
+- The generated current document id is excluded from the lookup so a record cannot match itself.
 - `NOT_CHECKED` remains in the enum for older or future deferred-processing records.
 - `perceptualHash` remains null until near-duplicate image matching is implemented.
+
+## Ownership Rules
+
+- Each document belongs to exactly one `userId`.
+- Dashboard and document detail pages only query documents for the current session user.
+- `POST /api/documents` requires authentication and stores the session user id as owner.
+- `GET /api/documents/{id}` and `GET /api/documents/{id}/original` require authentication and only return owner documents.
+- Missing and non-owned documents are handled the same way at the API boundary.

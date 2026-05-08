@@ -23,6 +23,11 @@ async function ensureDocumentIndexes() {
     { key: { userId: 1, createdAt: -1 }, name: "documents_user_created_at" },
     { key: { exactHash: 1 }, name: "documents_exact_hash", sparse: true },
     { key: { exactHash: 1, createdAt: 1 }, name: "documents_exact_hash_created_at", sparse: true },
+    {
+      key: { userId: 1, exactHash: 1, createdAt: 1, _id: 1 },
+      name: "documents_user_exact_hash_created_at_id",
+      sparse: true
+    },
     { key: { duplicateStatus: 1 }, name: "documents_duplicate_status" }
   ]);
   indexesReady = true;
@@ -77,6 +82,30 @@ export function buildUploadedDocumentRecord(input: {
   };
 }
 
+export async function findEarliestExactMatchForUser(input: {
+  userId: string;
+  exactHash: string;
+  excludeDocumentId?: ObjectId;
+}) {
+  const db = await getDb();
+  const query: {
+    userId: string;
+    exactHash: string;
+    _id?: { $ne: ObjectId };
+  } = {
+    userId: input.userId,
+    exactHash: input.exactHash
+  };
+
+  if (input.excludeDocumentId) {
+    query._id = { $ne: input.excludeDocumentId };
+  }
+
+  return db.collection<DocumentRecord>("documents").findOne(query, {
+    sort: { createdAt: 1, _id: 1 }
+  });
+}
+
 export async function createUploadedDocument(input: {
   userId: string;
   documentType: DocumentType;
@@ -92,9 +121,11 @@ export async function createUploadedDocument(input: {
   const documentId = new ObjectId();
   const exactHash = calculateSha256(input.buffer);
   const db = await getDb();
-  const existingExactMatch = await db
-    .collection<DocumentRecord>("documents")
-    .findOne({ exactHash }, { sort: { createdAt: 1 } });
+  const existingExactMatch = await findEarliestExactMatchForUser({
+    userId: input.userId,
+    exactHash,
+    excludeDocumentId: documentId
+  });
   const duplicateDecision = resolveExactDuplicateDecision(existingExactMatch);
   const objectKey = buildDocumentObjectKey({
     userId: input.userId,
@@ -167,5 +198,15 @@ export async function getDocumentForUser(id: string, userId: string) {
 }
 
 export function formatDuplicateStatus(status: DuplicateStatus) {
-  return status.replaceAll("_", " ");
+  const labels: Record<DuplicateStatus, string> = {
+    NOT_CHECKED: "Not checked",
+    PENDING: "Checking",
+    NEW: "New upload",
+    EXACT_DUPLICATE: "Exact duplicate",
+    DUPLICATE: "Duplicate",
+    POSSIBLE_DUPLICATE: "Possible duplicate",
+    ERROR: "Check failed"
+  };
+
+  return labels[status];
 }

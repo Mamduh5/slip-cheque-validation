@@ -12,8 +12,8 @@ export default async function UploadPage() {
           Add a bank transfer slip, deposit/payment slip, cheque, or unknown paper financial document image.
         </p>
         <div className="mt-5 rounded-lg border border-line bg-white p-4 text-sm leading-6 text-slate-600">
-          Exact duplicate matching is active. The app compares the uploaded file hash and marks the result as{" "}
-          <strong>NEW</strong> or <strong>EXACT DUPLICATE</strong>.
+          Exact duplicate matching is active within your account. The app compares the uploaded file hash and marks
+          the result as <strong>New upload</strong> or <strong>Exact duplicate</strong>.
         </div>
       </div>
       <UploadForm />

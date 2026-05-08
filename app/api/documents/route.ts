@@ -49,6 +49,7 @@ export async function POST(request: Request) {
     documentId: String(record._id),
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
+    similarityScore: record.similarityScore,
     status: record.status
   });
 }

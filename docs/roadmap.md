@@ -8,15 +8,17 @@
 - Protected dashboard and upload pages.
 - Original image upload storage.
 - Exact duplicate detection using SHA-256 file hashes.
+- Owner-only document detail and original-image access.
 - Document records with near-duplicate-ready fields.
 - Clear docs and Docker Compose local development.
 
 ## Next Phase
 
 - Add upload preview and clearer processing states.
-- Add tests for registration, auth guard behavior, and authenticated upload.
+- Add tests for registration and auth guard behavior.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
+- Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
 
 ## Later Phases
 
