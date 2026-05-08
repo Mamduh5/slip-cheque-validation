@@ -1,0 +1,56 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: slip-cheque-validation-app
+    command: npm run dev
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/slip_cheque_validation}
+      MONGODB_DB: ${MONGODB_DB:-slip_cheque_validation}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-document-images}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-only-change-me}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - app_next:/app/.next
+    depends_on:
+      - mongo
+      - minio
+
+  mongo:
+    image: mongo:7
+    container_name: slip-cheque-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: slip-cheque-minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  app_node_modules:
+  app_next:
+  mongo_data:
+  minio_data:
