@@ -19,11 +19,12 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
+    command: "docker compose up -d mongo minio && npm run dev -- --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
+      E2E_TEST_AUTH_ENABLED: "true",
       E2E_TEST_AUTH_USER_ID: "e2e-user",
       NEXTAUTH_SECRET: "e2e-test-secret",
       NEXTAUTH_URL: "http://127.0.0.1:3100",

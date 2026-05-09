@@ -284,7 +284,37 @@
 
 ### Known Limitations
 
-- There is no full browser E2E suite for the preview interaction yet.
+- Browser E2E remains intentionally focused on preview/reselect and upload recovery instead of broad UI coverage.
 - Client-side hints can differ from server-side quality results.
 - No crop tool, corner overlay, or perspective correction is implemented.
 - OCR, QR extraction, cheque parsing, bank verification, background queues, and microservices remain out of scope.
+
+## 2026-05-09 Real-Service Upload E2E
+
+### Changed
+
+- Added one Playwright happy-path upload test that uses the real `POST /api/documents` route.
+- Updated Playwright web server setup to start Docker Compose `mongo` and `minio` services before the local Next.js dev server.
+- Added E2E fixture helpers for deterministic image generation, MongoDB cleanup, MinIO cleanup, document lookup, and object existence checks.
+- Verified the happy-path E2E reaches the document detail page, shows duplicate/quality state, persists a MongoDB document, and writes the original object to MinIO.
+- Tightened the test-only auth bypass so it requires both non-production runtime and `E2E_TEST_AUTH_ENABLED=true`.
+- Routed document API auth checks through the same guarded current-user helper so the bypass behaves consistently in E2E without broadening production behavior.
+
+### Key Decisions
+
+- The real-service E2E uses the existing Docker Compose `mongo` and `minio` services instead of new infrastructure.
+- Fixture cleanup is explicit and owner-scoped: MongoDB rows for `e2e-user` are deleted from relevant collections, and MinIO objects under `documents/e2e-user/` are removed.
+- Only one real happy-path scenario was added to keep E2E narrow and reliable.
+
+### Verification
+
+- `npm run test:e2e`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+### Known Limitations
+
+- The happy-path E2E depends on local Docker being available.
+- It does not cover duplicate, review, or multi-user flows through the browser; those remain covered by unit/integration tests.

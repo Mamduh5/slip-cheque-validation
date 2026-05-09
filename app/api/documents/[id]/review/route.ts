@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
 import { DocumentReviewError, formatReviewStatus, reviewLikelyDuplicateDocument } from "@/lib/documents";
+import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -11,9 +10,9 @@ const reviewSchema = z.object({
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
+  const user = await getCurrentUser();
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
@@ -29,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const document = await reviewLikelyDuplicateDocument({
       documentId: id,
-      userId: session.user.id,
+      userId: user.id,
       decision: parsed.data.decision
     });
 

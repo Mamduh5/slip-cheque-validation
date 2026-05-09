@@ -1,5 +1,6 @@
 import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import { getE2eTestAuthUserId } from "@/lib/e2e-auth";
 
 const authProxy = withAuth({
   pages: {
@@ -8,7 +9,7 @@ const authProxy = withAuth({
 });
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (process.env.NODE_ENV !== "production" && process.env.E2E_TEST_AUTH_USER_ID) {
+  if (getE2eTestAuthUserId()) {
     return NextResponse.next();
   }
 

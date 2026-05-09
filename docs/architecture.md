@@ -117,7 +117,15 @@ The project uses Playwright for a deliberately small browser E2E layer. It is sc
 - Replacing the selected image through the retake/reselect flow.
 - Showing recovery UI after a server-authoritative quality failure.
 
-The E2E config starts the Next.js dev server on port `3100`. It uses `E2E_TEST_AUTH_USER_ID` to enable a dev/test-only auth bypass in `lib/session.ts` and `proxy.ts`; the bypass is disabled when `NODE_ENV` is `production`. The quality-failure scenario intercepts `POST /api/documents` in the browser test and returns a controlled `422` response, so MongoDB and MinIO are not required for this focused suite.
+The E2E config starts the existing Docker Compose `mongo` and `minio` services, then starts the Next.js dev server on port `3100`. It uses `E2E_TEST_AUTH_ENABLED=true` plus `E2E_TEST_AUTH_USER_ID` to enable a dev/test-only auth bypass in `lib/session.ts` and `proxy.ts`; the bypass returns null when `NODE_ENV` is `production`, even if those env vars are present.
+
+Current E2E coverage stays narrow:
+
+- Preview/reselect is browser-only and does not hit storage services.
+- Quality-failure recovery intercepts `POST /api/documents` and returns a controlled `422`.
+- One happy-path test uses the real upload route with MongoDB and MinIO, then verifies the created document record and original object.
+
+The real-service E2E uses `e2e-user` and cleans MongoDB records in `documents`, `audit_logs`, and `duplicate_review_pairs` for that user. It also removes MinIO objects under `documents/e2e-user/` before and after the real upload scenario.
 
 ## Duplicate Fields
 

@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+import {
+  cleanupE2eArtifacts,
+  createValidDocumentImage,
+  getE2eDocumentByFilename,
+  originalObjectExists
+} from "./e2e-fixtures";
 
 const redPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
@@ -77,4 +83,49 @@ test("server quality failure keeps the user in a recovery flow", async ({ page }
   ).toBeVisible();
   await expect(page.getByTestId("selected-image-preview")).toBeVisible();
   await expect(page.getByTestId("replace-image-button")).toBeEnabled();
+});
+
+test.describe.serial("real-service upload completion", () => {
+  test.beforeEach(async () => {
+    await cleanupE2eArtifacts();
+  });
+
+  test.afterEach(async () => {
+    await cleanupE2eArtifacts();
+  });
+
+  test("authenticated user uploads a valid image through the real route", async ({ page }) => {
+    const filename = `e2e-valid-upload-${Date.now()}.png`;
+    const image = await createValidDocumentImage();
+
+    await page.goto("/upload");
+    await page.getByTestId("document-file-input").setInputFiles({
+      name: filename,
+      mimeType: "image/png",
+      buffer: image
+    });
+
+    await expect(page.getByTestId("selected-image-preview")).toBeVisible();
+    await expect(page.getByText(filename)).toBeVisible();
+
+    await page.getByTestId("upload-submit-button").click();
+    await expect(page).toHaveURL(/\/documents\/[a-f0-9]{24}$/);
+    await expect(page.getByRole("heading", { name: filename })).toBeVisible();
+    await expect(page.getByText("New upload").first()).toBeVisible();
+    await expect(page.getByText(/Good|Needs attention/).first()).toBeVisible();
+    await expect(page.getByAltText("Uploaded financial document preview")).toBeVisible();
+
+    const document = await getE2eDocumentByFilename(filename);
+
+    expect(document).toBeTruthy();
+    expect(document).toMatchObject({
+      userId: "e2e-user",
+      originalFilename: filename,
+      duplicateStatus: "NEW",
+      reviewStatus: "NOT_REQUIRED",
+      status: "READY"
+    });
+    expect(document?.qualityStatus).toMatch(/PASS|WARN/);
+    await expect.poll(async () => (document ? originalObjectExists(document) : false)).toBe(true);
+  });
 });

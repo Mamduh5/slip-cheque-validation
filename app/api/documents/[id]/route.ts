@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getDocumentForUser, formatDuplicateStatus, formatQualityStatus, formatReviewStatus } from "@/lib/documents";
+import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
+  const user = await getCurrentUser();
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
   const { id } = await params;
-  const document = await getDocumentForUser(id, session.user.id);
+  const document = await getDocumentForUser(id, user.id);
 
   if (!document) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });

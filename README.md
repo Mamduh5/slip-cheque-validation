@@ -56,6 +56,8 @@ npm run build
 
 For non-Docker local development, set `MONGODB_URI` and MinIO values to reachable local services.
 
+`npm run test:e2e` uses Playwright. The command starts the existing Docker Compose `mongo` and `minio` services, runs the Next.js app locally on `127.0.0.1:3100`, and cleans up records/objects created for the deterministic E2E user.
+
 ## Environment Variables
 
 - `NEXT_PUBLIC_APP_NAME`: display name.
@@ -94,7 +96,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, quality warnings/failures, upload preview helper behavior, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
-Playwright covers the focused browser-critical upload preview path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, and recovery after a controlled server `422` quality failure. Run it with `npm run test:e2e`.
+Playwright covers the focused browser-critical upload path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, recovery after a controlled server `422` quality failure, and one real successful upload through MongoDB and MinIO. Run it with `npm run test:e2e`.
 
 ## Intentionally Not Implemented Yet
 

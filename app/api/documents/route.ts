@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { DocumentImageProcessingError } from "@/lib/document-processing";
 import { createUploadedDocument } from "@/lib/documents";
 import { ImageQualityFailureError } from "@/lib/image-quality";
+import { getCurrentUser } from "@/lib/session";
 import { uploadFieldsSchema, validateUploadFile } from "@/lib/upload-validation";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const user = await getCurrentUser();
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     record = await createUploadedDocument({
-      userId: session.user.id,
+      userId: user.id,
       documentType: parsedFields.data.documentType,
       sourceType: parsedFields.data.sourceType,
       originalFilename: file.name || "document-image",
