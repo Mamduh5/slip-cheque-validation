@@ -20,6 +20,10 @@ export async function ensureDocumentBucket() {
   return bucket;
 }
 
+export async function checkObjectStorageConnection() {
+  await minioClient.listBuckets();
+}
+
 export async function putOriginalDocumentObject(input: {
   objectKey: string;
   buffer: Buffer;

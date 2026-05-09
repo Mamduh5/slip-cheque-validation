@@ -14,6 +14,7 @@
 - Pre-submit upload preview with advisory client-side capture hints.
 - Focused Playwright E2E coverage for upload preview and quality-failure recovery.
 - One real-service Playwright happy-path upload test through MongoDB and MinIO.
+- CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
 - Clear docs and Docker Compose local development.
@@ -21,7 +22,7 @@
 ## Next Phase
 
 - Add richer upload progress and persisted post-upload result messaging.
-- Add a small CI-friendly E2E service bootstrap/check if this moves into CI.
+- Add a provider-specific CI workflow only when the target provider is known.
 - Add tests for registration and auth guard behavior.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.

@@ -9,6 +9,11 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "node scripts/e2e-env.mjs run",
+    "e2e:bootstrap": "node scripts/e2e-env.mjs bootstrap",
+    "e2e:wait": "node scripts/e2e-env.mjs wait --app",
+    "e2e:cleanup": "node scripts/e2e-env.mjs cleanup",
+    "e2e:diagnostics": "node scripts/e2e-env.mjs diagnostics",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

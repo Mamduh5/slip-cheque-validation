@@ -117,7 +117,16 @@ The project uses Playwright for a deliberately small browser E2E layer. It is sc
 - Replacing the selected image through the retake/reselect flow.
 - Showing recovery UI after a server-authoritative quality failure.
 
-The E2E config starts the existing Docker Compose `mongo` and `minio` services, then starts the Next.js dev server on port `3100`. It uses `E2E_TEST_AUTH_ENABLED=true` plus `E2E_TEST_AUTH_USER_ID` to enable a dev/test-only auth bypass in `lib/session.ts` and `proxy.ts`; the bypass returns null when `NODE_ENV` is `production`, even if those env vars are present.
+The E2E config starts the existing Docker Compose `mongo` and `minio` services through `scripts/e2e-env.mjs`, waits for MongoDB `ping` and MinIO `listBuckets`, then starts the Next.js dev server on port `3100`. Playwright waits on `/api/health`, which checks app availability plus MongoDB and MinIO connectivity. It uses `E2E_TEST_AUTH_ENABLED=true` plus `E2E_TEST_AUTH_USER_ID` to enable a dev/test-only auth bypass in `lib/session.ts` and `proxy.ts`; the bypass returns null when `NODE_ENV` is `production`, even if those env vars are present.
+
+E2E commands:
+
+- `npm run test:e2e`: local Playwright run using the same Docker-backed readiness path.
+- `npm run test:e2e:ci`: CI-style wrapper that runs Playwright with `CI=true` behavior and performs final artifact cleanup.
+- `npm run e2e:bootstrap`: starts Docker services and waits for MongoDB and MinIO.
+- `npm run e2e:wait`: waits for MongoDB, MinIO, and `/api/health`.
+- `npm run e2e:cleanup`: removes artifacts for the deterministic E2E user.
+- `npm run e2e:diagnostics`: prints checked service endpoints and `docker compose ps`.
 
 Current E2E coverage stays narrow:
 
@@ -125,7 +134,9 @@ Current E2E coverage stays narrow:
 - Quality-failure recovery intercepts `POST /api/documents` and returns a controlled `422`.
 - One happy-path test uses the real upload route with MongoDB and MinIO, then verifies the created document record and original object.
 
-The real-service E2E uses `e2e-user` and cleans MongoDB records in `documents`, `audit_logs`, and `duplicate_review_pairs` for that user. It also removes MinIO objects under `documents/e2e-user/` before and after the real upload scenario.
+The real-service E2E uses `e2e-user` and cleans MongoDB records in `documents`, `audit_logs`, and `duplicate_review_pairs` for that user. It also removes MinIO objects under `documents/e2e-user/` before and after the real upload scenario. The CI wrapper repeats cleanup at process end so interrupted or failed runs are less likely to pollute the next run.
+
+No provider-specific CI workflow is committed yet. The generic requirement is Docker availability, Node dependencies installed, and `npm run test:e2e:ci`.
 
 ## Duplicate Fields
 

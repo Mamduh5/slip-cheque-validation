@@ -3,10 +3,10 @@ import { MongoClient } from "mongodb";
 import sharp from "sharp";
 import type { DocumentRecord } from "../../lib/models";
 
-export const e2eUserId = "e2e-user";
-const mongodbUri = "mongodb://127.0.0.1:27017/slip_cheque_validation_e2e";
-const mongodbDb = "slip_cheque_validation_e2e";
-const minioBucket = "document-images-e2e";
+export const e2eUserId = process.env.E2E_TEST_AUTH_USER_ID ?? "e2e-user";
+const mongodbUri = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/slip_cheque_validation_e2e";
+const mongodbDb = process.env.MONGODB_DB ?? "slip_cheque_validation_e2e";
+const minioBucket = process.env.MINIO_BUCKET ?? "document-images-e2e";
 
 export async function cleanupE2eArtifacts() {
   await cleanupMongoArtifacts();
@@ -104,11 +104,11 @@ async function cleanupMinioArtifacts() {
 
 function getMinioClient() {
   return new Client({
-    endPoint: "127.0.0.1",
-    port: 9000,
-    useSSL: false,
-    accessKey: "minioadmin",
-    secretKey: "minioadmin"
+    endPoint: process.env.MINIO_ENDPOINT ?? "127.0.0.1",
+    port: Number(process.env.MINIO_PORT ?? "9000"),
+    useSSL: process.env.MINIO_USE_SSL === "true",
+    accessKey: process.env.MINIO_ACCESS_KEY ?? "minioadmin",
+    secretKey: process.env.MINIO_SECRET_KEY ?? "minioadmin"
   });
 }
 

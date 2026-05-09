@@ -318,3 +318,41 @@
 
 - The happy-path E2E depends on local Docker being available.
 - It does not cover duplicate, review, or multi-user flows through the browser; those remain covered by unit/integration tests.
+
+## 2026-05-09 CI-Ready E2E Bootstrap
+
+### Changed
+
+- Added `scripts/e2e-env.mjs` as a small generic E2E environment runner.
+- Added `npm run test:e2e:ci` as the CI-friendly command for the Docker-backed Playwright suite.
+- Added support commands: `e2e:bootstrap`, `e2e:wait`, `e2e:cleanup`, and `e2e:diagnostics`.
+- Replaced the inline Docker startup in Playwright config with `npm run e2e:bootstrap`.
+- Changed Playwright readiness from the app root to `/api/health`.
+- Expanded `/api/health` to check both MongoDB and MinIO connectivity.
+- Made E2E fixture helpers read the same environment defaults used by Playwright.
+
+### Key Decisions
+
+- The bootstrap stays generic and provider-neutral; no GitHub Actions or other CI-provider workflow was added yet.
+- Readiness uses real client checks: MongoDB `ping`, MinIO `listBuckets`, and app `/api/health`.
+- Diagnostics stay concise: checked endpoints, configured services, and `docker compose ps`.
+- Test artifact cleanup remains owner/path scoped to `e2e-user` and `documents/e2e-user/`.
+- The E2E auth bypass still requires non-production runtime, `E2E_TEST_AUTH_ENABLED=true`, and `E2E_TEST_AUTH_USER_ID`.
+
+### Verification
+
+- `npm run e2e:bootstrap`
+- `npm run e2e:diagnostics`
+- `npm run e2e:cleanup`
+- `npm run test:e2e:ci`
+- `npm run test:e2e`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+### Known Limitations
+
+- CI runners must provide Docker Compose and a working browser environment for Playwright.
+- The bootstrap does not stop Docker services automatically; it cleans test artifacts and leaves shared local services running.
+- No provider-specific CI workflow is committed until the deployment/CI target is known.
