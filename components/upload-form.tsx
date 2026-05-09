@@ -1,15 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QualityStatus, QualityWarningCode, SourceType } from "@/lib/models";
-
-const qualityWarningLabels: Record<QualityWarningCode, string> = {
-  IMAGE_TOO_SMALL: "Image is small. Retake closer if possible.",
-  BLURRY_IMAGE: "Image may be blurry. Keep the camera steady.",
-  TOO_DARK: "Image is dark. Use brighter, even lighting.",
-  TOO_BRIGHT: "Image is bright. Avoid glare and direct reflections."
-};
+import { qualityWarningLabels } from "@/lib/quality-thresholds";
+import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
 
 interface UploadResponse {
   documentId?: string;
@@ -20,15 +15,70 @@ interface UploadResponse {
 
 export function UploadForm() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceType, setSourceType] = useState<SourceType>("CAMERA");
   const [error, setError] = useState<string | null>(null);
   const [qualityWarnings, setQualityWarnings] = useState<QualityWarningCode[]>([]);
+  const [selectedPreview, setSelectedPreview] = useState<LocalPreviewState | null>(null);
+  const [isAnalyzingPreview, setIsAnalyzingPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (selectedPreview?.previewUrl) {
+        URL.revokeObjectURL(selectedPreview.previewUrl);
+      }
+    };
+  }, [selectedPreview?.previewUrl]);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0] ?? null;
+    setError(null);
+    setQualityWarnings([]);
+
+    if (!file) {
+      setSelectedPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedPreview(buildLocalPreviewState({ file, previewUrl }));
+    setIsAnalyzingPreview(true);
+
+    try {
+      const advisoryWarnings = await analyzeImagePreview(previewUrl);
+      setSelectedPreview((current) =>
+        current?.previewUrl === previewUrl ? { ...current, advisoryWarnings } : current
+      );
+    } catch {
+      setSelectedPreview((current) =>
+        current?.previewUrl === previewUrl ? { ...current, advisoryWarnings: [] } : current
+      );
+    } finally {
+      setIsAnalyzingPreview(false);
+    }
+  }
+
+  function chooseAnotherImage() {
+    setError(null);
+    setQualityWarnings([]);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setQualityWarnings([]);
+
+    if (!selectedPreview) {
+      setError("Take a photo or choose an image before uploading.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -96,16 +146,65 @@ export function UploadForm() {
           Image
         </label>
         <input
+          ref={fileInputRef}
           className="focus-ring w-full rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4"
           id="file"
           name="file"
           type="file"
           accept="image/jpeg,image/png,image/webp"
           capture={sourceType === "CAMERA" ? "environment" : undefined}
+          onChange={handleFileChange}
           required
         />
-        <p className="mt-2 text-xs text-slate-500">JPEG, PNG, or WebP up to the configured upload limit.</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Take a new photo or choose an existing JPEG, PNG, or WebP image.
+        </p>
       </div>
+
+      {selectedPreview ? (
+        <div className="overflow-hidden rounded-md border border-line bg-white">
+          <div className="border-b border-line px-3 py-2">
+            <p className="text-sm font-medium">Preview before upload</p>
+            <p className="mt-1 truncate text-xs text-slate-500">
+              {selectedPreview.fileName} | {selectedPreview.fileSizeLabel} | {selectedPreview.mimeType}
+            </p>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="max-h-[420px] w-full bg-slate-50 object-contain"
+            src={selectedPreview.previewUrl}
+            alt="Selected document preview"
+          />
+          <div className="space-y-3 border-t border-line p-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+              <p className="font-medium text-slate-800">Advisory preview check</p>
+              <p className="mt-1">
+                These local hints are only a preview. The server performs the final quality check after upload.
+              </p>
+              {isAnalyzingPreview ? (
+                <p className="mt-2 text-xs text-slate-500">Checking the preview...</p>
+              ) : selectedPreview.advisoryWarnings.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-orange-800">
+                  {selectedPreview.advisoryWarnings.map((warning) => (
+                    <li key={warning}>{qualityWarningLabels[warning]}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs text-green-700">No obvious preview issues found.</p>
+              )}
+            </div>
+            <button
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400"
+              type="button"
+              onClick={chooseAnotherImage}
+              disabled={isSubmitting}
+            >
+              Retake or choose another image
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-600">
         <p className="font-medium text-slate-800">Capture tips</p>
         <ul className="mt-1 list-disc space-y-1 pl-5">
@@ -130,10 +229,78 @@ export function UploadForm() {
       <button
         className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !selectedPreview}
       >
-        {isSubmitting ? "Uploading..." : "Upload document"}
+        {isSubmitting ? "Uploading..." : selectedPreview ? "Upload selected image" : "Choose an image first"}
       </button>
     </form>
   );
+}
+
+async function analyzeImagePreview(previewUrl: string) {
+  const image = await loadPreviewImage(previewUrl);
+  const maxDimension = 256;
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) {
+    return [];
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height);
+  const grayscale = new Uint8Array(width * height);
+  let luminanceSum = 0;
+
+  for (let index = 0; index < grayscale.length; index += 1) {
+    const offset = index * 4;
+    const luminance = Math.round(
+      imageData.data[offset] * 0.299 + imageData.data[offset + 1] * 0.587 + imageData.data[offset + 2] * 0.114
+    );
+    grayscale[index] = luminance;
+    luminanceSum += luminance;
+  }
+
+  return getClientAdvisoryWarnings({
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    meanLuminance: Number((luminanceSum / grayscale.length).toFixed(2)),
+    sharpness: Number(calculateClientSharpness(grayscale, width, height).toFixed(2))
+  });
+}
+
+function loadPreviewImage(previewUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Image preview could not be loaded."));
+    image.src = previewUrl;
+  });
+}
+
+function calculateClientSharpness(pixels: Uint8Array, width: number, height: number) {
+  if (width < 3 || height < 3) {
+    return 0;
+  }
+
+  const values: number[] = [];
+
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const center = pixels[y * width + x] * 4;
+      const top = pixels[(y - 1) * width + x];
+      const bottom = pixels[(y + 1) * width + x];
+      const left = pixels[y * width + x - 1];
+      const right = pixels[y * width + x + 1];
+      values.push(center - top - bottom - left - right);
+    }
+  }
+
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
 }

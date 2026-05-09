@@ -95,6 +95,19 @@ Warn-vs-fail behavior is conservative:
 
 The upload UI gives mobile capture guidance: keep the document flat, include all corners, avoid glare and shadows, and retake if the image is soft. Document detail shows quality status, warning text, and basic metrics.
 
+## Pre-Submit Upload Preview
+
+The upload form now shows a local image preview after file selection or camera capture. Users can inspect the selected image before final upload and quickly retake or choose another image.
+
+Client-side advisory hints are intentionally limited:
+
+- The browser checks selected image dimensions, average brightness, and a simple canvas sharpness heuristic.
+- These hints are labeled as preview/advisory signals.
+- Client hints do not block upload.
+- The server remains authoritative for file validation and quality assessment.
+
+If the server returns a quality failure such as an unusably small image, the user stays on the upload form, sees the server reason, and can retake or reselect without a dead end.
+
 ## Duplicate Fields
 
 - `exactHash`: exact byte-level duplicate lookup.
@@ -135,3 +148,5 @@ Near-duplicate matching is intentionally conservative and image-only. dHash may 
 Pairwise review memory does not infer cluster-level decisions. If document A is distinct from B, and B is distinct from C, the app does not infer anything about A and C.
 
 Quality heuristics are lightweight and explainable, not proof that the paper document is valid. Blur detection can be fooled by graphics or blank areas, and brightness checks use simple average luminance.
+
+Client-side preview hints can differ from server-side quality results because the browser uses a smaller canvas sample and does not perform the full server pipeline. Server results should be treated as final.

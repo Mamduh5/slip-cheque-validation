@@ -108,6 +108,8 @@
 - `npm audit --omit=dev`
 - `npm run build`
 - `npm audit --omit=dev`
+- `npm run build`
+- `npm audit --omit=dev`
 
 ### Known Limitations
 
@@ -222,3 +224,35 @@
 - Exposure checks use average luminance and may miss local glare or shadows.
 - There is no client-side pre-submit quality analysis yet; warnings are shown after upload on failure or on the resulting detail page.
 - The app does not detect all document corners or correct perspective skew.
+
+## 2026-05-09 Pre-Submit Upload Preview
+
+### Changed
+
+- Added a local image preview after camera capture or file selection.
+- Added file metadata display for the selected image.
+- Added a retake/reselect action that keeps the upload flow mobile-friendly.
+- Added client-side advisory hints for small images, possible blur, too-dark images, and too-bright images.
+- Clearly labeled client-side hints as advisory; server-side validation and server-side quality assessment remain authoritative.
+- Kept upload enabled when advisory hints appear.
+- Improved quality-failure recovery so server `422` responses keep the user on the upload form with clear warning details and a way to choose another image.
+- Added pure helper tests for preview metadata, reselect/replace state, advisory warning selection, and recovery prompt behavior.
+
+### Key Decisions
+
+- No browser-side result is trusted for persistence or enforcement.
+- Client-side heuristics mirror the server warning concepts but remain lower-fidelity because they run on a canvas preview sample.
+- Document detail remains the main place for full quality, duplicate, and review state.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+
+### Known Limitations
+
+- There is no full browser E2E suite for the preview interaction yet.
+- Client-side hints can differ from server-side quality results.
+- No crop tool, corner overlay, or perspective correction is implemented.
+- OCR, QR extraction, cheque parsing, bank verification, background queues, and microservices remain out of scope.

@@ -1,11 +1,13 @@
 import sharp from "sharp";
 import type { QualityMetrics, QualityStatus, QualityWarningCode } from "@/lib/models";
-
-export const minUsableDimension = 240;
-export const recommendedMinDimension = 800;
-export const darkLuminanceThreshold = 45;
-export const brightLuminanceThreshold = 225;
-export const blurrySharpnessThreshold = 55;
+import {
+  brightLuminanceThreshold,
+  blurrySharpnessThreshold,
+  darkLuminanceThreshold,
+  minUsableDimension,
+  qualityWarningLabels,
+  recommendedMinDimension
+} from "@/lib/quality-thresholds";
 
 export interface ImageQualityAssessment {
   qualityStatus: QualityStatus;
@@ -129,12 +131,5 @@ export function calculateLaplacianVariance(pixels: Buffer, width: number, height
 }
 
 export function formatQualityWarning(code: QualityWarningCode) {
-  const labels: Record<QualityWarningCode, string> = {
-    IMAGE_TOO_SMALL: "Image is small; retake closer if possible.",
-    BLURRY_IMAGE: "Image may be blurry; keep the camera steady.",
-    TOO_DARK: "Image is dark; use brighter, even lighting.",
-    TOO_BRIGHT: "Image is bright; avoid glare and direct reflections."
-  };
-
-  return labels[code];
+  return qualityWarningLabels[code];
 }
