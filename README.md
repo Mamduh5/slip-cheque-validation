@@ -50,6 +50,7 @@ npm run dev
 npm run typecheck
 npm run lint
 npm run test
+npm run test:e2e
 npm run build
 ```
 
@@ -92,6 +93,8 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 ## Verification Coverage
 
 Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, quality warnings/failures, upload preview helper behavior, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+
+Playwright covers the focused browser-critical upload preview path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, and recovery after a controlled server `422` quality failure. Run it with `npm run test:e2e`.
 
 ## Intentionally Not Implemented Yet
 

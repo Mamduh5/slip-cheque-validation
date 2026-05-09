@@ -3,6 +3,16 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 
 export async function getCurrentUser() {
+  const e2eUserId = getE2eTestUserId();
+
+  if (e2eUserId) {
+    return {
+      id: e2eUserId,
+      email: "e2e@example.test",
+      name: "E2E Test User"
+    };
+  }
+
   const session = await getServerSession(authOptions);
   return session?.user ?? null;
 }
@@ -15,4 +25,12 @@ export async function requireUser() {
   }
 
   return user;
+}
+
+function getE2eTestUserId() {
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+
+  return process.env.E2E_TEST_AUTH_USER_ID || null;
 }

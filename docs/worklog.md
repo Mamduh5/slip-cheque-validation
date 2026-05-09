@@ -190,6 +190,38 @@
 - Review notes and reset/reopen review actions are not implemented.
 - OCR, QR extraction, cheque parsing, bank verification, background queues, and microservices remain out of scope.
 
+## 2026-05-09 Focused Upload E2E
+
+### Changed
+
+- Added Playwright as the browser E2E tool for focused user-interaction coverage.
+- Added `npm run test:e2e`.
+- Added `playwright.config.ts` with a local Next.js dev server on port `3100`.
+- Added a dev/test-only auth bypass gated by `E2E_TEST_AUTH_USER_ID`, disabled in production.
+- Added stable upload-form test ids for the file input, preview card, replace button, submit button, and server error message.
+- Added browser E2E coverage for authenticated upload-page access, preview rendering, image replacement, and recovery after a controlled server `422` quality failure.
+- Added `.gitignore` entries for Playwright reports and test results.
+
+### Key Decisions
+
+- Playwright was chosen because it is the standard browser E2E tool for Next.js apps, supports file chooser interactions cleanly, and can run a local dev server from config.
+- The suite intentionally avoids real MongoDB and MinIO setup by intercepting the upload POST for the server-quality-failure scenario.
+- The E2E layer stays narrow; logic-heavy duplicate, review, and quality tests remain in Vitest.
+
+### Verification
+
+- `npm run test:e2e`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm audit --omit=dev`
+
+### Known Limitations
+
+- E2E currently covers preview and recovery only, not a full successful upload through MongoDB and MinIO.
+- The auth bypass is test-only and controlled by `E2E_TEST_AUTH_USER_ID`; it should not be enabled in production.
+
 ## 2026-05-09 Capture Quality Signals
 
 ### Changed

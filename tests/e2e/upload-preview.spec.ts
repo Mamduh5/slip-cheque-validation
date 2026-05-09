@@ -1,0 +1,80 @@
+import { expect, test } from "@playwright/test";
+
+const redPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+  "base64"
+);
+const bluePng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQCp8aGQAAAAAElFTkSuQmCC",
+  "base64"
+);
+
+test("authenticated user can preview and replace a selected image before upload", async ({ page }) => {
+  await page.goto("/upload");
+
+  await expect(page.getByRole("heading", { name: "Upload document" })).toBeVisible();
+
+  const fileInput = page.getByTestId("document-file-input");
+  await fileInput.setInputFiles({
+    name: "first-slip.png",
+    mimeType: "image/png",
+    buffer: redPng
+  });
+
+  await expect(page.getByTestId("selected-image-preview")).toBeVisible();
+  await expect(page.getByText("Preview before upload")).toBeVisible();
+  await expect(page.getByText("first-slip.png")).toBeVisible();
+  await expect(page.getByText("Advisory preview check")).toBeVisible();
+  await expect(page.getByTestId("upload-submit-button")).toBeEnabled();
+
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByTestId("replace-image-button").click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles({
+    name: "replacement-slip.png",
+    mimeType: "image/png",
+    buffer: bluePng
+  });
+
+  await expect(page.getByText("replacement-slip.png")).toBeVisible();
+  await expect(page.getByText("first-slip.png")).toHaveCount(0);
+});
+
+test("server quality failure keeps the user in a recovery flow", async ({ page }) => {
+  await page.route("**/api/documents", async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: "The selected image is too small to be useful. Retake it closer and include the full document.",
+        qualityStatus: "FAIL",
+        qualityWarnings: ["IMAGE_TOO_SMALL"],
+        qualityMetrics: {
+          width: 120,
+          height: 120,
+          meanLuminance: 128,
+          sharpness: 20
+        }
+      })
+    });
+  });
+
+  await page.goto("/upload");
+  await page.getByTestId("document-file-input").setInputFiles({
+    name: "tiny-slip.png",
+    mimeType: "image/png",
+    buffer: redPng
+  });
+
+  await expect(page.getByTestId("selected-image-preview")).toBeVisible();
+  await page.getByTestId("upload-submit-button").click();
+
+  await expect(
+    page.getByText("The selected image is too small to be useful. Retake it closer and include the full document.")
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("upload-error-message").getByText("Image is small. Retake closer if possible.")
+  ).toBeVisible();
+  await expect(page.getByTestId("selected-image-preview")).toBeVisible();
+  await expect(page.getByTestId("replace-image-button")).toBeEnabled();
+});

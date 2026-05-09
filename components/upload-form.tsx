@@ -109,7 +109,11 @@ export function UploadForm() {
   }
 
   return (
-    <form className="space-y-5 rounded-lg border border-line bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
+    <form
+      className="space-y-5 rounded-lg border border-line bg-white p-5 shadow-sm"
+      data-testid="upload-form"
+      onSubmit={handleSubmit}
+    >
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="documentType">
           Document type
@@ -151,6 +155,7 @@ export function UploadForm() {
           id="file"
           name="file"
           type="file"
+          data-testid="document-file-input"
           accept="image/jpeg,image/png,image/webp"
           capture={sourceType === "CAMERA" ? "environment" : undefined}
           onChange={handleFileChange}
@@ -162,7 +167,7 @@ export function UploadForm() {
       </div>
 
       {selectedPreview ? (
-        <div className="overflow-hidden rounded-md border border-line bg-white">
+        <div className="overflow-hidden rounded-md border border-line bg-white" data-testid="selected-image-preview">
           <div className="border-b border-line px-3 py-2">
             <p className="text-sm font-medium">Preview before upload</p>
             <p className="mt-1 truncate text-xs text-slate-500">
@@ -172,6 +177,7 @@ export function UploadForm() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="max-h-[420px] w-full bg-slate-50 object-contain"
+            data-testid="selected-image-preview-img"
             src={selectedPreview.previewUrl}
             alt="Selected document preview"
           />
@@ -194,9 +200,10 @@ export function UploadForm() {
               )}
             </div>
             <button
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400"
-              type="button"
-              onClick={chooseAnotherImage}
+            className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400"
+            type="button"
+            data-testid="replace-image-button"
+            onClick={chooseAnotherImage}
               disabled={isSubmitting}
             >
               Retake or choose another image
@@ -215,7 +222,10 @@ export function UploadForm() {
         </ul>
       </div>
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div
+          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          data-testid="upload-error-message"
+        >
           <p>{error}</p>
           {qualityWarnings.length > 0 ? (
             <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -229,6 +239,7 @@ export function UploadForm() {
       <button
         className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
+        data-testid="upload-submit-button"
         disabled={isSubmitting || !selectedPreview}
       >
         {isSubmitting ? "Uploading..." : selectedPreview ? "Upload selected image" : "Choose an image first"}

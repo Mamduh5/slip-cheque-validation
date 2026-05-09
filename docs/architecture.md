@@ -108,6 +108,17 @@ Client-side advisory hints are intentionally limited:
 
 If the server returns a quality failure such as an unusably small image, the user stays on the upload form, sees the server reason, and can retake or reselect without a dead end.
 
+## Browser E2E
+
+The project uses Playwright for a deliberately small browser E2E layer. It is scoped to user interaction that unit tests cannot cover well:
+
+- Reaching `/upload` as an authenticated user.
+- Rendering a selected image preview.
+- Replacing the selected image through the retake/reselect flow.
+- Showing recovery UI after a server-authoritative quality failure.
+
+The E2E config starts the Next.js dev server on port `3100`. It uses `E2E_TEST_AUTH_USER_ID` to enable a dev/test-only auth bypass in `lib/session.ts` and `proxy.ts`; the bypass is disabled when `NODE_ENV` is `production`. The quality-failure scenario intercepts `POST /api/documents` in the browser test and returns a controlled `422` response, so MongoDB and MinIO are not required for this focused suite.
+
 ## Duplicate Fields
 
 - `exactHash`: exact byte-level duplicate lookup.

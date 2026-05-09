@@ -12,6 +12,7 @@
 - Human review workflow for likely duplicates.
 - Capture quality warnings for photographed documents.
 - Pre-submit upload preview with advisory client-side capture hints.
+- Focused Playwright E2E coverage for upload preview and quality-failure recovery.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
 - Clear docs and Docker Compose local development.
@@ -19,6 +20,7 @@
 ## Next Phase
 
 - Add richer upload progress and persisted post-upload result messaging.
+- Add a happy-path browser E2E upload completion test when DB/object-storage fixtures are stable.
 - Add tests for registration and auth guard behavior.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
