@@ -99,6 +99,8 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Every upload creates an auditable document record. Exact duplicates are marked `EXACT_DUPLICATE` and linked to the earliest matching document.
 - Exact-match selection is deterministic: oldest `createdAt` wins, with `_id` as a stable tie-breaker.
 - Likely duplicates are marked `LIKELY_DUPLICATE` when no exact match exists and an owner-owned perceptual hash is within Hamming distance `8`. `similarityScore` is `1 - distance / 64`.
+- For `BANK_TRANSFER_SLIP`, duplicate detection is now structure-aware. Before promoting a perceptual match to `LIKELY_DUPLICATE`, the system compares existing structured evidence from QR decode and transfer metadata parsing. Identical raw QR payloads or identical raw transfer metadata payloads are treated as definitive duplicate signals. Any strong conflict (different raw QR payload, different raw metadata payload, different amount, different recipient, or different transaction reference) suppresses the `LIKELY_DUPLICATE` classification so clearly different slips do not enter review.
+- Non-slip document types and transfer slips without parsed metadata continue to use the generic image-based near-duplicate path.
 - Machine detection and human review are separate. `duplicateStatus` stores algorithm output; `reviewStatus` stores the user decision.
 - Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or mark not duplicate from the document detail page.
 - The dashboard supports filtering documents by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.

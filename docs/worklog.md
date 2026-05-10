@@ -2,6 +2,36 @@
 
 ## 2026-05-10
 
+### Structure-Aware Transfer-Slip Duplicate Detection
+
+#### Changed
+
+- Added `lib/transfer-slip-duplicate-assessment.ts` to centralize structured duplicate assessment for `BANK_TRANSFER_SLIP` documents.
+- The assessment compares `qrDecode.rawDecodedText`, `transferMetadata.rawPayload`, parsed `amount`, `merchantAccountInfo.targetIdentifier` (recipient), and `merchantAccountInfo.references.reference1` (transaction reference) between a new upload and perceptual-hash candidates.
+- Definitive positive signals (identical raw QR payload or identical raw metadata payload) override everything and accept the candidate as a duplicate.
+- Strong conflict signals (different raw QR payload, different raw metadata payload, different amount, different recipient, different transaction reference) suppress `LIKELY_DUPLICATE` classification when no definitive positive exists.
+- When suppression occurs, the document receives `duplicateStatus: NEW` and the `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: different amount, different recipient").
+- Added `findDuplicateMatchForUser` in `lib/documents.ts` that fetches full candidate documents (including `qrDecode` and `transferMetadata`) and runs the structured assessment on all perceptual candidates before selecting the best match.
+- Non-slip document types and transfer slips without parsed metadata continue to use the original generic image-only near-duplicate path.
+- Added 10 focused tests for the assessment logic: identical QR payload, different QR payload, different amount, different recipient, different transaction reference, different raw metadata payload, definitive signals, insufficient evidence, both sides lacking metadata, and conflict suppression with mixed fields.
+- Updated README, architecture, roadmap, and worklog documentation.
+
+#### Key Decisions
+
+- Image similarity is no longer the primary signal for `BANK_TRANSFER_SLIP` when structured evidence is available. It becomes a weaker signal or tie-breaker.
+- Any strong conflict suppresses the near-duplicate classification unless a definitive positive signal exists. This is intentionally conservative to reduce false review candidates.
+- The assessment is deterministic, uses only already-persisted data, and does not call external services.
+- Non-slip types were intentionally left on the original image-only path to keep the change focused and avoid destabilizing other document types.
+
+#### Verification
+
+- `npm run test` - all 89 tests pass (10 new assessment tests)
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+## 2026-05-10
+
 ### Local Structural Slip Verification
 
 #### Changed

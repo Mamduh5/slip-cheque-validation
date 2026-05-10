@@ -214,6 +214,9 @@ V1 computes `exactHash` during upload and checks for the earliest existing docum
 - Exact duplicate uploads still create a new document record for auditability.
 - Exact duplicate records use `duplicateStatus: "EXACT_DUPLICATE"`, set `matchedDocumentId`, and set `similarityScore` to `1`.
 - If there is no exact match, perceptual candidates are checked with owner-scoped dHash Hamming distance.
+- For `BANK_TRANSFER_SLIP` with parsed transfer metadata (`transferMetadata.result === "PARSED"`), the system first assesses structured evidence between the new document and each perceptual candidate before promoting to `LIKELY_DUPLICATE`. Identical `qrDecode.rawDecodedText` or identical `transferMetadata.rawPayload` are definitive positive signals. Different raw QR payload, different raw metadata payload, different amount, different recipient, or different transaction reference suppress the `LIKELY_DUPLICATE` classification.
+- Suppressed near-duplicates receive `duplicateStatus: "NEW"` and the `notes` field records the suppression reason.
+- Non-slip types and transfer slips without parsed metadata continue to use the original image-only near-duplicate path.
 - Likely duplicate records use `duplicateStatus: "LIKELY_DUPLICATE"`, set `matchedDocumentId`, and set `similarityScore` to `1 - hammingDistance / 64`.
 - Machine duplicate status remains separate from human review status.
 - New and exact duplicate records use `reviewStatus: "NOT_REQUIRED"`.

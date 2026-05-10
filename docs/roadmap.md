@@ -28,6 +28,7 @@
 - CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
+- Structure-aware transfer-slip duplicate detection that uses QR decode and parsed transfer metadata to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 

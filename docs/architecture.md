@@ -183,6 +183,25 @@ The normalized-image stage is intentionally small and in-process. It does not us
 - Likely duplicate threshold is Hamming distance `<= 8`, a conservative starting point.
 - Likely duplicate `similarityScore` means `1 - hammingDistance / 64`, rounded to four decimals. Exact duplicates continue to use `1`.
 
+## Structure-Aware Transfer-Slip Duplicate Detection
+
+For `BANK_TRANSFER_SLIP`, the duplicate decision layer is now structure-aware. After exact-hash matching, perceptual-hash candidates are collected and then assessed using structured evidence from QR decode and transfer metadata parsing. This prevents visually similar but structurally different slips from becoming false `LIKELY_DUPLICATE` review candidates.
+
+Evidence classes:
+
+- **Definitive positive signals** (override everything): identical `qrDecode.rawDecodedText`, identical `transferMetadata.rawPayload`.
+- **Strong conflict signals** (suppress `LIKELY_DUPLICATE` when no definitive positive exists): different `qrDecode.rawDecodedText`, different `transferMetadata.rawPayload`, different `amount`, different `merchantAccountInfo.targetIdentifier` (recipient), different `merchantAccountInfo.references.reference1` (transaction reference).
+- **Weak/tie-breaker signals** (used when structured evidence is insufficient or absent): perceptual image similarity, same bank template/layout.
+
+Decision behavior:
+
+- If a definitive positive signal exists, the candidate is accepted as a duplicate regardless of other differences.
+- If any strong conflict signal exists and there is no definitive positive, the `LIKELY_DUPLICATE` classification is suppressed. The document receives `duplicateStatus: NEW` and a `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: different amount, different recipient").
+- If structured evidence is insufficient (e.g., one side lacks parsed metadata, or neither side has the relevant fields), the system falls back to the generic perceptual-image path.
+- Non-slip document types and transfer slips without parsed metadata continue to use the original image-only near-duplicate path.
+
+The assessment logic lives in `lib/transfer-slip-duplicate-assessment.ts` and is consumed by `lib/documents.ts` during the upload duplicate-decision flow. It is deterministic, does not call external services, and does not modify the stored candidate documents.
+
 ## Capture Quality
 
 Quality assessment is a separate machine signal from duplicate detection and human review.

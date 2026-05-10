@@ -7,8 +7,14 @@ import { formatDocumentType, getDocumentTypeProcessingProfile } from "@/lib/docu
 import { getDb } from "@/lib/mongodb";
 import { resolveDuplicateDecision } from "@/lib/duplicate-detection";
 import { processUploadedDocumentImage } from "@/lib/document-processing";
-import { selectBestPerceptualMatch } from "@/lib/perceptual-hash";
+import {
+  hammingDistanceHex,
+  likelyDuplicateHammingThreshold,
+  selectBestPerceptualMatch,
+  similarityScoreFromHammingDistance
+} from "@/lib/perceptual-hash";
 import { filterUnreviewedCandidatePairs, upsertReviewedPair } from "@/lib/review-pairs";
+import { assessTransferSlipDuplicateCandidate } from "@/lib/transfer-slip-duplicate-assessment";
 import type {
   DocumentRecord,
   DocumentType,
@@ -88,6 +94,7 @@ export function buildUploadedDocumentRecord(input: {
   qualityMetrics: DocumentRecord["qualityMetrics"];
   qualityCheckedAt: DocumentRecord["qualityCheckedAt"];
   duplicateDecision: DuplicateDecision;
+  notes?: string | null;
 }): DocumentRecord {
   return {
     _id: input.documentId,
@@ -118,7 +125,7 @@ export function buildUploadedDocumentRecord(input: {
     qualityCheckedAt: input.qualityCheckedAt,
     exactHash: input.exactHash,
     perceptualHash: input.perceptualHash,
-    notes: null,
+    notes: input.notes ?? null,
     createdAt: input.now,
     updatedAt: input.now
   };
@@ -189,6 +196,129 @@ export async function findLikelyDuplicateMatchForUser(input: {
   return selectBestPerceptualMatch(unreviewedCandidates, input.perceptualHash);
 }
 
+export interface DuplicateMatchResult {
+  matchedDocumentId: string | null;
+  similarityScore: number | null;
+  suppressionNote?: string;
+}
+
+export async function findDuplicateMatchForUser(input: {
+  userId: string;
+  documentId: ObjectId;
+  perceptualHash: string;
+  documentType: DocumentType;
+  qrDecode: DocumentRecord["qrDecode"];
+  transferMetadata: DocumentRecord["transferMetadata"];
+  excludeDocumentId?: ObjectId;
+}): Promise<DuplicateMatchResult | null> {
+  const db = await getDb();
+  const query: {
+    userId: string;
+    perceptualHash: { $ne: null };
+    _id?: { $ne: ObjectId };
+  } = {
+    userId: input.userId,
+    perceptualHash: { $ne: null }
+  };
+
+  if (input.excludeDocumentId) {
+    query._id = { $ne: input.excludeDocumentId };
+  }
+
+  const candidates = await db
+    .collection<DocumentRecord>("documents")
+    .find(query, {
+      projection: {
+        _id: 1,
+        perceptualHash: 1,
+        createdAt: 1,
+        qrDecode: 1,
+        transferMetadata: 1
+      }
+    })
+    .sort({ createdAt: 1, _id: 1 })
+    .limit(200)
+    .toArray();
+  const unreviewedCandidates = await filterUnreviewedCandidatePairs({
+    userId: input.userId,
+    documentId: String(input.documentId),
+    candidates
+  });
+
+  const matches = unreviewedCandidates
+    .filter((candidate) => candidate.perceptualHash)
+    .map((candidate) => {
+      const distance = hammingDistanceHex(input.perceptualHash, candidate.perceptualHash as string);
+
+      return {
+        document: candidate,
+        hammingDistance: distance,
+        similarityScore: similarityScoreFromHammingDistance(distance)
+      };
+    })
+    .filter((match) => match.hammingDistance <= likelyDuplicateHammingThreshold)
+    .sort((left, right) => {
+      if (left.hammingDistance !== right.hammingDistance) {
+        return left.hammingDistance - right.hammingDistance;
+      }
+
+      const createdAtComparison =
+        left.document.createdAt.getTime() - right.document.createdAt.getTime();
+
+      if (createdAtComparison !== 0) {
+        return createdAtComparison;
+      }
+
+      return String(left.document._id).localeCompare(String(right.document._id));
+    });
+
+  if (matches.length === 0) {
+    return null;
+  }
+
+  // For transfer slips with parsed metadata, run structured assessment on all candidates
+  if (input.documentType === "BANK_TRANSFER_SLIP" && input.transferMetadata?.result === "PARSED") {
+    for (const match of matches) {
+      const assessment = assessTransferSlipDuplicateCandidate(
+        { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata },
+        {
+          qrDecode: match.document.qrDecode,
+          transferMetadata: match.document.transferMetadata
+        }
+      );
+      if (assessment.result !== "CONFLICT") {
+        return {
+          matchedDocumentId: String(match.document._id),
+          similarityScore: match.similarityScore
+        };
+      }
+    }
+
+    // All top candidates had strong conflicts
+    const firstConflict = assessTransferSlipDuplicateCandidate(
+      { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata },
+      {
+        qrDecode: matches[0].document.qrDecode,
+        transferMetadata: matches[0].document.transferMetadata
+      }
+    );
+
+    return {
+      matchedDocumentId: null,
+      similarityScore: null,
+      suppressionNote: firstConflict.notes
+    };
+  }
+
+  // Non-transfer-slip or no parsed metadata: return best perceptual match
+  const best = matches[0];
+
+  return {
+    matchedDocumentId: String(best.document._id),
+    similarityScore: best.similarityScore
+  };
+}
+
 export async function createUploadedDocument(input: {
   userId: string;
   documentType: DocumentType;
@@ -222,23 +352,27 @@ export async function createUploadedDocument(input: {
     documentType: documentTypeProfile.type,
     buffer: input.buffer
   });
-  const likelyDuplicateMatch =
+  const duplicateMatch =
     existingExactMatch === null
-      ? await findLikelyDuplicateMatchForUser({
+      ? await findDuplicateMatchForUser({
           userId: input.userId,
           documentId,
           perceptualHash: processedImage.perceptualHash,
+          documentType: input.documentType,
+          qrDecode: processedImage.qrDecode,
+          transferMetadata: processedImage.transferMetadata,
           excludeDocumentId: documentId
         })
       : null;
   const duplicateDecision = resolveDuplicateDecision({
     exactMatch: existingExactMatch,
-    nearMatch: likelyDuplicateMatch
-      ? {
-          matchedDocumentId: String(likelyDuplicateMatch.document._id),
-          similarityScore: likelyDuplicateMatch.similarityScore
-        }
-      : null
+    nearMatch:
+      duplicateMatch?.matchedDocumentId != null
+        ? {
+            matchedDocumentId: duplicateMatch.matchedDocumentId,
+            similarityScore: duplicateMatch.similarityScore as number
+          }
+        : null
   });
   const originalObject = await putOriginalDocumentObject({
     objectKey,
@@ -270,7 +404,8 @@ export async function createUploadedDocument(input: {
     qualityWarnings: processedImage.qualityWarnings,
     qualityMetrics: processedImage.qualityMetrics,
     qualityCheckedAt: processedImage.qualityCheckedAt,
-    duplicateDecision
+    duplicateDecision,
+    notes: duplicateMatch?.suppressionNote ?? null
   });
 
   await db.collection<DocumentRecord>("documents").insertOne(record);
