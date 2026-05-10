@@ -11,6 +11,7 @@
 - Owner-only audited document-type correction after upload.
 - Type-aware processing profiles with a slip-first branch for QR-oriented work.
 - Transfer-slip stage contract with active QR candidate analysis, QR decode, and transfer metadata parse, plus planned later verification.
+- Design-only slip verification contract documenting decode vs parse vs local structural validation vs external truth verification.
 - Executed transfer-slip QR-candidate analysis that records plausible QR-like regions.
 - Executed transfer-slip QR decode that extracts raw QR content without parsing or verifying business fields.
 - Executed transfer-slip metadata parsing that classifies decoded payloads and parses supported Thai QR payment payloads without verification.
@@ -34,7 +35,7 @@
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
-- Add slip verification only after parsed metadata semantics are stable and explicit verification sources are defined.
+- Add a non-executing `slipVerification` model or local structural-validation implementation only after the design contract in `docs/slip-verification-spec.md` is accepted.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.

@@ -4,6 +4,27 @@
 
 ### Changed
 
+- Added `docs/slip-verification-spec.md` as a design-only contract for future `SLIP_VERIFICATION`.
+- Defined the boundaries between raw decode, parsed metadata, local structural validation, and external truth verification.
+- Documented future verification inputs, proposed statuses/results, evidence categories, and a suggested non-live output shape.
+- Added safe UI/API terminology guidance and phrases to avoid unless a real external truth source exists.
+- Updated README, architecture, roadmap, data-model, and processing-profile wording to point to the spec and keep verification distinct from parsing.
+
+### Key Decisions
+
+- No runtime slip verification logic was implemented.
+- Local structural validation must not be called external verification.
+- Parsed metadata must continue to be presented as unverified.
+- External bank/provider truth remains unimplemented and must require an explicit future integration.
+
+### Verification
+
+- `npm run typecheck`
+
+## 2026-05-10 Transfer Metadata Parse
+
+### Changed
+
 - Implemented `TRANSFER_METADATA_PARSE` stage for bank transfer slips.
 - Added `lib/transfer-metadata-parse.ts` with decoded-payload classification before parsing.
 - Added conservative payload classifications: `THAI_QR_PAYMENT`, `GENERIC_URL`, `PLAIN_TEXT`, and `UNKNOWN_FORMAT`.

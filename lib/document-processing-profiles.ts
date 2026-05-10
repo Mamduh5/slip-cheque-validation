@@ -50,7 +50,8 @@ const transferSlipFutureStagePlan = [
     key: "SLIP_VERIFICATION",
     label: "Slip verification",
     status: "PLANNED",
-    description: "Future stage for validation checks after extraction exists."
+    description:
+      "Future stage for explicitly scoped verification. Local structural checks and external truth verification must remain separate."
   }
 ] as const;
 

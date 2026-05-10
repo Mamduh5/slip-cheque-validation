@@ -20,6 +20,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Owners can correct a document type after upload; type changes are audited and do not alter duplicate, review, or quality status.
 - Bank transfer slips run conservative QR-candidate analysis, QR decode, and transfer-metadata parsing stages.
 - QR decode stores raw decoded text. Transfer metadata parsing classifies decoded payloads first and only parses supported Thai QR payment payloads into structured fields. Parsed metadata is not verified.
+- `SLIP_VERIFICATION` is a planned stage with a design-only contract in `docs/slip-verification-spec.md`; no verification runtime or external truth source exists yet.
 - Document records and original-image previews are owner-only.
 - OCR, slip verification, cheque parsing, and bank verification are intentionally not implemented yet.
 
@@ -86,6 +87,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - `documentType` is a durable user-selected intake field. It is separate from duplicate, review, and quality status and prepares the record for later type-specific processing.
 - Correcting `documentType` makes the new type the source of truth for future type-aware stages. Existing original/normalized assets and duplicate/review/quality decisions remain unchanged, and transfer-slip QR-candidate, QR-decode, and transfer-metadata results are cleared because the record is not reprocessed during correction.
 - Upload processing records a type-aware processing profile. Bank transfer slips use the first slip-specific branch and now run QR-candidate analysis, QR decode, and transfer metadata parsing after normalized-image generation; slip verification remains planned only.
+- Slip verification terminology is intentionally strict: raw decode, parsed metadata, local structural checks, and external truth verification must remain separate.
 - Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
 - The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.
 - The perceptual hash is 64-bit dHash computed from the normalized derivative. dHash was chosen because it is simple, deterministic, fast, and adequate for a conservative first near-duplicate signal.

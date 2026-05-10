@@ -94,6 +94,8 @@ Profiles define the current branch and future stage hints:
 
 The profile is stored on new document records as lightweight metadata and exposed by document APIs. Planned stages are contract metadata only. They are not OCR or verification results.
 
+The planned `SLIP_VERIFICATION` stage is governed by `docs/slip-verification-spec.md`. That spec separates raw decode, parsed metadata, local structural validation, and external truth verification before any runtime verification code is added.
+
 ## Transfer-Slip QR-Candidate Analysis
 
 `QR_CANDIDATE` is now a real executed transfer-slip stage. It only applies to `BANK_TRANSFER_SLIP` documents.
@@ -132,6 +134,17 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Parsed fields remain an interpretation of the decoded payload only. They are not verified and are not proof of payment status, authenticity, or bank truth.
 - Unsupported formats produce clean `UNSUPPORTED_FORMAT` or `NO_STRUCTURED_METADATA` results instead of fake business fields.
 - Non-slip types do not run the stage.
+
+## Planned Slip Verification Boundary
+
+`SLIP_VERIFICATION` is not implemented. The design contract is documented in `docs/slip-verification-spec.md`.
+
+- Successful QR decode means raw QR content was extracted.
+- Successful transfer metadata parse means supported structure was interpreted from decoded QR content.
+- Local structural validation, if later implemented, can only say a payload is structurally consistent with supported rules.
+- External truth verification, if later implemented, requires a configured external evidence source and must identify what claim was checked.
+- Local structural consistency must not be labeled as bank/provider verification.
+- Until an external truth source exists, UI/API language must continue to say parsed values are not verified.
 
 ## Document-Type Correction
 

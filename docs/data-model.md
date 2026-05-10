@@ -147,8 +147,8 @@ Future type-specific work can use this field for QR handling, cheque-specific ex
 
 Owners can correct `documentType` after upload. Corrections:
 
-- update only `documentType`, `processingProfile`, `qrCandidateAnalysis`, and `updatedAt`;
-- clear any existing `qrCandidateAnalysis` because the image is not reprocessed during correction;
+- update only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, and `updatedAt`;
+- clear any existing `qrCandidateAnalysis`, `qrDecode`, and `transferMetadata` because the image is not reprocessed during correction;
 - write a `DOCUMENT_TYPE_UPDATED` audit log with old type, new type, who changed it, and when;
 - do not recompute duplicate matching, quality assessment, normalized images, exact hashes, or perceptual hashes;
 - make the corrected type the current source of truth for future type-aware stages.
@@ -165,11 +165,11 @@ Owners can correct `documentType` after upload. Corrections:
 Transfer slips include stage contract entries:
 
 - `QR_CANDIDATE`: active QR-like region candidate analysis on the normalized derivative. No QR decoding is performed.
-- `QR_DECODE`: future QR payload decoding.
-- `TRANSFER_METADATA_PARSE`: future parsing of decoded transfer metadata.
-- `SLIP_VERIFICATION`: future verification after extraction exists.
+- `QR_DECODE`: active QR payload decoding that stores raw decoded text without verification.
+- `TRANSFER_METADATA_PARSE`: active parsing of supported decoded transfer metadata without verification.
+- `SLIP_VERIFICATION`: planned verification stage governed by `docs/slip-verification-spec.md`; no runtime field exists yet.
 
-Profiles document the branch, active shared stages, transfer-slip QR-candidate analysis, and future stage hints. They do not mean QR decoding, OCR, cheque parsing, or bank verification has run.
+Profiles document the branch, active shared stages, active transfer-slip decode/parse stages, and planned stage hints. They do not mean OCR, cheque parsing, slip verification, or bank verification has run.
 
 ## Transfer-Slip QR-Candidate Fields
 
