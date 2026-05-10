@@ -5,12 +5,50 @@ import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
 import { ReviewStatusPill } from "@/components/review-status-pill";
-import { buildResultSummary, toneClasses } from "@/lib/document-result-summary";
+import {
+  buildResultSummary,
+  parseSuppressionReasons,
+  toneClasses
+} from "@/lib/document-result-summary";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeGuidance } from "@/lib/document-types";
 import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
 import { formatQualityWarning } from "@/lib/image-quality";
 import { requireUser } from "@/lib/session";
+
+function duplicateDecisionLabel(document: Awaited<ReturnType<typeof getDocumentForUser>>) {
+  if (!document) return null;
+
+  if (document.duplicateStatus === "EXACT_DUPLICATE") {
+    return { title: "Exact duplicate", description: "This upload is a byte-level exact match with another document.", tone: "info" as const };
+  }
+
+  if (document.duplicateStatus === "LIKELY_DUPLICATE") {
+    return {
+      title: "Likely duplicate — review needed",
+      description: "Image similarity suggests this may be the same document. A side-by-side comparison is available for your review.",
+      tone: "warning" as const
+    };
+  }
+
+  if (document.notes?.startsWith("Suppressed near-duplicate")) {
+    const reasons = parseSuppressionReasons(document.notes);
+    const reasonText =
+      reasons.length === 1
+        ? `Structured evidence shows the ${reasons[0]}.`
+        : reasons.length > 1
+          ? `Structured evidence shows differences: ${reasons.join(", ")}.`
+          : "Structured evidence showed differences between the documents.";
+
+    return {
+      title: "Near-duplicate review suppressed",
+      description: `A visually similar candidate was found, but it was not flagged for review. ${reasonText} For transfer slips, structured metadata outweighs visual similarity in duplicate detection.`,
+      tone: "info" as const
+    };
+  }
+
+  return { title: "New upload", description: "This document is treated as new based on current evidence.", tone: "positive" as const };
+}
 
 function formatBytes(bytes: number) {
   const mb = bytes / 1024 / 1024;
@@ -155,6 +193,39 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                   </div>
                 ))}
               </dl>
+            </div>
+          );
+        })()}
+
+        {/* Dedicated duplicate-decision transparency */}
+        {(() => {
+          const decision = duplicateDecisionLabel(document);
+          if (!decision) return null;
+
+          return (
+            <div
+              className="mt-4 rounded-lg border border-line bg-white p-4 shadow-sm"
+              data-testid="duplicate-decision-card"
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Duplicate decision</p>
+              <div className={`mt-2 rounded-md border p-3 text-sm ${toneClasses(decision.tone)}`}>
+                <p className="font-medium">{decision.title}</p>
+                <p className="mt-1 text-xs opacity-90">{decision.description}</p>
+              </div>
+              {document.matchedDocumentId && matchedDocument ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  {matchDescription(document.duplicateStatus)}{" "}
+                  <Link
+                    className="font-medium text-accent hover:text-accent-dark"
+                    href={`/documents/${String(matchedDocument._id)}`}
+                  >
+                    {matchedDocument.originalFilename}
+                  </Link>
+                  {document.similarityScore !== null && (
+                    <span> (visual similarity {formatSimilarity(document.similarityScore)})</span>
+                  )}
+                </p>
+              ) : null}
             </div>
           );
         })()}

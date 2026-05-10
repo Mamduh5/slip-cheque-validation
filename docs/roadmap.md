@@ -31,6 +31,8 @@
 - Structure-aware transfer-slip duplicate detection that uses QR decode and parsed transfer metadata to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
 - Staged upload progress indicator with disabled submit and clear stage labels.
 - Post-upload result summary on the document detail page derived from stored document fields, redirect-safe and refresh-safe.
+- Duplicate-decision transparency: a dedicated "Duplicate decision" card on the document detail page explaining exact duplicate, likely duplicate, new upload, and suppressed near-duplicate outcomes with structured-conflict reasons.
+- Dashboard suppression badges so users can visually distinguish suppressed near-duplicates from plain new uploads.
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 

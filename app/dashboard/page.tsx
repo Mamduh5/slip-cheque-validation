@@ -6,6 +6,7 @@ import { formatDocumentType } from "@/lib/document-types";
 import { duplicateStatuses, documentTypes } from "@/lib/models";
 import { getRecentDocumentsForUser } from "@/lib/documents";
 import { type DocumentReviewFilter } from "@/lib/formatters";
+import { parseSuppressionReasons } from "@/lib/document-result-summary";
 import { requireUser } from "@/lib/session";
 
 function formatDate(date: Date) {
@@ -13,6 +14,16 @@ function formatDate(date: Date) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function dashboardDuplicateSublabel(document: { duplicateStatus: string; notes?: string | null | undefined }): string | null {
+  if (document.duplicateStatus !== "NEW") return null;
+  if (!document.notes || !document.notes.startsWith("Suppressed near-duplicate")) return null;
+
+  const reasons = parseSuppressionReasons(document.notes);
+  if (reasons.length === 0) return "Suppressed near-duplicate";
+  if (reasons.length === 1) return `Suppressed: ${reasons[0]}`;
+  return `Suppressed: ${reasons[0]}, ${reasons[1]}${reasons.length > 2 ? "+" : ""}`;
 }
 
 const reviewFilters: Array<{ label: string; value: DocumentReviewFilter }> = [
@@ -121,6 +132,15 @@ export default async function DashboardPage({
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{document.originalFilename}</span>
                   <span className="block text-xs text-slate-500">{document.mimeType}</span>
+                  {(() => {
+                    const sublabel = dashboardDuplicateSublabel(document);
+                    if (!sublabel) return null;
+                    return (
+                      <span className="mt-1 inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
+                        {sublabel}
+                      </span>
+                    );
+                  })()}
                   <span className="block text-xs text-slate-500 sm:hidden">
                     {formatDocumentType(document.documentType)}
                   </span>

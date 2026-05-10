@@ -19,6 +19,8 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Lightweight framing guidance for paper-document photos.
 - Staged upload progress indicator showing "Uploading image…", "Processing document…", and "Finalizing result…" states with disabled submit to prevent duplicate uploads.
 - Post-upload result summary on the document detail page derived from stored fields: duplicate outcome, review status, quality warnings, and transfer-slip processing stage results. The summary is redirect-safe and refresh-safe because it reads the persisted document record.
+- Duplicate-decision transparency: the document detail page shows a dedicated "Duplicate decision" card that explains exactly why a document was marked as exact duplicate, likely duplicate, new upload, or suppressed near-duplicate. For suppressed transfer-slip near-duplicates, the card shows which structured differences (amount, recipient, transaction reference, QR payload) caused the suppression.
+- Dashboard list shows subtle suppression badges for near-duplicates that were suppressed by structured evidence, so users can distinguish them from plain new uploads at a glance.
 - Uploads require an explicit document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
 - Owners can correct a document type after upload; type changes are audited and do not alter duplicate, review, or quality status.
 - Bank transfer slips run conservative QR-candidate analysis, QR decode, and transfer-metadata parsing stages.

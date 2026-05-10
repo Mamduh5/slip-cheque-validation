@@ -266,6 +266,38 @@ The summary communicates:
 
 All wording is honest and conservative. It does not claim bank/provider verification, payment truth, or authenticity. The summary logic lives in `lib/document-result-summary.ts` as a pure function over `DocumentRecord`.
 
+## Duplicate-Decision Transparency
+
+Beyond the general upload result summary, the document detail page includes a dedicated **"Duplicate decision"** card that explains the duplicate outcome in more depth.
+
+### What it shows
+
+- **Exact duplicate**: title "Exact duplicate" with explanation that it is a byte-level match.
+- **Likely duplicate**: title "Likely duplicate — review needed" with explanation that image similarity suggests a match, and a side-by-side comparison is available.
+- **New upload**: title "New upload" with a brief explanation.
+- **Suppressed near-duplicate** (transfer slips only): title "Near-duplicate review suppressed" with a description that a visually similar candidate was found but not flagged for review, and which structured differences (amount, recipient, transaction reference, or QR payload) outweighed visual similarity.
+
+### Matched candidate reference
+
+If a match candidate exists (`matchedDocumentId`), the card also shows:
+- A link to the matched document
+- The visual similarity score when available
+
+### Dashboard visibility
+
+The dashboard list adds a small sky-blue badge under the filename for suppressed near-duplicates:
+- Single reason: `Suppressed: amount differed`
+- Two reasons: `Suppressed: amount differed, recipient differed`
+- More than two: `Suppressed: amount differed, recipient differed+`
+
+This helps users quickly distinguish suppressed near-duplicates from plain new uploads without opening each document.
+
+### Parsing stored notes
+
+The system reuses the existing `notes` field that was already being populated during upload. Notes follow the format `Suppressed near-duplicate: {reason1}, {reason2}`. A small `parseSuppressionReasons` helper in `lib/document-result-summary.ts` normalizes these raw reason strings into human-readable phrases like "amount differed", "recipient differed", "QR payload differed", etc.
+
+This is explanation UX only: no new verification logic, no external integration, no new stored fields.
+
 ## Browser E2E
 
 The project uses Playwright for a deliberately small browser E2E layer. It is scoped to user interaction that unit tests cannot cover well:

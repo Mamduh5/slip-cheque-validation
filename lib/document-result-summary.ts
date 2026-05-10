@@ -6,6 +6,46 @@ export interface ResultSummaryItem {
   tone: "neutral" | "positive" | "warning" | "info";
 }
 
+/**
+ * Parse a suppression note like "Suppressed near-duplicate: different amount, different recipient"
+ * into an array of human-readable reason fragments.
+ */
+export function parseSuppressionReasons(note: string | null): string[] {
+  if (!note || !note.startsWith("Suppressed near-duplicate:")) {
+    return [];
+  }
+
+  const reasonsText = note.replace("Suppressed near-duplicate:", "").trim();
+  if (!reasonsText) return [];
+
+  const rawReasons = reasonsText.split(",").map((r) => r.trim());
+
+  return rawReasons.map((reason) => {
+    switch (reason) {
+      case "different amount":
+        return "amount differed";
+      case "different recipient":
+        return "recipient differed";
+      case "different transaction reference":
+        return "transaction reference differed";
+      case "different raw QR payload":
+        return "QR payload differed";
+      case "different transfer metadata payload":
+        return "transfer metadata payload differed";
+      default:
+        return reason;
+    }
+  });
+}
+
+function formatSuppressionReasons(reasons: string[]): string {
+  if (reasons.length === 0) return "Structured differences found";
+  if (reasons.length === 1) return `Suppressed because ${reasons[0]}`;
+  const last = reasons[reasons.length - 1];
+  const rest = reasons.slice(0, -1).join(", ");
+  return `Suppressed because ${rest} and ${last}`;
+}
+
 export function buildResultSummary(document: DocumentRecord): ResultSummaryItem[] {
   const parts: ResultSummaryItem[] = [];
 
@@ -15,7 +55,17 @@ export function buildResultSummary(document: DocumentRecord): ResultSummaryItem[
   } else if (document.duplicateStatus === "LIKELY_DUPLICATE") {
     parts.push({ label: "Duplicate check", value: "Likely duplicate — review needed", tone: "warning" });
   } else if (document.notes?.startsWith("Suppressed near-duplicate")) {
-    parts.push({ label: "Duplicate check", value: "New upload (near-duplicate suppressed)", tone: "positive" });
+    const reasons = parseSuppressionReasons(document.notes);
+    parts.push({
+      label: "Duplicate check",
+      value: "Near-duplicate review suppressed",
+      tone: "info"
+    });
+    parts.push({
+      label: "Why",
+      value: formatSuppressionReasons(reasons),
+      tone: "info"
+    });
   } else {
     parts.push({ label: "Duplicate check", value: "New upload", tone: "positive" });
   }
@@ -61,11 +111,6 @@ export function buildResultSummary(document: DocumentRecord): ResultSummaryItem[
     } else if (document.transferMetadata?.result === "PARSE_FAILED") {
       parts.push({ label: "Metadata", value: "Parse failed", tone: "neutral" });
     }
-  }
-
-  // Suppression note
-  if (document.notes?.startsWith("Suppressed near-duplicate")) {
-    parts.push({ label: "Note", value: document.notes, tone: "info" });
   }
 
   return parts;

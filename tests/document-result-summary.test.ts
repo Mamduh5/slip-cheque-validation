@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildResultSummary, toneClasses } from "../lib/document-result-summary";
+import { buildResultSummary, parseSuppressionReasons, toneClasses } from "../lib/document-result-summary";
 import type { DocumentRecord } from "../lib/models";
 
 function makeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
@@ -71,7 +71,7 @@ describe("buildResultSummary", () => {
     expect(review?.tone).toBe("warning");
   });
 
-  it("shows suppressed near-duplicate when notes indicate suppression", () => {
+  it("shows suppressed near-duplicate with parsed reasons", () => {
     const summary = buildResultSummary(
       makeDocument({
         duplicateStatus: "NEW",
@@ -79,12 +79,24 @@ describe("buildResultSummary", () => {
       })
     );
     const duplicate = summary.find((s) => s.label === "Duplicate check");
-    const note = summary.find((s) => s.label === "Note");
+    const why = summary.find((s) => s.label === "Why");
 
-    expect(duplicate?.value).toBe("New upload (near-duplicate suppressed)");
-    expect(duplicate?.tone).toBe("positive");
-    expect(note?.value).toBe("Suppressed near-duplicate: different amount, different recipient");
-    expect(note?.tone).toBe("info");
+    expect(duplicate?.value).toBe("Near-duplicate review suppressed");
+    expect(duplicate?.tone).toBe("info");
+    expect(why?.value).toBe("Suppressed because amount differed and recipient differed");
+    expect(why?.tone).toBe("info");
+  });
+
+  it("shows suppressed with single reason", () => {
+    const summary = buildResultSummary(
+      makeDocument({
+        duplicateStatus: "NEW",
+        notes: "Suppressed near-duplicate: different raw QR payload"
+      })
+    );
+    const why = summary.find((s) => s.label === "Why");
+
+    expect(why?.value).toBe("Suppressed because QR payload differed");
   });
 
   it("shows confirmed duplicate review status", () => {
@@ -284,6 +296,42 @@ describe("buildResultSummary", () => {
     for (const term of forbidden) {
       expect(allText).not.toContain(term);
     }
+  });
+});
+
+describe("parseSuppressionReasons", () => {
+  it("parses amount and recipient conflicts", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: different amount, different recipient")).toEqual([
+      "amount differed",
+      "recipient differed"
+    ]);
+  });
+
+  it("parses QR payload conflict", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: different raw QR payload")).toEqual([
+      "QR payload differed"
+    ]);
+  });
+
+  it("parses transfer metadata payload conflict", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: different transfer metadata payload")).toEqual([
+      "transfer metadata payload differed"
+    ]);
+  });
+
+  it("parses transaction reference conflict", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: different transaction reference")).toEqual([
+      "transaction reference differed"
+    ]);
+  });
+
+  it("returns empty for non-suppression notes", () => {
+    expect(parseSuppressionReasons("Some other note")).toEqual([]);
+    expect(parseSuppressionReasons(null)).toEqual([]);
+  });
+
+  it("returns empty for empty suppression prefix", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate:")).toEqual([]);
   });
 });
 

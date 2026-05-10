@@ -39,6 +39,40 @@
 
 ## 2026-05-10
 
+### Duplicate-Decision Transparency
+
+#### Changed
+
+- Added `parseSuppressionReasons` to `lib/document-result-summary.ts` to normalize existing suppression notes like "Suppressed near-duplicate: different amount, different recipient" into human-readable reason fragments ("amount differed", "recipient differed", etc.).
+- Updated `buildResultSummary` so suppressed near-duplicates show:
+  - Duplicate check: "Near-duplicate review suppressed" (info tone, more visible than the old "New upload (near-duplicate suppressed)")
+  - Why: "Suppressed because {reasons}" with proper list formatting for multiple reasons
+- Added dedicated **"Duplicate decision"** card to `app/documents/[id]/page.tsx`:
+  - Exact duplicate: explains byte-level match, links to matched document with similarity score
+  - Likely duplicate: explains image similarity and side-by-side comparison availability
+  - New upload: brief explanation
+  - Suppressed near-duplicate: explains that a visually similar candidate was found but structured differences outweighed visual similarity, lists which differences (amount, recipient, transaction reference, QR payload)
+- Updated dashboard (`app/dashboard/page.tsx`) to show small sky-blue suppression badges under filenames for suppressed near-duplicates, with concise reason snippets like "Suppressed: amount differed" or "Suppressed: amount differed, recipient differed+".
+- Added 6 new tests for `parseSuppressionReasons` covering all known conflict types and edge cases.
+- Added 1 new test for single-reason suppression in `buildResultSummary`.
+- Updated existing suppressed test to match the new messaging format.
+
+#### Key Decisions
+
+- Reused the existing `notes` field (already populated by `lib/transfer-slip-duplicate-assessment.ts`) instead of adding new stored fields. This keeps the change purely UX/explanation.
+- Used `parseSuppressionReasons` as a single formatting helper so string parsing stays in one clean place, not scattered across components.
+- Kept dashboard badge subtle (small sky-blue pill, 10px font) so it does not overwhelm the list but still provides a useful signal.
+- All wording stays honest: "suppressed" not "verified different", "structured differences found" not "proved unrelated", "near-duplicate review suppressed" not "confirmed not duplicate".
+
+#### Verification
+
+- `npm run test` - all 112 tests pass (6 new parseSuppressionReasons tests, 1 new single-reason test, updated suppressed test)
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+## 2026-05-10
+
 ### Structure-Aware Transfer-Slip Duplicate Detection
 
 #### Changed
