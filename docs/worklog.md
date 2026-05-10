@@ -2,6 +2,26 @@
 
 ## 2026-05-10
 
+### Operations Runbook
+
+#### Changed
+
+- Added `docs/operations.md` with a general write-mode maintenance checklist.
+- Documented the `slipVerification` backfill workflow: backup reminder, environment variables, dry-run, real run, post-run confirmation, expected output, and caveats.
+- Linked the runbook from README, architecture, and roadmap docs without duplicating the full checklist.
+
+#### Key Decisions
+
+- Documentation-only change.
+- No verification logic, OCR, bank/provider integration, queue, service split, or command behavior change was added.
+- The runbook states that the backfill is optional, idempotent, does not create per-record audit logs, and only writes the safe no-evidence scaffold.
+
+#### Verification
+
+- `npm run lint`
+
+## 2026-05-10
+
 ### Slip Verification Backfill Policy
 
 #### Changed

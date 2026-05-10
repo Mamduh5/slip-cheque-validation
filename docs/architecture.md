@@ -143,7 +143,7 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Successful transfer metadata parse means supported structure was interpreted from decoded QR content.
 - The current `slipVerification` field uses `status: "COMPLETED"`, `result: "NOT_VERIFIED"`, and `evidenceCategory: "NO_EVIDENCE"` for new transfer-slip uploads.
 - Legacy transfer-slip records with missing or null `slipVerification` remain readable. API responses coalesce missing values to `null`, and the UI shows safe "not available" wording instead of implying verification.
-- Backfill is optional and operational, not automatic at startup. `npm run backfill:slip-verification -- --dry-run` reports eligible records; `npm run backfill:slip-verification` updates only `BANK_TRANSFER_SLIP` records where `slipVerification` is missing or null.
+- Backfill is optional and operational, not automatic at startup. `npm run backfill:slip-verification -- --dry-run` reports eligible records; `npm run backfill:slip-verification` updates only `BANK_TRANSFER_SLIP` records where `slipVerification` is missing or null. The operator checklist is in `docs/operations.md`.
 - The backfill sets only `slipVerification` to the same no-evidence scaffold used for new uploads. It does not modify duplicate, review, quality, QR-candidate, QR-decode, or transfer-metadata fields.
 - Local structural validation, if later implemented, can only say a payload is structurally consistent with supported rules.
 - External truth verification, if later implemented, requires a configured external evidence source and must identify what claim was checked.

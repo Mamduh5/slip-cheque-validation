@@ -28,7 +28,7 @@
 - CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
-- Clear docs and Docker Compose local development.
+- Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 
 ## Next Phase
 

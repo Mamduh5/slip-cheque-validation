@@ -68,7 +68,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 `npm run test:e2e:ci` is the CI-friendly wrapper. It runs the same Playwright suite with `CI=true` semantics and performs deterministic artifact cleanup afterward for the E2E user. Useful support commands are `npm run e2e:bootstrap`, `npm run e2e:wait`, `npm run e2e:cleanup`, and `npm run e2e:diagnostics`.
 
-`npm run backfill:slip-verification -- --dry-run` counts older `BANK_TRANSFER_SLIP` records with missing or null `slipVerification`. `npm run backfill:slip-verification` fills only those records with the safe `NOT_VERIFIED` / `NO_EVIDENCE` scaffold. The command is optional and idempotent; the app still reads legacy null records safely.
+`npm run backfill:slip-verification -- --dry-run` counts older `BANK_TRANSFER_SLIP` records with missing or null `slipVerification`. `npm run backfill:slip-verification` fills only those records with the safe `NOT_VERIFIED` / `NO_EVIDENCE` scaffold. The command is optional and idempotent; the app still reads legacy null records safely. Follow `docs/operations.md` before running write-mode maintenance commands.
 
 ## Environment Variables
 
