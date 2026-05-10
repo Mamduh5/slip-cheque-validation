@@ -455,3 +455,39 @@
 - There is no audit-history UI yet; correction events are stored in `audit_logs`.
 - A user can still choose the wrong type again.
 - Existing documents with missing or legacy type values still need migration/backfill before production data import.
+
+## 2026-05-10 Type-Aware Processing Boundary
+
+### Changed
+
+- Added `lib/document-processing-profiles.ts` as the single type-aware processing dispatch point.
+- Added processing branches for transfer slips, deposit/payment slips, cheques, and generic unknown documents.
+- Made `BANK_TRANSFER_SLIP` use the first slip-specific internal branch.
+- Persisted a lightweight `processingProfile` snapshot on new document records.
+- Exposed processing profile metadata through upload and document detail API responses.
+- Added a small processing profile note on document detail.
+- Updated document-type correction to update the current processing profile alongside the corrected type.
+- Added tests for profile dispatch, slip-specific branch selection, all supported upload types, API profile exposure, and real-service E2E profile display after correction.
+
+### Key Decisions
+
+- Current runtime behavior remains shared: quality assessment, normalized image generation, exact hash matching, and dHash near-duplicate matching.
+- Processing profiles are planning metadata, not evidence that extraction or verification has run.
+- Transfer slips are the first planned specialized path; likely future work is QR candidate handling.
+- Deposit/payment slips and cheques stay conservative/manual for now.
+- Unknown documents stay on the generic branch unless the owner corrects the type.
+- No OCR, QR extraction, cheque parsing, bank verification, automatic type inference, queue, microservice, crop tool, or camera overlay was added.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test:e2e`
+
+### Known Limitations
+
+- Profiles are lightweight metadata only; they do not execute specialized extraction stages.
+- Existing records without `processingProfile` rely on runtime fallback from `documentType` until backfilled.
+- Correcting a type updates the current profile but does not reprocess original or normalized assets.

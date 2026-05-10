@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
+import { getDocumentProcessingProfile, getTypeAwareProcessingPlan } from "../lib/document-processing-profiles";
 import {
   formatDocumentType,
   getDocumentTypeDescription,
@@ -18,7 +19,31 @@ describe("document helpers", () => {
     expect(getDocumentTypeGuidance("CHEQUE").title).toContain("cheques");
     expect(getDocumentTypeProcessingProfile("CHEQUE")).toMatchObject({
       type: "CHEQUE",
+      name: "cheque-v1",
       futureChequeExtractionCandidate: true
+    });
+  });
+
+  it("selects type-aware processing profiles for all supported document types", () => {
+    expect(getTypeAwareProcessingPlan("BANK_TRANSFER_SLIP")).toMatchObject({
+      specializedBranch: "slip",
+      profile: {
+        name: "bank-transfer-slip-v1",
+        branch: "TRANSFER_SLIP",
+        futureStages: expect.arrayContaining(["qr-candidate-handling"])
+      }
+    });
+    expect(getTypeAwareProcessingPlan("DEPOSIT_PAYMENT_SLIP")).toMatchObject({
+      specializedBranch: "payment-slip",
+      profile: { branch: "PAYMENT_SLIP" }
+    });
+    expect(getTypeAwareProcessingPlan("CHEQUE")).toMatchObject({
+      specializedBranch: "cheque",
+      profile: { branch: "CHEQUE" }
+    });
+    expect(getTypeAwareProcessingPlan("UNKNOWN")).toMatchObject({
+      specializedBranch: "generic",
+      profile: { branch: "GENERIC" }
     });
   });
 
@@ -60,6 +85,7 @@ describe("document helpers", () => {
         fileSize: 96,
         algorithm: "normalized-webp-grayscale-v1"
       },
+      processingProfile: getDocumentProcessingProfile("CHEQUE"),
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
       qualityStatus: "PASS",
@@ -91,6 +117,10 @@ describe("document helpers", () => {
       qualityWarnings: [],
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
+      processingProfile: {
+        name: "cheque-v1",
+        branch: "CHEQUE"
+      },
       status: "READY"
     });
     expect(record.createdAt).toBe(now);
@@ -118,6 +148,7 @@ describe("document helpers", () => {
         fileSize: 96,
         algorithm: "normalized-webp-grayscale-v1"
       },
+      processingProfile: getDocumentProcessingProfile("UNKNOWN"),
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "PASS",
@@ -163,6 +194,7 @@ describe("document helpers", () => {
         fileSize: 96,
         algorithm: "normalized-webp-grayscale-v1"
       },
+      processingProfile: getDocumentProcessingProfile("UNKNOWN"),
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "WARN",

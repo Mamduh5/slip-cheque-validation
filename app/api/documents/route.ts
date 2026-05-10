@@ -72,6 +72,7 @@ export async function POST(request: Request) {
     documentId: String(record._id),
     documentType: record.documentType,
     documentTypeLabel: formatDocumentType(record.documentType),
+    processingProfile: record.processingProfile,
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,

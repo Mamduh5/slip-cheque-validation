@@ -1,4 +1,5 @@
 import type { DocumentType } from "@/lib/models";
+import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 
 export const documentTypeLabels: Record<DocumentType, string> = {
   BANK_TRANSFER_SLIP: "Bank transfer slip",
@@ -53,7 +54,10 @@ export function getDocumentTypeGuidance(type: DocumentType) {
 }
 
 export function getDocumentTypeProcessingProfile(type: DocumentType) {
+  const profile = getDocumentProcessingProfile(type);
+
   return {
+    ...profile,
     type,
     futureQrCandidate: type === "BANK_TRANSFER_SLIP",
     futureChequeExtractionCandidate: type === "CHEQUE",

@@ -37,6 +37,8 @@ export const qualityWarningCodes = [
   "TOO_BRIGHT"
 ] as const;
 
+export const documentProcessingBranches = ["TRANSFER_SLIP", "PAYMENT_SLIP", "CHEQUE", "GENERIC"] as const;
+
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
@@ -45,6 +47,7 @@ export type ReviewStatus = (typeof reviewStatuses)[number];
 export type ReviewPairDecision = (typeof reviewPairDecisions)[number];
 export type QualityStatus = (typeof qualityStatuses)[number];
 export type QualityWarningCode = (typeof qualityWarningCodes)[number];
+export type DocumentProcessingBranch = (typeof documentProcessingBranches)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -77,6 +80,15 @@ export interface QualityMetrics {
   sharpness: number;
 }
 
+export interface DocumentProcessingProfileSnapshot {
+  name: string;
+  label: string;
+  branch: DocumentProcessingBranch;
+  description: string;
+  currentStages: string[];
+  futureStages: string[];
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -88,6 +100,7 @@ export interface DocumentRecord {
   originalObject: StoredObjectRef;
   normalizedObject: StoredObjectRef | null;
   normalizedImage: NormalizedImageMetadata | null;
+  processingProfile?: DocumentProcessingProfileSnapshot;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;

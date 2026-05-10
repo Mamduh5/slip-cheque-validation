@@ -39,6 +39,10 @@ Stores one registry record per uploaded document image.
 | `normalizedImage.mimeType` | string \| null | Currently `image/webp`. |
 | `normalizedImage.fileSize` | number \| null | Normalized derivative size in bytes. |
 | `normalizedImage.algorithm` | string \| null | Currently `normalized-webp-grayscale-v1`. |
+| `processingProfile.name` | string | Type-aware processing profile name, such as `bank-transfer-slip-v1`. |
+| `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
+| `processingProfile.currentStages` | string[] | Current enabled stages. All v1 types currently use shared quality, normalization, and duplicate stages. |
+| `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
@@ -110,10 +114,21 @@ Future type-specific work can use this field for QR handling, cheque-specific ex
 
 Owners can correct `documentType` after upload. Corrections:
 
-- update only `documentType` and `updatedAt`;
+- update only `documentType`, `processingProfile`, and `updatedAt`;
 - write a `DOCUMENT_TYPE_UPDATED` audit log with old type, new type, who changed it, and when;
 - do not recompute duplicate matching, quality assessment, normalized images, exact hashes, or perceptual hashes;
 - make the corrected type the current source of truth for future type-aware stages.
+
+## Type-Aware Processing Profile
+
+`processingProfile` is a lightweight snapshot of the current type-aware processing branch.
+
+- `BANK_TRANSFER_SLIP` uses `bank-transfer-slip-v1` on the `TRANSFER_SLIP` branch.
+- `DEPOSIT_PAYMENT_SLIP` uses `deposit-payment-slip-v1` on the `PAYMENT_SLIP` branch.
+- `CHEQUE` uses `cheque-v1` on the `CHEQUE` branch.
+- `UNKNOWN` uses `generic-unknown-v1` on the `GENERIC` branch.
+
+Profiles currently document the branch and future stage hints only. They do not mean QR extraction, OCR, cheque parsing, or bank verification has run.
 
 ## Duplicate-Check Fields
 

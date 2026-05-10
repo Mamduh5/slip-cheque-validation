@@ -5,6 +5,7 @@ import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
 import { ReviewStatusPill } from "@/components/review-status-pill";
+import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeGuidance } from "@/lib/document-types";
 import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
 import { formatQualityWarning } from "@/lib/image-quality";
@@ -60,6 +61,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     document.reviewStatus === "PENDING" &&
     matchedDocument !== null;
   const documentTypeGuidance = getDocumentTypeGuidance(document.documentType);
+  const processingProfile = document.processingProfile ?? getDocumentProcessingProfile(document.documentType);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
@@ -155,6 +157,12 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
         <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Type-specific intake note</dt>
           <dd className="mt-1 text-sm text-slate-700">{documentTypeGuidance.title}</dd>
+        </div>
+
+        <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Processing profile</dt>
+          <dd className="mt-1 text-sm font-medium text-slate-800">{processingProfile.label}</dd>
+          <dd className="mt-1 text-sm text-slate-700">{processingProfile.description}</dd>
         </div>
 
         <div className="mt-3 rounded-md border border-line p-3">

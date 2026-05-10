@@ -1,3 +1,4 @@
+import { getTypeAwareProcessingPlan } from "@/lib/document-processing-profiles";
 import { normalizeDocumentImage } from "@/lib/image-normalization";
 import { ImageQualityFailureError, assessImageQuality } from "@/lib/image-quality";
 import { calculateDHash } from "@/lib/perceptual-hash";
@@ -14,6 +15,7 @@ export class DocumentImageProcessingError extends Error {
 export interface ProcessedDocumentImage {
   normalizedObject: NonNullable<DocumentRecord["normalizedObject"]>;
   normalizedImage: NonNullable<DocumentRecord["normalizedImage"]>;
+  processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   perceptualHash: string;
   qualityStatus: DocumentRecord["qualityStatus"];
   qualityWarnings: DocumentRecord["qualityWarnings"];
@@ -35,6 +37,7 @@ export async function processUploadedDocumentImage(input: {
   buffer: Buffer;
 }): Promise<ProcessedDocumentImage> {
   try {
+    const processingPlan = getTypeAwareProcessingPlan(input.documentType);
     const quality = await assessImageQuality(input.buffer);
 
     if (quality.qualityStatus === "FAIL") {
@@ -54,6 +57,7 @@ export async function processUploadedDocumentImage(input: {
     return {
       normalizedObject,
       normalizedImage: normalized.metadata,
+      processingProfile: processingPlan.profile,
       perceptualHash,
       qualityStatus: quality.qualityStatus,
       qualityWarnings: quality.qualityWarnings,

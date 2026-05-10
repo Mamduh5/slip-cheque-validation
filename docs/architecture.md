@@ -73,7 +73,25 @@ Supported document types:
 - `CHEQUE`
 - `UNKNOWN`
 
-The processing boundary includes a small document-type profile so later stages can add slip QR handling, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
+The processing boundary includes a document-type processing profile so later stages can add slip QR handling, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
+
+## Type-Aware Processing Boundary
+
+`lib/document-processing-profiles.ts` is the single dispatch point for document-type-aware processing. The current runtime still uses shared intake stages for every type:
+
+- capture-quality assessment;
+- normalized image generation;
+- SHA-256 exact duplicate check;
+- dHash near-duplicate check.
+
+Profiles define the current branch and future stage hints:
+
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first planned specialized path; future work is likely QR candidate handling, printed-field extraction, and transfer-slip-specific validation.
+- `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
+- `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
+- `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
+
+The profile is stored on new document records as lightweight metadata and exposed by document APIs. It is a processing plan marker, not proof of content extraction or verification.
 
 ## Document-Type Correction
 
@@ -81,7 +99,7 @@ Owners can correct `documentType` after upload from the document detail page. Th
 
 Correction behavior is intentionally narrow:
 
-- Only `documentType` and `updatedAt` are changed on the document record.
+- Only `documentType`, `processingProfile`, and `updatedAt` are changed on the document record.
 - Non-owned or missing documents return `404`.
 - Invalid type values return `400`.
 - Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.

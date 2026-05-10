@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { ObjectId } from "mongodb";
+import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeProcessingProfile } from "@/lib/document-types";
 import { getDb } from "@/lib/mongodb";
 import { resolveDuplicateDecision } from "@/lib/duplicate-detection";
@@ -72,6 +73,7 @@ export function buildUploadedDocumentRecord(input: {
   originalObject: DocumentRecord["originalObject"];
   normalizedObject: DocumentRecord["normalizedObject"];
   normalizedImage: DocumentRecord["normalizedImage"];
+  processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -91,6 +93,7 @@ export function buildUploadedDocumentRecord(input: {
     originalObject: input.originalObject,
     normalizedObject: input.normalizedObject,
     normalizedImage: input.normalizedImage,
+    processingProfile: input.processingProfile,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
@@ -245,6 +248,7 @@ export async function createUploadedDocument(input: {
     originalObject,
     normalizedObject: processedImage.normalizedObject,
     normalizedImage: processedImage.normalizedImage,
+    processingProfile: processedImage.processingProfile,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,
@@ -269,6 +273,8 @@ export async function createUploadedDocument(input: {
       exactHash,
       documentType: record.documentType,
       documentTypeLabel: formatDocumentType(record.documentType),
+      processingProfileName: record.processingProfile?.name,
+      processingProfileBranch: record.processingProfile?.branch,
       perceptualHash: record.perceptualHash,
       matchedDocumentId: record.matchedDocumentId,
       qualityStatus: record.qualityStatus,
@@ -349,6 +355,8 @@ export async function updateDocumentTypeForUser(input: {
   const oldDuplicateStatus = document.duplicateStatus;
   const oldReviewStatus = document.reviewStatus;
   const oldQualityStatus = document.qualityStatus;
+  const oldProcessingProfile = document.processingProfile ?? getDocumentProcessingProfile(document.documentType);
+  const newProcessingProfile = getDocumentProcessingProfile(input.documentType);
 
   await db.collection<DocumentRecord>("documents").updateOne(
     {
@@ -358,6 +366,7 @@ export async function updateDocumentTypeForUser(input: {
     {
       $set: {
         documentType: input.documentType,
+        processingProfile: newProcessingProfile,
         updatedAt: now
       }
     }
@@ -373,6 +382,8 @@ export async function updateDocumentTypeForUser(input: {
       oldDocumentTypeLabel: formatDocumentType(oldDocumentType),
       newDocumentType: input.documentType,
       newDocumentTypeLabel: formatDocumentType(input.documentType),
+      oldProcessingProfileName: oldProcessingProfile.name,
+      newProcessingProfileName: newProcessingProfile.name,
       changedByUserId: input.userId,
       unchangedDuplicateStatus: oldDuplicateStatus,
       unchangedReviewStatus: oldReviewStatus,

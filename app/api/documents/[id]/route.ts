@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { documentTypes } from "@/lib/models";
 import {
   getDocumentForUser,
@@ -30,11 +31,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!document) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
+  const processingProfile = document.processingProfile ?? getDocumentProcessingProfile(document.documentType);
 
   return NextResponse.json({
     documentId: String(document._id),
     documentType: document.documentType,
     documentTypeLabel: formatDocumentType(document.documentType),
+    processingProfile,
     sourceType: document.sourceType,
     originalFilename: document.originalFilename,
     mimeType: document.mimeType,
@@ -86,11 +89,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!document) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
+  const processingProfile = document.processingProfile ?? getDocumentProcessingProfile(document.documentType);
 
   return NextResponse.json({
     documentId: String(document._id),
     documentType: document.documentType,
     documentTypeLabel: formatDocumentType(document.documentType),
+    processingProfile,
     duplicateStatus: document.duplicateStatus,
     duplicateStatusLabel: formatDuplicateStatus(document.duplicateStatus),
     reviewStatus: document.reviewStatus,

@@ -5,6 +5,7 @@ import { GET as getDocument, PATCH as updateDocument } from "../app/api/document
 import { GET as getOriginalDocument } from "../app/api/documents/[id]/original/route";
 import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
+import { getDocumentProcessingProfile } from "../lib/document-processing-profiles";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
 import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
@@ -208,6 +209,11 @@ async function upload(bytes?: string, documentType?: DocumentType) {
       qualityWarnings?: string[];
       documentType?: string;
       documentTypeLabel?: string;
+      processingProfile?: {
+        name: string;
+        branch: string;
+        futureStages: string[];
+      };
       error?: string;
     }
   };
@@ -220,7 +226,12 @@ describe("document API integration boundaries", () => {
     testState.reviewPairs.length = 0;
     testState.auditLogs.length = 0;
     testState.processUploadedDocumentImage.mockReset();
-    testState.processUploadedDocumentImage.mockImplementation(async (input: { userId: string; documentId: string; buffer: Buffer }) => ({
+    testState.processUploadedDocumentImage.mockImplementation(async (input: {
+      userId: string;
+      documentId: string;
+      documentType: DocumentType;
+      buffer: Buffer;
+    }) => ({
       normalizedObject: {
         bucket: "document-images",
         key: `documents/${input.userId}/${input.documentId}/normalized.webp`
@@ -232,6 +243,7 @@ describe("document API integration boundaries", () => {
         fileSize: 128,
         algorithm: "normalized-webp-grayscale-v1"
       },
+      processingProfile: getDocumentProcessingProfile(input.documentType),
       perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
       qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
       qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -257,12 +269,20 @@ describe("document API integration boundaries", () => {
     expect(body.duplicateStatus).toBe("NEW");
     expect(body.documentType).toBe("CHEQUE");
     expect(body.documentTypeLabel).toBe("Cheque");
+    expect(body.processingProfile).toMatchObject({
+      name: "cheque-v1",
+      branch: "CHEQUE"
+    });
     expect(body.matchedDocumentId).toBeNull();
     expect(body.similarityScore).toBeNull();
     expect(testState.documents).toHaveLength(1);
     expect(testState.documents[0]).toMatchObject({
       userId: "user-1",
       documentType: "CHEQUE",
+      processingProfile: {
+        name: "cheque-v1",
+        branch: "CHEQUE"
+      },
       status: "READY",
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
@@ -290,10 +310,40 @@ describe("document API integration boundaries", () => {
     const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
       params: Promise.resolve({ id: body.documentId as string })
     });
-    const detail = (await detailResponse.json()) as { documentType: string; documentTypeLabel: string };
+    const detail = (await detailResponse.json()) as {
+      documentType: string;
+      documentTypeLabel: string;
+      processingProfile: { name: string; branch: string };
+    };
 
     expect(detail.documentType).toBe("DEPOSIT_PAYMENT_SLIP");
     expect(detail.documentTypeLabel).toBe("Deposit/payment slip");
+    expect(detail.processingProfile).toMatchObject({
+      name: "deposit-payment-slip-v1",
+      branch: "PAYMENT_SLIP"
+    });
+  });
+
+  it("selects the correct processing profile for every supported upload type", async () => {
+    setSession("user-1");
+
+    const expectations: Array<[DocumentType, string, string]> = [
+      ["BANK_TRANSFER_SLIP", "bank-transfer-slip-v1", "TRANSFER_SLIP"],
+      ["DEPOSIT_PAYMENT_SLIP", "deposit-payment-slip-v1", "PAYMENT_SLIP"],
+      ["CHEQUE", "cheque-v1", "CHEQUE"],
+      ["UNKNOWN", "generic-unknown-v1", "GENERIC"]
+    ];
+
+    for (const [documentType, profileName, branch] of expectations) {
+      const { response, body } = await upload(`image bytes ${documentType}`, documentType);
+
+      expect(response.status).toBe(200);
+      expect(body.documentType).toBe(documentType);
+      expect(body.processingProfile).toMatchObject({
+        name: profileName,
+        branch
+      });
+    }
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {
@@ -311,6 +361,7 @@ describe("document API integration boundaries", () => {
     const payload = (await response.json()) as {
       documentType: string;
       documentTypeLabel: string;
+      processingProfile: { name: string; branch: string };
       duplicateStatus: string;
       reviewStatus: string;
       qualityStatus: string;
@@ -320,12 +371,20 @@ describe("document API integration boundaries", () => {
     expect(payload).toMatchObject({
       documentType: "BANK_TRANSFER_SLIP",
       documentTypeLabel: "Bank transfer slip",
+      processingProfile: {
+        name: "bank-transfer-slip-v1",
+        branch: "TRANSFER_SLIP"
+      },
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
       qualityStatus: "WARN"
     });
     expect(testState.documents[0]).toMatchObject({
       documentType: "BANK_TRANSFER_SLIP",
+      processingProfile: {
+        name: "bank-transfer-slip-v1",
+        branch: "TRANSFER_SLIP"
+      },
       duplicateStatus: before.duplicateStatus,
       matchedDocumentId: before.matchedDocumentId,
       similarityScore: before.similarityScore,
@@ -341,6 +400,8 @@ describe("document API integration boundaries", () => {
         metadata: expect.objectContaining({
           oldDocumentType: "CHEQUE",
           newDocumentType: "BANK_TRANSFER_SLIP",
+          oldProcessingProfileName: "cheque-v1",
+          newProcessingProfileName: "bank-transfer-slip-v1",
           changedByUserId: "user-1",
           unchangedDuplicateStatus: "NEW",
           unchangedReviewStatus: "NOT_REQUIRED",

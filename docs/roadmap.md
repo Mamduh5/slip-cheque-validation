@@ -9,6 +9,7 @@
 - Original image upload storage.
 - Explicit document-type intake for transfer slips, deposit/payment slips, cheques, and unknown documents.
 - Owner-only audited document-type correction after upload.
+- Type-aware processing profiles with a slip-first branch for future QR-oriented work.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.
@@ -29,6 +30,7 @@
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
+- Add real transfer-slip QR candidate handling as the first specialized processing stage when ready.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
