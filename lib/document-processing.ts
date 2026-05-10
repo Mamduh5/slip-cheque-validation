@@ -5,6 +5,7 @@ import { calculateDHash } from "@/lib/perceptual-hash";
 import { putNormalizedDocumentObject } from "@/lib/object-storage";
 import { analyzeQrCandidateFromNormalizedImage } from "@/lib/qr-candidate-analysis";
 import { attemptQrDecode } from "@/lib/qr-decode";
+import { buildSlipVerificationScaffold } from "@/lib/slip-verification";
 import { attemptTransferMetadataParse } from "@/lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType } from "@/lib/models";
 
@@ -22,6 +23,7 @@ export interface ProcessedDocumentImage {
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
   qrDecode: DocumentRecord["qrDecode"];
   transferMetadata: DocumentRecord["transferMetadata"];
+  slipVerification: DocumentRecord["slipVerification"];
   perceptualHash: string;
   qualityStatus: DocumentRecord["qualityStatus"];
   qualityWarnings: DocumentRecord["qualityWarnings"];
@@ -76,6 +78,10 @@ export async function processUploadedDocumentImage(input: {
             qrDecode
           })
         : null;
+    const slipVerification =
+      processingPlan.specializedBranch === "slip"
+        ? buildSlipVerificationScaffold()
+        : null;
 
     return {
       normalizedObject,
@@ -84,6 +90,7 @@ export async function processUploadedDocumentImage(input: {
       qrCandidateAnalysis,
       qrDecode,
       transferMetadata,
+      slipVerification,
       perceptualHash,
       qualityStatus: quality.qualityStatus,
       qualityWarnings: quality.qualityWarnings,

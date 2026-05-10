@@ -77,6 +77,7 @@ export function buildUploadedDocumentRecord(input: {
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
   qrDecode: DocumentRecord["qrDecode"];
   transferMetadata: DocumentRecord["transferMetadata"];
+  slipVerification: DocumentRecord["slipVerification"];
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -100,6 +101,7 @@ export function buildUploadedDocumentRecord(input: {
     qrCandidateAnalysis: input.qrCandidateAnalysis,
     qrDecode: input.qrDecode,
     transferMetadata: input.transferMetadata,
+    slipVerification: input.slipVerification,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
@@ -258,6 +260,7 @@ export async function createUploadedDocument(input: {
     qrCandidateAnalysis: processedImage.qrCandidateAnalysis,
     qrDecode: processedImage.qrDecode,
     transferMetadata: processedImage.transferMetadata,
+    slipVerification: processedImage.slipVerification,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,
@@ -296,6 +299,13 @@ export async function createUploadedDocument(input: {
             status: record.transferMetadata.status,
             result: record.transferMetadata.result,
             payloadFormat: record.transferMetadata.payloadFormat
+          }
+        : null,
+      slipVerification: record.slipVerification
+        ? {
+            status: record.slipVerification.status,
+            result: record.slipVerification.result,
+            evidenceCategory: record.slipVerification.evidenceCategory
           }
         : null,
       perceptualHash: record.perceptualHash,
@@ -393,6 +403,7 @@ export async function updateDocumentTypeForUser(input: {
         qrCandidateAnalysis: null,
         qrDecode: null,
         transferMetadata: null,
+        slipVerification: null,
         updatedAt: now
       }
     }
@@ -411,6 +422,7 @@ export async function updateDocumentTypeForUser(input: {
       oldProcessingProfileName: oldProcessingProfile.name,
       newProcessingProfileName: newProcessingProfile.name,
       qrCandidateAnalysisReset: document.qrCandidateAnalysis ? true : false,
+      slipVerificationReset: document.slipVerification ? true : false,
       changedByUserId: input.userId,
       unchangedDuplicateStatus: oldDuplicateStatus,
       unchangedReviewStatus: oldReviewStatus,

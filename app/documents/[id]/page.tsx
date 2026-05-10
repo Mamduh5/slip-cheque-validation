@@ -75,6 +75,18 @@ function formatTransferMetadataResult(result: string | undefined) {
   return "Transfer metadata parse not available";
 }
 
+function formatSlipVerificationResult(result: string | undefined) {
+  if (result === "NOT_VERIFIED") {
+    return "Not verified";
+  }
+
+  if (result === "UNSUPPORTED") {
+    return "Unsupported for verification";
+  }
+
+  return "Slip verification not available";
+}
+
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
@@ -323,6 +335,30 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                   </dl>
                 </dd>
               ) : null}
+            </div>
+
+            <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Slip verification</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-800">
+                {formatSlipVerificationResult(document.slipVerification?.result)}
+              </dd>
+              <dd className="mt-1 text-sm text-slate-700">
+                {document.slipVerification?.status === "COMPLETED" &&
+                document.slipVerification.result === "NOT_VERIFIED" &&
+                document.slipVerification.evidenceCategory === "NO_EVIDENCE"
+                  ? "No verification evidence is available. No local structural validation or external provider verification has been performed."
+                  : document.slipVerification?.status === "COMPLETED" &&
+                      document.slipVerification.result === "UNSUPPORTED"
+                    ? "This slip is unsupported for verification. Parsed metadata, if present, remains unverified."
+                    : document.slipVerification?.status === "SKIPPED"
+                      ? "Slip verification was skipped. Parsed metadata, if present, remains unverified."
+                      : document.slipVerification?.status === "NOT_APPLICABLE"
+                        ? "Slip verification is not applicable for this document."
+                        : "This record does not have slip verification scaffold results."}
+              </dd>
+              <dd className="mt-1 text-xs text-slate-500">
+                Parsed metadata is not confirmed payment truth, authenticity, or completion.
+              </dd>
             </div>
           </>
         ) : null}

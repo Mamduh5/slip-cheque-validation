@@ -61,6 +61,9 @@ export const transferMetadataPayloadFormats = [
   "PLAIN_TEXT",
   "UNKNOWN_FORMAT"
 ] as const;
+export const slipVerificationStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED"] as const;
+export const slipVerificationResults = ["NOT_VERIFIED", "UNSUPPORTED"] as const;
+export const slipVerificationEvidenceCategories = ["NO_EVIDENCE", "LOCAL_STRUCTURAL_CHECK"] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
@@ -79,6 +82,9 @@ export type QrDecodeOutcome = (typeof qrDecodeOutcomes)[number];
 export type TransferMetadataParseStageStatus = (typeof transferMetadataParseStageStatuses)[number];
 export type TransferMetadataParseResult = (typeof transferMetadataParseResults)[number];
 export type TransferMetadataPayloadFormat = (typeof transferMetadataPayloadFormats)[number];
+export type SlipVerificationStageStatus = (typeof slipVerificationStageStatuses)[number];
+export type SlipVerificationResult = (typeof slipVerificationResults)[number];
+export type SlipVerificationEvidenceCategory = (typeof slipVerificationEvidenceCategories)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -204,6 +210,16 @@ export interface TransferMetadataParseAnalysisResult {
   warnings: string[];
 }
 
+export interface SlipVerificationAnalysisResult {
+  stage: "SLIP_VERIFICATION";
+  algorithm: "slip-verification-scaffold-v1";
+  status: SlipVerificationStageStatus;
+  result: SlipVerificationResult;
+  evidenceCategory: SlipVerificationEvidenceCategory;
+  evaluatedAt: Date;
+  notes: string[];
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -219,6 +235,7 @@ export interface DocumentRecord {
   qrCandidateAnalysis?: QrCandidateAnalysisResult | null;
   qrDecode?: QrDecodeAnalysisResult | null;
   transferMetadata?: TransferMetadataParseAnalysisResult | null;
+  slipVerification?: SlipVerificationAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;

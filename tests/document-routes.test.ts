@@ -219,6 +219,7 @@ async function upload(bytes?: string, documentType?: DocumentType) {
         futureStages: string[];
       };
       qrCandidateAnalysis?: DocumentRecord["qrCandidateAnalysis"];
+      slipVerification?: DocumentRecord["slipVerification"];
       error?: string;
     }
   };
@@ -309,6 +310,23 @@ function buildMockTransferMetadata(documentType: DocumentType, buffer: Buffer): 
     : null;
 }
 
+function buildMockSlipVerification(documentType: DocumentType): DocumentRecord["slipVerification"] {
+  return documentType === "BANK_TRANSFER_SLIP"
+    ? {
+        stage: "SLIP_VERIFICATION",
+        algorithm: "slip-verification-scaffold-v1",
+        status: "COMPLETED",
+        result: "NOT_VERIFIED",
+        evidenceCategory: "NO_EVIDENCE",
+        evaluatedAt: new Date("2026-05-08T10:00:00.000Z"),
+        notes: [
+          "Slip verification runtime scaffold recorded with no verification evidence.",
+          "No local structural validation or external provider verification has been performed."
+        ]
+      }
+    : null;
+}
+
 describe("document API integration boundaries", () => {
   beforeEach(() => {
     setSession(null);
@@ -358,6 +376,7 @@ describe("document API integration boundaries", () => {
           : null,
       qrDecode: buildMockQrDecode(input.documentType, input.buffer),
       transferMetadata: buildMockTransferMetadata(input.documentType, input.buffer),
+      slipVerification: buildMockSlipVerification(input.documentType),
       perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
       qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
       qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -469,7 +488,7 @@ describe("document API integration boundaries", () => {
     }
   });
 
-  it("exposes transfer-slip QR-candidate, QR-decode, and transfer-metadata parse stage results without verification results", async () => {
+  it("exposes transfer-slip QR-candidate, QR-decode, transfer-metadata parse, and safe slip-verification scaffold results", async () => {
     setSession("user-1");
 
     const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
@@ -488,6 +507,7 @@ describe("document API integration boundaries", () => {
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
       qrDecode: DocumentRecord["qrDecode"];
       transferMetadata: DocumentRecord["transferMetadata"];
+      slipVerification: DocumentRecord["slipVerification"];
     };
 
     expect(detail.processingProfile.capabilities).toMatchObject({
@@ -518,6 +538,17 @@ describe("document API integration boundaries", () => {
       stage: "TRANSFER_METADATA_PARSE",
       status: "SKIPPED",
       result: "NO_STRUCTURED_METADATA"
+    });
+    expect(detail.slipVerification).toMatchObject({
+      stage: "SLIP_VERIFICATION",
+      algorithm: "slip-verification-scaffold-v1",
+      status: "COMPLETED",
+      result: "NOT_VERIFIED",
+      evidenceCategory: "NO_EVIDENCE"
+    });
+    expect(testState.documents[0].slipVerification).toMatchObject({
+      result: "NOT_VERIFIED",
+      evidenceCategory: "NO_EVIDENCE"
     });
   });
 
