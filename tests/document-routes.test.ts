@@ -554,6 +554,25 @@ describe("document API integration boundaries", () => {
     });
   });
 
+  it("keeps legacy transfer-slip records with missing slipVerification readable before backfill", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
+    delete (testState.documents[0] as Partial<DocumentRecord>).slipVerification;
+
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as {
+      documentType: string;
+      slipVerification: DocumentRecord["slipVerification"];
+    };
+
+    expect(detailResponse.status).toBe(200);
+    expect(detail.documentType).toBe("BANK_TRANSFER_SLIP");
+    expect(detail.slipVerification).toBeNull();
+  });
+
   it("successfully decodes QR content when candidate is found and QR is decodable", async () => {
     setSession("user-1");
 

@@ -57,6 +57,8 @@ npm run lint
 npm run test
 npm run test:e2e
 npm run test:e2e:ci
+npm run backfill:slip-verification -- --dry-run
+npm run backfill:slip-verification
 npm run build
 ```
 
@@ -65,6 +67,8 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 `npm run test:e2e` uses Playwright. The Playwright web-server command starts the existing Docker Compose `mongo` and `minio` services, waits for real MongoDB and MinIO client readiness, runs the Next.js app locally on `127.0.0.1:3100`, and waits for `/api/health`.
 
 `npm run test:e2e:ci` is the CI-friendly wrapper. It runs the same Playwright suite with `CI=true` semantics and performs deterministic artifact cleanup afterward for the E2E user. Useful support commands are `npm run e2e:bootstrap`, `npm run e2e:wait`, `npm run e2e:cleanup`, and `npm run e2e:diagnostics`.
+
+`npm run backfill:slip-verification -- --dry-run` counts older `BANK_TRANSFER_SLIP` records with missing or null `slipVerification`. `npm run backfill:slip-verification` fills only those records with the safe `NOT_VERIFIED` / `NO_EVIDENCE` scaffold. The command is optional and idempotent; the app still reads legacy null records safely.
 
 ## Environment Variables
 
@@ -87,6 +91,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - `documentType` is a durable user-selected intake field. It is separate from duplicate, review, and quality status and prepares the record for later type-specific processing.
 - Correcting `documentType` makes the new type the source of truth for future type-aware stages. Existing original/normalized assets and duplicate/review/quality decisions remain unchanged, and transfer-slip QR-candidate, QR-decode, transfer-metadata, and slip-verification scaffold results are cleared because the record is not reprocessed during correction.
 - Upload processing records a type-aware processing profile. Bank transfer slips use the first slip-specific branch and now run QR-candidate analysis, QR decode, transfer metadata parsing, and a minimal `slipVerification` scaffold after normalized-image generation; actual verification remains planned only.
+- Older transfer-slip records may have `slipVerification` missing or null. The read path displays them safely, and the optional backfill command only adds the no-evidence scaffold without touching duplicate, review, quality, QR, or transfer-metadata fields.
 - Slip verification terminology is intentionally strict: raw decode, parsed metadata, local structural checks, and external truth verification must remain separate.
 - Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
 - The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.

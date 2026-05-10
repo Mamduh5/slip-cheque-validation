@@ -178,6 +178,25 @@ Transfer slips include stage contract entries:
 
 Profiles document the branch, active shared stages, active transfer-slip decode/parse stages, and planned stage hints. They do not mean OCR, cheque parsing, slip verification, or bank verification has run.
 
+## Slip Verification Backfill Policy
+
+The app is lazy-compatible with older transfer-slip records where `slipVerification` is missing or null. Document detail APIs return `slipVerification: null` for those records, and the UI presents safe not-available wording.
+
+An optional idempotent maintenance command can normalize persisted shape:
+
+```bash
+npm run backfill:slip-verification -- --dry-run
+npm run backfill:slip-verification
+```
+
+The backfill:
+
+- targets only `BANK_TRANSFER_SLIP` records where `slipVerification` is missing or null;
+- sets only `slipVerification` to the safe `SLIP_VERIFICATION` / `COMPLETED` / `NOT_VERIFIED` / `NO_EVIDENCE` scaffold;
+- skips records that already have `slipVerification`;
+- skips all non-transfer-slip document types;
+- does not change duplicate, review, quality, hash, object, QR-candidate, QR-decode, transfer-metadata, or document-type fields.
+
 ## Transfer-Slip QR-Candidate Fields
 
 `qrCandidateAnalysis` is only populated for new `BANK_TRANSFER_SLIP` records processed after the QR-candidate stage was added. The stage uses the normalized derivative and an explainable high-contrast square-window heuristic to record whether a plausible QR-like region exists.

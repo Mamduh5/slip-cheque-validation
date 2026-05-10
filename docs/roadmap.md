@@ -16,6 +16,7 @@
 - Executed transfer-slip QR decode that extracts raw QR content without parsing or verifying business fields.
 - Executed transfer-slip metadata parsing that classifies decoded payloads and parses supported Thai QR payment payloads without verification.
 - Persisted transfer-slip `slipVerification` scaffold that currently records `NOT_VERIFIED` with `NO_EVIDENCE` only.
+- Optional idempotent `slipVerification` backfill command for older transfer-slip records, with lazy-compatible read behavior before backfill.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.

@@ -14,6 +14,7 @@
     "e2e:wait": "node scripts/e2e-env.mjs wait --app",
     "e2e:cleanup": "node scripts/e2e-env.mjs cleanup",
     "e2e:diagnostics": "node scripts/e2e-env.mjs diagnostics",
+    "backfill:slip-verification": "node scripts/backfill-slip-verification.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

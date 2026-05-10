@@ -2,6 +2,32 @@
 
 ## 2026-05-10
 
+### Slip Verification Backfill Policy
+
+#### Changed
+
+- Added `lib/slip-verification-backfill.ts` with a reusable idempotent backfill query/update path.
+- Added `scripts/backfill-slip-verification.mjs` and `npm run backfill:slip-verification`.
+- Added `--dry-run` support to report eligible legacy transfer-slip records without updating them.
+- Kept document reads lazy-compatible with missing or null `slipVerification`; detail API returns null and UI remains safe.
+- Added tests for missing/null targeting, non-slip skip behavior, populated-record skip behavior, idempotency, dry-run reporting, update arguments, and legacy detail API readability.
+- Updated README, architecture, roadmap, and data-model docs with the policy and command.
+
+#### Key Decisions
+
+- No startup migration was added.
+- The backfill only targets `BANK_TRANSFER_SLIP` records where `slipVerification` is missing or null.
+- The backfill only sets the safe no-evidence scaffold and does not modify duplicate, review, quality, QR, transfer metadata, hash, object, or document-type fields.
+- No local structural validation, external provider integration, OCR, cheque parsing, queue, or new service was added.
+
+#### Verification
+
+- `npm run test` - all 65 tests pass
+- `npm run typecheck`
+- `npm run lint`
+
+## 2026-05-10
+
 ### Slip Verification Runtime Scaffold
 
 #### Changed
