@@ -99,6 +99,15 @@ The upload UI gives mobile capture guidance: keep the document flat, include all
 
 The upload form now shows a local image preview after file selection or camera capture. Users can inspect the selected image before final upload and quickly retake or choose another image.
 
+The upload page also includes lightweight framing guidance for photographed paper documents:
+
+- A short capture checklist near the upload control.
+- A static phone-photo framing card that reminds users to keep the paper edges visible.
+- Corner-style guides on the selected-image preview.
+- A preview checklist for corners, frame fill, sharpness, glare, and shadows.
+
+These framing aids are not document detection. They do not crop, transform, verify, or block images.
+
 Client-side advisory hints are intentionally limited:
 
 - The browser checks selected image dimensions, average brightness, and a simple canvas sharpness heuristic.

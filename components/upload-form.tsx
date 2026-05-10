@@ -147,7 +147,7 @@ export function UploadForm() {
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="file">
-          Image
+          Take a photo or choose an image
         </label>
         <input
           ref={fileInputRef}
@@ -162,7 +162,7 @@ export function UploadForm() {
           required
         />
         <p className="mt-2 text-xs text-slate-500">
-          Take a new photo or choose an existing JPEG, PNG, or WebP image.
+          Use the camera on phones, or select an existing JPEG, PNG, or WebP image.
         </p>
       </div>
 
@@ -174,14 +174,34 @@ export function UploadForm() {
               {selectedPreview.fileName} | {selectedPreview.fileSizeLabel} | {selectedPreview.mimeType}
             </p>
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="max-h-[420px] w-full bg-slate-50 object-contain"
-            data-testid="selected-image-preview-img"
-            src={selectedPreview.previewUrl}
-            alt="Selected document preview"
-          />
+          <div className="relative bg-slate-100" data-testid="preview-framing-aid">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="max-h-[420px] w-full object-contain"
+              data-testid="selected-image-preview-img"
+              src={selectedPreview.previewUrl}
+              alt="Selected document preview"
+            />
+            <div className="pointer-events-none absolute inset-3 rounded-sm border border-white/70 shadow-[0_0_0_9999px_rgba(15,23,42,0.08)]">
+              <span className="absolute left-0 top-0 h-8 w-8 border-l-2 border-t-2 border-emerald-500" />
+              <span className="absolute right-0 top-0 h-8 w-8 border-r-2 border-t-2 border-emerald-500" />
+              <span className="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-emerald-500" />
+              <span className="absolute bottom-0 right-0 h-8 w-8 border-b-2 border-r-2 border-emerald-500" />
+            </div>
+          </div>
           <div className="space-y-3 border-t border-line p-3">
+            <div
+              className="rounded-md border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-950"
+              data-testid="preview-checklist"
+            >
+              <p className="font-medium">Before uploading, check the photo.</p>
+              <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                <li>All corners are visible.</li>
+                <li>The paper fills most of the frame.</li>
+                <li>Text and edges look sharp.</li>
+                <li>There is no heavy glare or shadow.</li>
+              </ul>
+            </div>
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
               <p className="font-medium text-slate-800">Advisory preview check</p>
               <p className="mt-1">
@@ -190,9 +210,11 @@ export function UploadForm() {
               {isAnalyzingPreview ? (
                 <p className="mt-2 text-xs text-slate-500">Checking the preview...</p>
               ) : selectedPreview.advisoryWarnings.length > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-orange-800">
+                <ul className="mt-2 flex flex-wrap gap-2 text-xs text-orange-900">
                   {selectedPreview.advisoryWarnings.map((warning) => (
-                    <li key={warning}>{qualityWarningLabels[warning]}</li>
+                    <li key={warning} className="rounded-full border border-orange-200 bg-orange-50 px-2 py-1">
+                      {qualityWarningLabels[warning]}
+                    </li>
                   ))}
                 </ul>
               ) : (
@@ -200,10 +222,10 @@ export function UploadForm() {
               )}
             </div>
             <button
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400"
-            type="button"
-            data-testid="replace-image-button"
-            onClick={chooseAnotherImage}
+              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400 sm:w-auto"
+              type="button"
+              data-testid="replace-image-button"
+              onClick={chooseAnotherImage}
               disabled={isSubmitting}
             >
               Retake or choose another image

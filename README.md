@@ -15,7 +15,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Near-duplicate detection is implemented using a normalized image derivative and 64-bit dHash.
 - Likely duplicates have a separate human review workflow with side-by-side comparison.
 - Capture quality assessment records warning signals for small, blurry, dark, or bright images.
-- Upload includes a pre-submit image preview with advisory client-side capture hints and a retake/reselect flow.
+- Upload includes light framing guidance, a pre-submit image preview with advisory client-side capture hints, and a retake/reselect flow.
 - Document records and original-image previews are owner-only.
 - OCR, QR extraction, cheque parsing, and bank verification are intentionally not implemented yet.
 
@@ -91,6 +91,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Quality assessment is separate from duplicate and review state. Accepted uploads store `qualityStatus`, `qualityWarnings`, `qualityMetrics`, and `qualityCheckedAt`.
 - Most quality issues warn and continue. Clearly unusable tiny images are rejected with a capture-quality error before the duplicate pipeline runs.
 - Client-side preview hints are advisory only. Server-side validation and quality assessment remain the source of truth.
+- Framing aids are static guidance only. They do not detect documents, crop images, or verify document contents.
 - If the server rejects a poor-quality image, the upload form keeps the user in a recovery flow so they can retake or choose another image.
 - API upload, document detail, and original-image routes require authentication. Missing or non-owned documents return `404` for owner-scoped lookups, so another user's document existence is not exposed.
 - TypeScript imports use the `@/*` `paths` alias without `baseUrl`, which avoids relying on deprecated `baseUrl` behavior.
@@ -108,5 +109,6 @@ Playwright covers the focused browser-critical upload path: authenticated `/uplo
 - Cheque verification or clearing integration.
 - Admin workflows, profile management, and document deletion.
 - Background workers or queue-based processing.
+- Live camera framing overlays, crop tools, and perspective correction UI.
 
 See `docs/` for architecture, roadmap, data model, and task progress notes.

@@ -19,6 +19,9 @@ test("authenticated user can preview and replace a selected image before upload"
   await page.goto("/upload");
 
   await expect(page.getByRole("heading", { name: "Upload document" })).toBeVisible();
+  await expect(page.getByTestId("capture-guidance")).toContainText("Frame the paper clearly");
+  await expect(page.getByTestId("capture-guidance")).toContainText("Fill most of the frame");
+  await expect(page.getByTestId("framing-guide-card")).toContainText("Phone photo framing guide");
 
   const fileInput = page.getByTestId("document-file-input");
   await fileInput.setInputFiles({
@@ -28,9 +31,13 @@ test("authenticated user can preview and replace a selected image before upload"
   });
 
   await expect(page.getByTestId("selected-image-preview")).toBeVisible();
+  await expect(page.getByTestId("preview-framing-aid")).toBeVisible();
+  await expect(page.getByTestId("preview-checklist")).toContainText("All corners are visible");
+  await expect(page.getByTestId("preview-checklist")).toContainText("The paper fills most of the frame");
   await expect(page.getByText("Preview before upload")).toBeVisible();
   await expect(page.getByText("first-slip.png")).toBeVisible();
   await expect(page.getByText("Advisory preview check")).toBeVisible();
+  await expect(page.getByText("Image is small. Retake closer if possible.")).toBeVisible();
   await expect(page.getByTestId("upload-submit-button")).toBeEnabled();
 
   const fileChooserPromise = page.waitForEvent("filechooser");

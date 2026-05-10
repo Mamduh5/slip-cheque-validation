@@ -12,6 +12,7 @@
 - Human review workflow for likely duplicates.
 - Capture quality warnings for photographed documents.
 - Pre-submit upload preview with advisory client-side capture hints.
+- Lightweight framing guidance for paper-document photos.
 - Focused Playwright E2E coverage for upload preview and quality-failure recovery.
 - One real-service Playwright happy-path upload test through MongoDB and MinIO.
 - CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
@@ -24,6 +25,7 @@
 - Add richer upload progress and persisted post-upload result messaging.
 - Add a provider-specific CI workflow only when the target provider is known.
 - Add tests for registration and auth guard behavior.
+- Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.

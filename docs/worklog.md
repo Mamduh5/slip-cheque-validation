@@ -356,3 +356,35 @@
 - CI runners must provide Docker Compose and a working browser environment for Playwright.
 - The bootstrap does not stop Docker services automatically; it cleans test artifacts and leaves shared local services running.
 - No provider-specific CI workflow is committed until the deployment/CI target is known.
+
+## 2026-05-10 Upload Framing Guidance
+
+### Changed
+
+- Added a clearer upload-page capture checklist for paper document photos.
+- Added a static phone-photo framing card with corner marks as visual guidance.
+- Added corner-style framing aids around the selected-image preview.
+- Added a preview checklist that reminds users to check corners, frame fill, sharpness, glare, and shadows before upload.
+- Kept advisory warning badges visible in the preview area and preserved the retake/reselect flow.
+- Added Playwright assertions for the framing guidance, preview framing aid, advisory warning display, and reselect behavior.
+
+### Key Decisions
+
+- Framing aids are guidance only. They do not detect documents, crop images, validate contents, or replace server-side quality checks.
+- Client-side advisory hints remain separate from server-side quality status.
+- Duplicate status, review status, and quality status were not changed.
+- No crop tool, perspective correction UI, live camera overlay, OCR, QR extraction, cheque parsing, bank verification, queue, or microservice was added.
+
+### Verification
+
+- `npm run test:e2e`
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+### Known Limitations
+
+- The framing guide is static and cannot tell whether the actual document is aligned or complete.
+- Users can still upload photos that ignore the guide unless server-side validation rejects them.
+- More advanced capture tooling, such as crop handles or perspective correction, remains intentionally out of scope.
