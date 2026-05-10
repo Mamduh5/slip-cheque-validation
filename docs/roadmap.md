@@ -10,9 +10,10 @@
 - Explicit document-type intake for transfer slips, deposit/payment slips, cheques, and unknown documents.
 - Owner-only audited document-type correction after upload.
 - Type-aware processing profiles with a slip-first branch for QR-oriented work.
-- Transfer-slip stage contract with active QR candidate analysis and QR decode, plus planned metadata parse and later verification.
+- Transfer-slip stage contract with active QR candidate analysis, QR decode, and transfer metadata parse, plus planned later verification.
 - Executed transfer-slip QR-candidate analysis that records plausible QR-like regions.
 - Executed transfer-slip QR decode that extracts raw QR content without parsing or verifying business fields.
+- Executed transfer-slip metadata parsing that classifies decoded payloads and parses supported Thai QR payment payloads without verification.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.
@@ -33,7 +34,7 @@
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
-- Add transfer-slip metadata parsing to interpret decoded QR payloads into structured bank/account/amount/reference fields.
+- Add slip verification only after parsed metadata semantics are stable and explicit verification sources are defined.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
@@ -45,7 +46,8 @@
 - Stronger image normalization for skew, crop, glare, and rotation edge cases.
 - Better client-side camera guidance, preview cropping, and corner framing aids.
 - Cluster-level duplicate review behavior beyond pair memory.
-- Transfer metadata parsing and slip verification for bank transfer slips.
+- Broader transfer payload parsing formats beyond the initial Thai QR payment support.
+- Slip verification for bank transfer slips.
 - OCR-assisted field extraction.
 - Cheque-specific field extraction.
 - Review workflow for possible duplicates.

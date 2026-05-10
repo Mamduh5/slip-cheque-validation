@@ -55,6 +55,26 @@ function formatQrCandidateResult(result: string | undefined) {
   return "QR candidate analysis not available";
 }
 
+function formatTransferMetadataResult(result: string | undefined) {
+  if (result === "PARSED") {
+    return "Transfer metadata parsed";
+  }
+
+  if (result === "UNSUPPORTED_FORMAT") {
+    return "Unsupported QR payload format";
+  }
+
+  if (result === "NO_STRUCTURED_METADATA") {
+    return "No structured transfer metadata";
+  }
+
+  if (result === "PARSE_FAILED") {
+    return "Transfer metadata parse failed";
+  }
+
+  return "Transfer metadata parse not available";
+}
+
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
@@ -239,6 +259,68 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                   <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-800">
                     {document.qrDecode.rawDecodedText}
                   </pre>
+                </dd>
+              ) : null}
+            </div>
+
+            <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Transfer metadata parse</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-800">
+                {formatTransferMetadataResult(document.transferMetadata?.result)}
+              </dd>
+              <dd className="mt-1 text-sm text-slate-700">
+                {document.transferMetadata?.status === "COMPLETED" && document.transferMetadata.result === "PARSED"
+                  ? `Decoded QR payload was classified as ${document.transferMetadata.payloadFormat} and parsed into structured metadata. These values are not verified.`
+                  : document.transferMetadata?.status === "COMPLETED" && document.transferMetadata.result === "UNSUPPORTED_FORMAT"
+                    ? `Decoded QR payload was classified as ${document.transferMetadata.payloadFormat}; this format is not parsed as transfer metadata.`
+                    : document.transferMetadata?.status === "COMPLETED" && document.transferMetadata.result === "NO_STRUCTURED_METADATA"
+                      ? `Decoded QR payload was classified as ${document.transferMetadata.payloadFormat}, but no structured transfer metadata was derived.`
+                      : document.transferMetadata?.status === "SKIPPED"
+                        ? "Transfer metadata parse was skipped because decoded QR content is not available."
+                        : document.transferMetadata?.status === "NOT_APPLICABLE"
+                          ? "Transfer metadata parse is not applicable for this document."
+                          : document.transferMetadata?.status === "FAILED"
+                            ? "Transfer metadata parse failed for this upload."
+                            : "This record does not have transfer metadata parse results."}
+              </dd>
+              {document.transferMetadata?.metadata ? (
+                <dd className="mt-2 rounded border border-slate-200 bg-white p-2 text-xs text-slate-700">
+                  <div className="font-medium text-slate-500">Parsed metadata (not verified):</div>
+                  <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <dt className="font-medium text-slate-500">Country / currency</dt>
+                      <dd>
+                        {document.transferMetadata.metadata.countryCode ?? "Unknown"} /{" "}
+                        {document.transferMetadata.metadata.currencyCode ?? "Unknown"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Amount</dt>
+                      <dd>{document.transferMetadata.metadata.amount ?? "Not present"}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Payment subtype</dt>
+                      <dd>{document.transferMetadata.metadata.merchantAccountInfo?.subtype ?? "Unknown"}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Target identifier</dt>
+                      <dd className="break-all">
+                        {document.transferMetadata.metadata.merchantAccountInfo?.targetIdentifier ?? "Not present"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Reference 1</dt>
+                      <dd className="break-all">
+                        {document.transferMetadata.metadata.merchantAccountInfo?.references.reference1 ?? "Not present"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-slate-500">Reference 2</dt>
+                      <dd className="break-all">
+                        {document.transferMetadata.metadata.merchantAccountInfo?.references.reference2 ?? "Not present"}
+                      </dd>
+                    </div>
+                  </dl>
                 </dd>
               ) : null}
             </div>

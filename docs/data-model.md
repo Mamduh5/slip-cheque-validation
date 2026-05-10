@@ -41,9 +41,9 @@ Stores one registry record per uploaded document image.
 | `normalizedImage.algorithm` | string \| null | Currently `normalized-webp-grayscale-v1`. |
 | `processingProfile.name` | string | Type-aware processing profile name, such as `bank-transfer-slip-v1`. |
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
-| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis` and `qr-decode`. |
+| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`, `qr-decode`, and `transfer-metadata-parse`. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
-| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE` and `QR_DECODE` as `ACTIVE`; metadata parse and verification remain `PLANNED`. Shared stages are marked `ACTIVE`. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE`, `QR_DECODE`, and `TRANSFER_METADATA_PARSE` as `ACTIVE`; verification remains `PLANNED`. Shared stages are marked `ACTIVE`. |
 | `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. Extraction and verification are currently false. |
 | `qrCandidateAnalysis.stage` | string \| null | Transfer-slip-only stage key, currently `QR_CANDIDATE`. Null or absent for non-slip records and older records. |
 | `qrCandidateAnalysis.algorithm` | string \| null | Currently `qr-candidate-heuristic-v1`. |
@@ -62,6 +62,20 @@ Stores one registry record per uploaded document image.
 | `qrDecode.decodedTextLength` | number \| null | Length of raw decoded text when successful. |
 | `qrDecode.sourceImageType` | enum \| null | Currently `normalized-image` when decode was attempted; null when skipped. |
 | `qrDecode.notes` | string[] \| null | Short non-authoritative notes about decode attempt. No business interpretation is stored. |
+| `transferMetadata.stage` | string \| null | Transfer-slip-only stage key, currently `TRANSFER_METADATA_PARSE`. Null or absent for non-slip records and older records. |
+| `transferMetadata.algorithm` | string \| null | Currently `transfer-metadata-parse-v1`. |
+| `transferMetadata.status` | enum \| null | `COMPLETED`, `FAILED`, `SKIPPED`, or `NOT_APPLICABLE`. `SKIPPED` when decoded QR text is unavailable. |
+| `transferMetadata.result` | enum \| null | `PARSED`, `UNSUPPORTED_FORMAT`, `NO_STRUCTURED_METADATA`, or `PARSE_FAILED`. |
+| `transferMetadata.payloadFormat` | enum \| null | Conservative classification before parsing: `THAI_QR_PAYMENT`, `GENERIC_URL`, `PLAIN_TEXT`, or `UNKNOWN_FORMAT`. |
+| `transferMetadata.parsedAt` | Date \| null | When transfer metadata parse ran. |
+| `transferMetadata.metadata` | object \| null | Parsed structured metadata when available. This is parsed from decoded QR content and is not verified. |
+| `transferMetadata.metadata.merchantAccountInfo` | object \| null | Supported Thai QR merchant account info such as PromptPay or bill-payment subtype, target identifier, and bill references when derivable. |
+| `transferMetadata.metadata.amount` | string \| null | Amount string from the supported QR payload when present. Not a verified payment amount. |
+| `transferMetadata.metadata.countryCode` | string \| null | Country tag from the supported QR payload when present. |
+| `transferMetadata.metadata.currencyCode` | string \| null | Currency tag from the supported QR payload when present. |
+| `transferMetadata.metadata.rawTopLevelTags` | object | Raw parsed top-level TLV tags for audit/debug use. |
+| `transferMetadata.notes` | string[] \| null | Short non-authoritative notes about parse behavior. |
+| `transferMetadata.warnings` | string[] \| null | Warnings for suspicious but parseable structure, such as unexpected amount formatting. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |

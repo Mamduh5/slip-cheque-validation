@@ -8,7 +8,11 @@ import { POST as uploadDocument } from "../app/api/documents/route";
 import { getDocumentProcessingProfile } from "../lib/document-processing-profiles";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
+import { attemptTransferMetadataParse } from "../lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
+
+const thaiPromptPayPayload =
+  "00020101021229370016A000000677010111011300668123456785802TH53037645406100.005909TEST SHOP6007BANGKOK6304ABCD";
 
 const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,
@@ -220,6 +224,91 @@ async function upload(bytes?: string, documentType?: DocumentType) {
   };
 }
 
+function buildMockQrDecode(documentType: DocumentType, buffer: Buffer): DocumentRecord["qrDecode"] {
+  const text = buffer.toString("utf8");
+
+  if (documentType !== "BANK_TRANSFER_SLIP") {
+    return null;
+  }
+
+  if (text.includes("thai")) {
+    return {
+      stage: "QR_DECODE",
+      algorithm: "jsqr-decode-v1",
+      status: "COMPLETED",
+      result: "QR_DECODED",
+      decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+      rawDecodedText: thaiPromptPayPayload,
+      decodedTextLength: thaiPromptPayPayload.length,
+      sourceImageType: "normalized-image",
+      notes: ["QR content was successfully decoded from the normalized image."]
+    };
+  }
+
+  if (text.includes("decoded text")) {
+    return {
+      stage: "QR_DECODE",
+      algorithm: "jsqr-decode-v1",
+      status: "COMPLETED",
+      result: "QR_DECODED",
+      decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+      rawDecodedText: "plain transfer note only",
+      decodedTextLength: 24,
+      sourceImageType: "normalized-image",
+      notes: ["QR content was successfully decoded from the normalized image."]
+    };
+  }
+
+  if (text.includes("decoded")) {
+    return {
+      stage: "QR_DECODE",
+      algorithm: "jsqr-decode-v1",
+      status: "COMPLETED",
+      result: "QR_DECODED",
+      decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+      rawDecodedText: "https://example.com/payment/12345",
+      decodedTextLength: 33,
+      sourceImageType: "normalized-image",
+      notes: ["QR content was successfully decoded from the normalized image."]
+    };
+  }
+
+  if (text.includes("qr")) {
+    return {
+      stage: "QR_DECODE",
+      algorithm: "jsqr-decode-v1",
+      status: "COMPLETED",
+      result: "NO_QR_DECODED",
+      decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+      rawDecodedText: null,
+      decodedTextLength: null,
+      sourceImageType: "normalized-image",
+      notes: ["QR decode was attempted on the normalized image but no valid QR code was found."]
+    };
+  }
+
+  return {
+    stage: "QR_DECODE",
+    algorithm: "jsqr-decode-v1",
+    status: "SKIPPED",
+    result: "NO_QR_DECODED",
+    decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+    rawDecodedText: null,
+    decodedTextLength: null,
+    sourceImageType: null,
+    notes: ["QR decode was skipped because no plausible QR candidate was found."]
+  };
+}
+
+function buildMockTransferMetadata(documentType: DocumentType, buffer: Buffer): DocumentRecord["transferMetadata"] {
+  return documentType === "BANK_TRANSFER_SLIP"
+    ? attemptTransferMetadataParse({
+        qrDecode: buildMockQrDecode(documentType, buffer) ?? null,
+        parsedAt: new Date("2026-05-08T10:00:00.000Z")
+      })
+    : null;
+}
+
 describe("document API integration boundaries", () => {
   beforeEach(() => {
     setSession(null);
@@ -267,44 +356,8 @@ describe("document API integration boundaries", () => {
               notes: ["QR content was not decoded."]
             }
           : null,
-      qrDecode:
-        input.documentType === "BANK_TRANSFER_SLIP"
-          ? input.buffer.toString("utf8").includes("qr") && input.buffer.toString("utf8").includes("decoded")
-            ? {
-                stage: "QR_DECODE",
-                algorithm: "jsqr-decode-v1",
-                status: "COMPLETED",
-                result: "QR_DECODED",
-                decodedAt: new Date("2026-05-08T10:00:00.000Z"),
-                rawDecodedText: "https://example.com/payment/12345",
-                decodedTextLength: 35,
-                sourceImageType: "normalized-image",
-                notes: ["QR content was successfully decoded from the normalized image."]
-              }
-            : input.buffer.toString("utf8").includes("qr")
-              ? {
-                  stage: "QR_DECODE",
-                  algorithm: "jsqr-decode-v1",
-                  status: "COMPLETED",
-                  result: "NO_QR_DECODED",
-                  decodedAt: new Date("2026-05-08T10:00:00.000Z"),
-                  rawDecodedText: null,
-                  decodedTextLength: null,
-                  sourceImageType: "normalized-image",
-                  notes: ["QR decode was attempted on the normalized image but no valid QR code was found."]
-                }
-              : {
-                  stage: "QR_DECODE",
-                  algorithm: "jsqr-decode-v1",
-                  status: "SKIPPED",
-                  result: "NO_QR_DECODED",
-                  decodedAt: new Date("2026-05-08T10:00:00.000Z"),
-                  rawDecodedText: null,
-                  decodedTextLength: null,
-                  sourceImageType: null,
-                  notes: ["QR decode was skipped because no plausible QR candidate was found."]
-                }
-          : null,
+      qrDecode: buildMockQrDecode(input.documentType, input.buffer),
+      transferMetadata: buildMockTransferMetadata(input.documentType, input.buffer),
       perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
       qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
       qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -416,7 +469,7 @@ describe("document API integration boundaries", () => {
     }
   });
 
-  it("exposes transfer-slip QR-candidate and QR-decode stage results without extraction results", async () => {
+  it("exposes transfer-slip QR-candidate, QR-decode, and transfer-metadata parse stage results without verification results", async () => {
     setSession("user-1");
 
     const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
@@ -434,6 +487,7 @@ describe("document API integration boundaries", () => {
       };
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
       qrDecode: DocumentRecord["qrDecode"];
+      transferMetadata: DocumentRecord["transferMetadata"];
     };
 
     expect(detail.processingProfile.capabilities).toMatchObject({
@@ -445,7 +499,7 @@ describe("document API integration boundaries", () => {
       expect.arrayContaining([
         expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
         expect.objectContaining({ key: "QR_DECODE", status: "ACTIVE" }),
-        expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
+        expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "ACTIVE" }),
         expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
       ])
     );
@@ -460,6 +514,11 @@ describe("document API integration boundaries", () => {
       status: "COMPLETED",
       result: "NO_QR_DECODED"
     });
+    expect(detail.transferMetadata).toMatchObject({
+      stage: "TRANSFER_METADATA_PARSE",
+      status: "SKIPPED",
+      result: "NO_STRUCTURED_METADATA"
+    });
   });
 
   it("successfully decodes QR content when candidate is found and QR is decodable", async () => {
@@ -472,6 +531,7 @@ describe("document API integration boundaries", () => {
     const detail = (await detailResponse.json()) as {
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
       qrDecode: DocumentRecord["qrDecode"];
+      transferMetadata: DocumentRecord["transferMetadata"];
     };
 
     expect(detail.qrCandidateAnalysis).toMatchObject({
@@ -485,19 +545,77 @@ describe("document API integration boundaries", () => {
       status: "COMPLETED",
       result: "QR_DECODED",
       rawDecodedText: "https://example.com/payment/12345",
-      decodedTextLength: 35,
+      decodedTextLength: 33,
       sourceImageType: "normalized-image"
     });
     expect(testState.documents[0].qrDecode?.rawDecodedText).toBe("https://example.com/payment/12345");
+    expect(detail.transferMetadata).toMatchObject({
+      stage: "TRANSFER_METADATA_PARSE",
+      status: "COMPLETED",
+      result: "UNSUPPORTED_FORMAT",
+      payloadFormat: "GENERIC_URL",
+      metadata: null
+    });
   });
 
-  it("does not run QR-candidate analysis or QR decode for non-transfer-slip document types", async () => {
+  it("persists parsed transfer metadata for supported decoded Thai QR payloads", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("transfer slip qr thai image bytes", "BANK_TRANSFER_SLIP");
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as {
+      transferMetadata: DocumentRecord["transferMetadata"];
+    };
+
+    expect(detail.transferMetadata).toMatchObject({
+      stage: "TRANSFER_METADATA_PARSE",
+      algorithm: "transfer-metadata-parse-v1",
+      status: "COMPLETED",
+      result: "PARSED",
+      payloadFormat: "THAI_QR_PAYMENT",
+      metadata: {
+        amount: "100.00",
+        countryCode: "TH",
+        currencyCode: "764",
+        merchantAccountInfo: {
+          subtype: "PROMPTPAY",
+          targetIdentifier: "0066812345678",
+          targetIdentifierType: "PROMPTPAY_MOBILE"
+        }
+      }
+    });
+    expect(testState.documents[0].transferMetadata?.metadata?.merchantAccountInfo?.targetIdentifier).toBe("0066812345678");
+  });
+
+  it("records plain decoded QR text as no structured transfer metadata", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("transfer slip qr decoded text image bytes", "BANK_TRANSFER_SLIP");
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as {
+      transferMetadata: DocumentRecord["transferMetadata"];
+    };
+
+    expect(detail.transferMetadata).toMatchObject({
+      status: "COMPLETED",
+      result: "NO_STRUCTURED_METADATA",
+      payloadFormat: "PLAIN_TEXT",
+      metadata: null
+    });
+  });
+
+  it("does not run QR-candidate analysis, QR decode, or transfer metadata parse for non-transfer-slip document types", async () => {
     setSession("user-1");
 
     await upload("deposit slip qr-like image bytes", "DEPOSIT_PAYMENT_SLIP");
 
     expect(testState.documents[0].qrCandidateAnalysis).toBeNull();
     expect(testState.documents[0].qrDecode).toBeNull();
+    expect(testState.documents[0].transferMetadata).toBeNull();
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {

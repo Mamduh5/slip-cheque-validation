@@ -4,6 +4,37 @@
 
 ### Changed
 
+- Implemented `TRANSFER_METADATA_PARSE` stage for bank transfer slips.
+- Added `lib/transfer-metadata-parse.ts` with decoded-payload classification before parsing.
+- Added conservative payload classifications: `THAI_QR_PAYMENT`, `GENERIC_URL`, `PLAIN_TEXT`, and `UNKNOWN_FORMAT`.
+- Added supported Thai QR payment parsing using EMV-style TLV structure and Thai QR PromptPay / bill-payment application IDs.
+- Added `transferMetadata` to document records with stage status, result, payload format, parsed metadata, notes, warnings, and timestamp.
+- Updated the transfer-slip processing profile to mark `TRANSFER_METADATA_PARSE` as ACTIVE while keeping `SLIP_VERIFICATION` planned.
+- Updated upload processing, persistence, API responses, and document detail UI to expose parsed metadata separately from raw QR decode.
+- Added deterministic unit and route coverage for supported Thai QR payment parsing, generic URL unsupported format handling, plain text no-structured-metadata handling, non-slip skip behavior, and API persistence.
+- Updated README, architecture, roadmap, worklog, and data-model documentation.
+
+### Key Decisions
+
+- Parsing is separate from both `qrDecode.rawDecodedText` and future slip verification.
+- Decoded payloads are classified before parsing so generic URLs and plain text are not misrepresented as transfer metadata.
+- Parsed Thai QR payment values are structural fields only; they are not verified and are not proof of payment status, authenticity, or bank truth.
+- No OCR, cheque parsing, bank verification, queues, or microservice architecture were introduced.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test` - all 57 tests pass
+
+### Assumptions
+
+- Initial supported structured format is Thai QR payment / PromptPay-like EMV TLV payloads.
+- Broader payload families can be added later behind the same classification-first boundary.
+
+## 2026-05-10 QR Decode
+
+### Changed
+
 - Implemented `QR_DECODE` stage for bank transfer slips.
 - Added jsQR library for QR code decoding.
 - Created `lib/qr-decode.ts` with conservative QR decode logic that attempts decoding when a plausible QR candidate exists.

@@ -76,6 +76,7 @@ export function buildUploadedDocumentRecord(input: {
   processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
   qrDecode: DocumentRecord["qrDecode"];
+  transferMetadata: DocumentRecord["transferMetadata"];
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -98,6 +99,7 @@ export function buildUploadedDocumentRecord(input: {
     processingProfile: input.processingProfile,
     qrCandidateAnalysis: input.qrCandidateAnalysis,
     qrDecode: input.qrDecode,
+    transferMetadata: input.transferMetadata,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
@@ -255,6 +257,7 @@ export async function createUploadedDocument(input: {
     processingProfile: processedImage.processingProfile,
     qrCandidateAnalysis: processedImage.qrCandidateAnalysis,
     qrDecode: processedImage.qrDecode,
+    transferMetadata: processedImage.transferMetadata,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,
@@ -286,6 +289,13 @@ export async function createUploadedDocument(input: {
             status: record.qrCandidateAnalysis.status,
             result: record.qrCandidateAnalysis.result,
             candidateCount: record.qrCandidateAnalysis.candidateCount
+          }
+        : null,
+      transferMetadata: record.transferMetadata
+        ? {
+            status: record.transferMetadata.status,
+            result: record.transferMetadata.result,
+            payloadFormat: record.transferMetadata.payloadFormat
           }
         : null,
       perceptualHash: record.perceptualHash,
@@ -382,6 +392,7 @@ export async function updateDocumentTypeForUser(input: {
         processingProfile: newProcessingProfile,
         qrCandidateAnalysis: null,
         qrDecode: null,
+        transferMetadata: null,
         updatedAt: now
       }
     }

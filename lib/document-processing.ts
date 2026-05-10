@@ -5,6 +5,7 @@ import { calculateDHash } from "@/lib/perceptual-hash";
 import { putNormalizedDocumentObject } from "@/lib/object-storage";
 import { analyzeQrCandidateFromNormalizedImage } from "@/lib/qr-candidate-analysis";
 import { attemptQrDecode } from "@/lib/qr-decode";
+import { attemptTransferMetadataParse } from "@/lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType } from "@/lib/models";
 
 export class DocumentImageProcessingError extends Error {
@@ -20,6 +21,7 @@ export interface ProcessedDocumentImage {
   processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
   qrDecode: DocumentRecord["qrDecode"];
+  transferMetadata: DocumentRecord["transferMetadata"];
   perceptualHash: string;
   qualityStatus: DocumentRecord["qualityStatus"];
   qualityWarnings: DocumentRecord["qualityWarnings"];
@@ -68,6 +70,12 @@ export async function processUploadedDocumentImage(input: {
             qrCandidateAnalysis
           })
         : null;
+    const transferMetadata =
+      processingPlan.specializedBranch === "slip"
+        ? attemptTransferMetadataParse({
+            qrDecode
+          })
+        : null;
 
     return {
       normalizedObject,
@@ -75,6 +83,7 @@ export async function processUploadedDocumentImage(input: {
       processingProfile: processingPlan.profile,
       qrCandidateAnalysis,
       qrDecode,
+      transferMetadata,
       perceptualHash,
       qualityStatus: quality.qualityStatus,
       qualityWarnings: quality.qualityWarnings,

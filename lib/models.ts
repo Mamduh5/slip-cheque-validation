@@ -48,6 +48,19 @@ export const qrCandidateResults = [
 
 export const qrDecodeStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED", "FAILED"] as const;
 export const qrDecodeOutcomes = ["NO_QR_DECODED", "QR_DECODED"] as const;
+export const transferMetadataParseStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED", "FAILED"] as const;
+export const transferMetadataParseResults = [
+  "PARSED",
+  "UNSUPPORTED_FORMAT",
+  "NO_STRUCTURED_METADATA",
+  "PARSE_FAILED"
+] as const;
+export const transferMetadataPayloadFormats = [
+  "THAI_QR_PAYMENT",
+  "GENERIC_URL",
+  "PLAIN_TEXT",
+  "UNKNOWN_FORMAT"
+] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
@@ -63,6 +76,9 @@ export type QrCandidateStageStatus = (typeof qrCandidateStageStatuses)[number];
 export type QrCandidateResult = (typeof qrCandidateResults)[number];
 export type QrDecodeStageStatus = (typeof qrDecodeStageStatuses)[number];
 export type QrDecodeOutcome = (typeof qrDecodeOutcomes)[number];
+export type TransferMetadataParseStageStatus = (typeof transferMetadataParseStageStatuses)[number];
+export type TransferMetadataParseResult = (typeof transferMetadataParseResults)[number];
+export type TransferMetadataPayloadFormat = (typeof transferMetadataPayloadFormats)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -147,6 +163,47 @@ export interface QrDecodeAnalysisResult {
   notes: string[];
 }
 
+export interface TransferMetadataFields {
+  emvVersion: string | null;
+  initiationMethod: string | null;
+  merchantAccountInfo: {
+    tag: string;
+    applicationId: string | null;
+    subtype: "PROMPTPAY" | "BILL_PAYMENT" | "UNKNOWN_THAI_QR";
+    targetIdentifier: string | null;
+    targetIdentifierType:
+      | "PROMPTPAY_MOBILE"
+      | "PROMPTPAY_NATIONAL_ID_OR_TAX_ID"
+      | "PROMPTPAY_EWALLET"
+      | "BILLER_ID"
+      | "UNKNOWN";
+    references: {
+      reference1: string | null;
+      reference2: string | null;
+      reference3: string | null;
+    };
+  } | null;
+  countryCode: string | null;
+  currencyCode: string | null;
+  amount: string | null;
+  merchantName: string | null;
+  merchantCity: string | null;
+  crc: string | null;
+  rawTopLevelTags: Record<string, string>;
+}
+
+export interface TransferMetadataParseAnalysisResult {
+  stage: "TRANSFER_METADATA_PARSE";
+  algorithm: "transfer-metadata-parse-v1";
+  status: TransferMetadataParseStageStatus;
+  result: TransferMetadataParseResult;
+  payloadFormat: TransferMetadataPayloadFormat;
+  parsedAt: Date;
+  metadata: TransferMetadataFields | null;
+  notes: string[];
+  warnings: string[];
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -161,6 +218,7 @@ export interface DocumentRecord {
   processingProfile?: DocumentProcessingProfileSnapshot;
   qrCandidateAnalysis?: QrCandidateAnalysisResult | null;
   qrDecode?: QrDecodeAnalysisResult | null;
+  transferMetadata?: TransferMetadataParseAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;
