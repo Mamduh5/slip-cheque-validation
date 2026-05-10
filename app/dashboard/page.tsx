@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DocumentStatusPill } from "@/components/document-status-pill";
 import { ReviewStatusPill } from "@/components/review-status-pill";
+import { formatDocumentType } from "@/lib/document-types";
 import { getRecentDocumentsForUser, type DocumentReviewFilter } from "@/lib/documents";
 import { requireUser } from "@/lib/session";
 
@@ -104,9 +105,12 @@ export default async function DashboardPage({
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{document.originalFilename}</span>
                   <span className="block text-xs text-slate-500">{document.mimeType}</span>
+                  <span className="block text-xs text-slate-500 sm:hidden">
+                    {formatDocumentType(document.documentType)}
+                  </span>
                 </span>
                 <span className="hidden text-sm text-slate-600 sm:block">
-                  {document.documentType.replaceAll("_", " ")}
+                  {formatDocumentType(document.documentType)}
                 </span>
                 <span className="hidden text-sm text-slate-600 sm:block">{formatDate(document.createdAt)}</span>
                 <span className="hidden sm:block">

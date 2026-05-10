@@ -50,18 +50,30 @@ documents/{userId}/{documentId}/normalized.webp
 ## Upload Flow
 
 1. Authenticated user opens `/upload`.
-2. Browser sends multipart form data to `POST /api/documents`.
-3. Server validates metadata, MIME type, and file size.
-4. Server computes a SHA-256 exact file hash.
-5. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
-6. The in-process document processing service decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
-7. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
-8. Original image bytes are stored unchanged in MinIO.
-9. A new document record is inserted into MongoDB for auditability.
-10. If no match exists, `duplicateStatus` is `NEW`.
-11. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
-12. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
-13. User is redirected to `/documents/{id}`.
+2. User selects a document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
+3. Browser sends multipart form data to `POST /api/documents`.
+4. Server validates document type, source type, MIME type, and file size.
+5. Server computes a SHA-256 exact file hash.
+6. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
+7. The in-process document processing service receives the selected document type, decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
+8. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
+9. Original image bytes are stored unchanged in MinIO.
+10. A new document record is inserted into MongoDB for auditability.
+11. If no match exists, `duplicateStatus` is `NEW`.
+12. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
+13. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
+14. User is redirected to `/documents/{id}`.
+
+`documentType` is user-selected and durable. It is not inferred from image content and is separate from machine duplicate status, human review status, and capture quality status.
+
+Supported document types:
+
+- `BANK_TRANSFER_SLIP`
+- `DEPOSIT_PAYMENT_SLIP`
+- `CHEQUE`
+- `UNKNOWN`
+
+The processing boundary includes a small document-type profile so later stages can add slip QR handling, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
 
 Exact-match selection is deterministic: matching candidates are sorted by `createdAt ASC` and then `_id ASC`. The pending upload's generated id is excluded from the lookup, so the current upload cannot become its own match. If several exact matches already exist for the same owner, new duplicates link to the earliest record by that ordering.
 

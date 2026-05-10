@@ -22,6 +22,10 @@ test("authenticated user can preview and replace a selected image before upload"
   await expect(page.getByTestId("capture-guidance")).toContainText("Frame the paper clearly");
   await expect(page.getByTestId("capture-guidance")).toContainText("Fill most of the frame");
   await expect(page.getByTestId("framing-guide-card")).toContainText("Phone photo framing guide");
+  await expect(page.getByTestId("document-type-UNKNOWN")).toBeChecked();
+  await page.getByText("Cheque", { exact: true }).click();
+  await expect(page.getByTestId("document-type-CHEQUE")).toBeChecked();
+  await expect(page.getByTestId("document-type-guidance")).toContainText("For cheques");
 
   const fileInput = page.getByTestId("document-file-input");
   await fileInput.setInputFiles({
@@ -106,6 +110,7 @@ test.describe.serial("real-service upload completion", () => {
     const image = await createValidDocumentImage();
 
     await page.goto("/upload");
+    await page.getByText("Bank transfer slip", { exact: true }).click();
     await page.getByTestId("document-file-input").setInputFiles({
       name: filename,
       mimeType: "image/png",
@@ -118,6 +123,7 @@ test.describe.serial("real-service upload completion", () => {
     await page.getByTestId("upload-submit-button").click();
     await expect(page).toHaveURL(/\/documents\/[a-f0-9]{24}$/);
     await expect(page.getByRole("heading", { name: filename })).toBeVisible();
+    await expect(page.getByText("Bank transfer slip").first()).toBeVisible();
     await expect(page.getByText("New upload").first()).toBeVisible();
     await expect(page.getByText(/Good|Needs attention/).first()).toBeVisible();
     await expect(page.getByAltText("Uploaded financial document preview")).toBeVisible();
@@ -128,6 +134,7 @@ test.describe.serial("real-service upload completion", () => {
     expect(document).toMatchObject({
       userId: "e2e-user",
       originalFilename: filename,
+      documentType: "BANK_TRANSFER_SLIP",
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
       status: "READY"

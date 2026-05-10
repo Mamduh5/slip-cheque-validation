@@ -7,7 +7,7 @@ import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
-import type { DocumentRecord, DuplicateReviewPairRecord } from "../lib/models";
+import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
 
 const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,
@@ -178,9 +178,9 @@ function setSession(userId: string | null) {
   testState.session = userId ? { user: { id: userId, email: `${userId}@example.test` } } : null;
 }
 
-function createUploadRequest(bytes = "same image bytes") {
+function createUploadRequest(bytes = "same image bytes", documentType: DocumentType = "CHEQUE") {
   const formData = new FormData();
-  formData.set("documentType", "CHEQUE");
+  formData.set("documentType", documentType);
   formData.set("sourceType", "UPLOAD");
   formData.set(
     "file",
@@ -195,8 +195,8 @@ function createUploadRequest(bytes = "same image bytes") {
   });
 }
 
-async function upload(bytes?: string) {
-  const response = await uploadDocument(createUploadRequest(bytes));
+async function upload(bytes?: string, documentType?: DocumentType) {
+  const response = await uploadDocument(createUploadRequest(bytes, documentType));
   return {
     response,
     body: (await response.json()) as {
@@ -206,6 +206,8 @@ async function upload(bytes?: string) {
       similarityScore?: number | null;
       qualityStatus?: string;
       qualityWarnings?: string[];
+      documentType?: string;
+      documentTypeLabel?: string;
       error?: string;
     }
   };
@@ -253,11 +255,14 @@ describe("document API integration boundaries", () => {
     expect(response.status).toBe(200);
     expect(body.documentId).toBeDefined();
     expect(body.duplicateStatus).toBe("NEW");
+    expect(body.documentType).toBe("CHEQUE");
+    expect(body.documentTypeLabel).toBe("Cheque");
     expect(body.matchedDocumentId).toBeNull();
     expect(body.similarityScore).toBeNull();
     expect(testState.documents).toHaveLength(1);
     expect(testState.documents[0]).toMatchObject({
       userId: "user-1",
+      documentType: "CHEQUE",
       status: "READY",
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
@@ -270,6 +275,25 @@ describe("document API integration boundaries", () => {
         key: expect.stringContaining("/normalized.webp")
       }
     });
+  });
+
+  it("persists the selected document type and exposes its display label", async () => {
+    setSession("user-1");
+
+    const { response, body } = await upload("deposit slip bytes", "DEPOSIT_PAYMENT_SLIP");
+
+    expect(response.status).toBe(200);
+    expect(body.documentType).toBe("DEPOSIT_PAYMENT_SLIP");
+    expect(body.documentTypeLabel).toBe("Deposit/payment slip");
+    expect(testState.documents[0].documentType).toBe("DEPOSIT_PAYMENT_SLIP");
+
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as { documentType: string; documentTypeLabel: string };
+
+    expect(detail.documentType).toBe("DEPOSIT_PAYMENT_SLIP");
+    expect(detail.documentTypeLabel).toBe("Deposit/payment slip");
   });
 
   it("creates a new EXACT_DUPLICATE record linked to the earliest owned match", async () => {

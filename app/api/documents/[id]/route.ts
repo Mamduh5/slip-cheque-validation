@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getDocumentForUser, formatDuplicateStatus, formatQualityStatus, formatReviewStatus } from "@/lib/documents";
+import {
+  getDocumentForUser,
+  formatDocumentType,
+  formatDuplicateStatus,
+  formatQualityStatus,
+  formatReviewStatus
+} from "@/lib/documents";
 import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -21,6 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json({
     documentId: String(document._id),
     documentType: document.documentType,
+    documentTypeLabel: formatDocumentType(document.documentType),
     sourceType: document.sourceType,
     originalFilename: document.originalFilename,
     mimeType: document.mimeType,

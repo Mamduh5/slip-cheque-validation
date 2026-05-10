@@ -2,7 +2,13 @@
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { QualityStatus, QualityWarningCode, SourceType } from "@/lib/models";
+import {
+  documentTypeOptions,
+  formatDocumentType,
+  getDocumentTypeDescription,
+  getDocumentTypeGuidance
+} from "@/lib/document-types";
+import type { DocumentType, QualityStatus, QualityWarningCode, SourceType } from "@/lib/models";
 import { qualityWarningLabels } from "@/lib/quality-thresholds";
 import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
 
@@ -16,12 +22,14 @@ interface UploadResponse {
 export function UploadForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [documentType, setDocumentType] = useState<DocumentType>("UNKNOWN");
   const [sourceType, setSourceType] = useState<SourceType>("CAMERA");
   const [error, setError] = useState<string | null>(null);
   const [qualityWarnings, setQualityWarnings] = useState<QualityWarningCode[]>([]);
   const [selectedPreview, setSelectedPreview] = useState<LocalPreviewState | null>(null);
   const [isAnalyzingPreview, setIsAnalyzingPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedTypeGuidance = getDocumentTypeGuidance(documentType);
 
   useEffect(() => {
     return () => {
@@ -114,22 +122,44 @@ export function UploadForm() {
       data-testid="upload-form"
       onSubmit={handleSubmit}
     >
-      <div>
-        <label className="mb-1 block text-sm font-medium" htmlFor="documentType">
-          Document type
-        </label>
-        <select
-          className="focus-ring w-full rounded-md border border-line bg-white px-3 py-2"
-          id="documentType"
-          name="documentType"
-          defaultValue="UNKNOWN"
+      <fieldset>
+        <legend className="mb-2 block text-sm font-medium">Document type</legend>
+        <div className="grid gap-2 sm:grid-cols-2" data-testid="document-type-options">
+          {documentTypeOptions.map((type) => (
+            <label
+              className={`cursor-pointer rounded-md border p-3 text-sm transition ${
+                documentType === type
+                  ? "border-accent bg-sky-50 text-slate-950"
+                  : "border-line bg-white text-slate-700 hover:border-slate-400"
+              }`}
+              key={type}
+            >
+              <input
+                className="sr-only"
+                type="radio"
+                name="documentType"
+                value={type}
+                checked={documentType === type}
+                data-testid={`document-type-${type}`}
+                onChange={() => setDocumentType(type)}
+              />
+              <span className="block font-medium">{formatDocumentType(type)}</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">{getDocumentTypeDescription(type)}</span>
+            </label>
+          ))}
+        </div>
+        <div
+          className="mt-3 rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-600"
+          data-testid="document-type-guidance"
         >
-          <option value="UNKNOWN">Unknown</option>
-          <option value="BANK_TRANSFER_SLIP">Bank transfer slip</option>
-          <option value="DEPOSIT_PAYMENT_SLIP">Deposit or payment slip</option>
-          <option value="CHEQUE">Paper cheque</option>
-        </select>
-      </div>
+          <p className="font-medium text-slate-800">{selectedTypeGuidance.title}</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {selectedTypeGuidance.tips.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </div>
+      </fieldset>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="sourceType">
           Source

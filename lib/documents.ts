@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { ObjectId } from "mongodb";
+import { formatDocumentType, getDocumentTypeProcessingProfile } from "@/lib/document-types";
 import { getDb } from "@/lib/mongodb";
 import { resolveDuplicateDecision } from "@/lib/duplicate-detection";
 import { processUploadedDocumentImage } from "@/lib/document-processing";
@@ -184,6 +185,7 @@ export async function createUploadedDocument(input: {
   buffer: Buffer;
 }) {
   await ensureDocumentIndexes();
+  const documentTypeProfile = getDocumentTypeProcessingProfile(input.documentType);
 
   const now = new Date();
   const documentId = new ObjectId();
@@ -203,6 +205,7 @@ export async function createUploadedDocument(input: {
   const processedImage = await processUploadedDocumentImage({
     userId: input.userId,
     documentId: String(documentId),
+    documentType: documentTypeProfile.type,
     buffer: input.buffer
   });
   const likelyDuplicateMatch =
@@ -264,6 +267,8 @@ export async function createUploadedDocument(input: {
     targetId: String(documentId),
     metadata: {
       exactHash,
+      documentType: record.documentType,
+      documentTypeLabel: formatDocumentType(record.documentType),
       perceptualHash: record.perceptualHash,
       matchedDocumentId: record.matchedDocumentId,
       qualityStatus: record.qualityStatus,
@@ -438,6 +443,8 @@ export function formatQualityStatus(status: DocumentRecord["qualityStatus"]) {
 
   return labels[status];
 }
+
+export { formatDocumentType };
 
 function reviewStatusForDuplicateDecision(status: DuplicateDecision["duplicateStatus"]): ReviewStatus {
   return status === "LIKELY_DUPLICATE" ? "PENDING" : "NOT_REQUIRED";

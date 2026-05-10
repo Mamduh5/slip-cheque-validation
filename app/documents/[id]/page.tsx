@@ -4,6 +4,7 @@ import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
 import { ReviewStatusPill } from "@/components/review-status-pill";
+import { formatDocumentType, getDocumentTypeGuidance } from "@/lib/document-types";
 import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
 import { formatQualityWarning } from "@/lib/image-quality";
 import { requireUser } from "@/lib/session";
@@ -57,6 +58,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     document.duplicateStatus === "LIKELY_DUPLICATE" &&
     document.reviewStatus === "PENDING" &&
     matchedDocument !== null;
+  const documentTypeGuidance = getDocumentTypeGuidance(document.documentType);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
@@ -121,7 +123,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {[
-            ["Document type", document.documentType.replaceAll("_", " ")],
+            ["Document type", formatDocumentType(document.documentType)],
             ["Source", document.sourceType],
             ["Processing status", document.status],
             ["MIME type", document.mimeType],
@@ -146,6 +148,11 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
               <dd className="mt-1 break-words text-sm">{value}</dd>
             </div>
           ))}
+        </div>
+
+        <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Type-specific intake note</dt>
+          <dd className="mt-1 text-sm text-slate-700">{documentTypeGuidance.title}</dd>
         </div>
 
         <div className="mt-3 rounded-md border border-line p-3">

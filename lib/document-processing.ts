@@ -2,7 +2,7 @@ import { normalizeDocumentImage } from "@/lib/image-normalization";
 import { ImageQualityFailureError, assessImageQuality } from "@/lib/image-quality";
 import { calculateDHash } from "@/lib/perceptual-hash";
 import { putNormalizedDocumentObject } from "@/lib/object-storage";
-import type { DocumentRecord } from "@/lib/models";
+import type { DocumentRecord, DocumentType } from "@/lib/models";
 
 export class DocumentImageProcessingError extends Error {
   constructor() {
@@ -31,6 +31,7 @@ export function buildNormalizedDocumentObjectKey(input: {
 export async function processUploadedDocumentImage(input: {
   userId: string;
   documentId: string;
+  documentType: DocumentType;
   buffer: Buffer;
 }): Promise<ProcessedDocumentImage> {
   try {

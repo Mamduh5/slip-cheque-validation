@@ -25,7 +25,7 @@ Stores one registry record per uploaded document image.
 | --- | --- | --- |
 | `_id` | ObjectId | Document id. |
 | `userId` | string | Owner user id from session. |
-| `documentType` | enum | `BANK_TRANSFER_SLIP`, `DEPOSIT_PAYMENT_SLIP`, `CHEQUE`, `UNKNOWN`. |
+| `documentType` | enum | Durable user-selected intake type: `BANK_TRANSFER_SLIP`, `DEPOSIT_PAYMENT_SLIP`, `CHEQUE`, `UNKNOWN`. |
 | `sourceType` | enum | `CAMERA` or `UPLOAD`. |
 | `originalFilename` | string | Browser-provided filename. |
 | `mimeType` | string | Allowed now: JPEG, PNG, WebP. |
@@ -88,6 +88,25 @@ Stores owner-scoped review memory for a specific pair of documents.
 | `reviewedAt` | Date | Decision timestamp. |
 | `createdAt` | Date | Pair memory creation timestamp. |
 | `updatedAt` | Date | Pair memory update timestamp. |
+
+## Document-Type Field
+
+`documentType` is selected during upload and stored on every document record. It is a product intake category, not automated content extraction.
+
+Supported values:
+
+- `BANK_TRANSFER_SLIP`: transfer receipt or confirmation slip.
+- `DEPOSIT_PAYMENT_SLIP`: deposit, bill payment, or counter payment slip.
+- `CHEQUE`: paper cheque image.
+- `UNKNOWN`: user is not sure or the document type is unclear.
+
+The upload form shows type-specific guidance after selection, dashboard items and detail pages display the chosen type, and upload/detail API responses expose both the enum and a display label. This field is separate from:
+
+- `duplicateStatus`: machine duplicate decision.
+- `reviewStatus`: human decision for likely duplicates.
+- `qualityStatus`: capture-quality signal.
+
+Future type-specific work can use this field for QR handling, cheque-specific extraction, or payment-slip handling. Those pipelines are intentionally not implemented yet.
 
 ## Duplicate-Check Fields
 

@@ -388,3 +388,38 @@
 - The framing guide is static and cannot tell whether the actual document is aligned or complete.
 - Users can still upload photos that ignore the guide unless server-side validation rejects them.
 - More advanced capture tooling, such as crop handles or perspective correction, remains intentionally out of scope.
+
+## 2026-05-10 Document-Type Groundwork
+
+### Changed
+
+- Added a document-type helper module for labels, descriptions, upload guidance, and a small future-processing profile.
+- Kept the existing stored `documentType` enum as the durable source of truth.
+- Replaced raw enum display with user-facing labels on dashboard and document detail.
+- Changed upload document-type selection from a plain select to mobile-friendly radio cards.
+- Added conservative type-specific upload guidance for transfer slips, deposit/payment slips, cheques, and unknown documents.
+- Added `documentType` and `documentTypeLabel` to upload and document detail API responses.
+- Included document type and display label in upload audit metadata.
+- Passed the selected document type into the in-process image-processing boundary so future type-specific stages have a clear branch point.
+- Added tests for type labels/profiles, type persistence, API detail exposure, upload selection UI, and real-service E2E persistence.
+
+### Key Decisions
+
+- Document type is user-selected in this phase; the app does not infer it from image content.
+- Document type remains separate from machine duplicate status, human review status, and capture quality status.
+- Type-specific guidance is instructional only and does not claim content understanding or verification.
+- No OCR, QR extraction, cheque parsing, bank verification, queue, microservice, crop tool, or camera overlay was added.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test:e2e`
+
+### Known Limitations
+
+- Users can choose the wrong document type; there is no automated type suggestion yet.
+- Future type-specific extraction pipelines are represented only by a lightweight profile boundary.
+- Existing documents with older or missing type values would need a migration/backfill before production data import.

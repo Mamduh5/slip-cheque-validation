@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DocumentImageProcessingError } from "@/lib/document-processing";
-import { createUploadedDocument } from "@/lib/documents";
+import { createUploadedDocument, formatDocumentType } from "@/lib/documents";
 import { ImageQualityFailureError } from "@/lib/image-quality";
 import { getCurrentUser } from "@/lib/session";
 import { uploadFieldsSchema, validateUploadFile } from "@/lib/upload-validation";
@@ -70,6 +70,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     documentId: String(record._id),
+    documentType: record.documentType,
+    documentTypeLabel: formatDocumentType(record.documentType),
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,

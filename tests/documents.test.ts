@@ -1,8 +1,27 @@
 import { ObjectId } from "mongodb";
 import { describe, expect, it } from "vitest";
+import {
+  formatDocumentType,
+  getDocumentTypeDescription,
+  getDocumentTypeGuidance,
+  getDocumentTypeProcessingProfile
+} from "../lib/document-types";
 import { buildDocumentObjectKey, buildUploadedDocumentRecord, calculateSha256 } from "../lib/documents";
 
 describe("document helpers", () => {
+  it("formats and describes supported document types", () => {
+    expect(formatDocumentType("BANK_TRANSFER_SLIP")).toBe("Bank transfer slip");
+    expect(formatDocumentType("DEPOSIT_PAYMENT_SLIP")).toBe("Deposit/payment slip");
+    expect(formatDocumentType("CHEQUE")).toBe("Cheque");
+    expect(formatDocumentType("UNKNOWN")).toBe("Not sure / unknown");
+    expect(getDocumentTypeDescription("UNKNOWN")).toContain("unclear");
+    expect(getDocumentTypeGuidance("CHEQUE").title).toContain("cheques");
+    expect(getDocumentTypeProcessingProfile("CHEQUE")).toMatchObject({
+      type: "CHEQUE",
+      futureChequeExtractionCandidate: true
+    });
+  });
+
   it("calculates stable SHA-256 exact hashes", () => {
     expect(calculateSha256(Buffer.from("same image bytes"))).toBe(
       "f10266197016b8e8842aeba6800100997ce04f35a45a3bff974711e9615ea597"
