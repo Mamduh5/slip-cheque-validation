@@ -1,4 +1,4 @@
-import type { DocumentRecord } from "@/lib/models";
+import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
 
 export interface ResultSummaryItem {
   label: string;
@@ -6,9 +6,33 @@ export interface ResultSummaryItem {
   tone: "neutral" | "positive" | "warning" | "info";
 }
 
+export function reasonCodeToLabel(reason: DuplicateDecisionReason): string {
+  switch (reason) {
+    case "AMOUNT_MISMATCH":
+      return "amount differed";
+    case "RECIPIENT_MISMATCH":
+      return "recipient differed";
+    case "REFERENCE_MISMATCH":
+      return "transaction reference differed";
+    case "QR_PAYLOAD_MISMATCH":
+      return "QR payload differed";
+    case "TRANSFER_METADATA_PAYLOAD_MISMATCH":
+      return "transfer metadata payload differed";
+    case "IMAGE_SIMILARITY_ONLY":
+      return "image similarity only";
+    case "IDENTICAL_QR_PAYLOAD":
+      return "identical QR payload";
+    case "IDENTICAL_TRANSFER_METADATA_PAYLOAD":
+      return "identical transfer metadata payload";
+    default:
+      return reason;
+  }
+}
+
 /**
  * Parse a suppression note like "Suppressed near-duplicate: different amount, different recipient"
  * into an array of human-readable reason fragments.
+ * Legacy fallback for records created before structured reason codes existed.
  */
 export function parseSuppressionReasons(note: string | null): string[] {
   if (!note || !note.startsWith("Suppressed near-duplicate:")) {
@@ -46,15 +70,43 @@ function formatSuppressionReasons(reasons: string[]): string {
   return `Suppressed because ${rest} and ${last}`;
 }
 
+function getSuppressionReasons(document: DocumentRecord): string[] {
+  // Prefer structured reason codes for new records
+  if (
+    document.duplicateDecisionType === "SUPPRESSED_NEAR_DUPLICATE" &&
+    document.duplicateDecisionReasons.length > 0
+  ) {
+    return document.duplicateDecisionReasons.map(reasonCodeToLabel);
+  }
+
+  // Legacy fallback for older records that only have note strings
+  return parseSuppressionReasons(document.notes ?? null);
+}
+
 export function buildResultSummary(document: DocumentRecord): ResultSummaryItem[] {
   const parts: ResultSummaryItem[] = [];
 
-  // Duplicate outcome
-  if (document.duplicateStatus === "EXACT_DUPLICATE") {
+  // Duplicate outcome - prefer structured decision type when present
+  const decisionType = document.duplicateDecisionType;
+
+  if (decisionType === "EXACT_DUPLICATE" || document.duplicateStatus === "EXACT_DUPLICATE") {
     parts.push({ label: "Duplicate check", value: "Exact duplicate found", tone: "info" });
-  } else if (document.duplicateStatus === "LIKELY_DUPLICATE") {
+  } else if (decisionType === "LIKELY_DUPLICATE_REVIEW" || document.duplicateStatus === "LIKELY_DUPLICATE") {
     parts.push({ label: "Duplicate check", value: "Likely duplicate — review needed", tone: "warning" });
+  } else if (decisionType === "SUPPRESSED_NEAR_DUPLICATE") {
+    const reasons = getSuppressionReasons(document);
+    parts.push({
+      label: "Duplicate check",
+      value: "Near-duplicate review suppressed",
+      tone: "info"
+    });
+    parts.push({
+      label: "Why",
+      value: formatSuppressionReasons(reasons),
+      tone: "info"
+    });
   } else if (document.notes?.startsWith("Suppressed near-duplicate")) {
+    // Legacy fallback for records without structured decision type
     const reasons = parseSuppressionReasons(document.notes);
     parts.push({
       label: "Duplicate check",

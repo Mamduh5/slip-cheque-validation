@@ -1,14 +1,43 @@
-import type { DocumentRecord } from "@/lib/models";
+import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
 
 export interface TransferSlipDuplicateAssessment {
   result: "MATCH" | "CONFLICT" | "INSUFFICIENT_EVIDENCE";
   conflicts: string[];
   positiveEvidence: string[];
   notes: string;
+  reasonCodes: DuplicateDecisionReason[];
 }
 
 function isNonEmpty(value: string | null | undefined): value is string {
   return value !== null && value !== undefined && value.trim().length > 0;
+}
+
+function conflictToReasonCode(conflict: string): DuplicateDecisionReason {
+  switch (conflict) {
+    case "different amount":
+      return "AMOUNT_MISMATCH";
+    case "different recipient":
+      return "RECIPIENT_MISMATCH";
+    case "different transaction reference":
+      return "REFERENCE_MISMATCH";
+    case "different raw QR payload":
+      return "QR_PAYLOAD_MISMATCH";
+    case "different transfer metadata payload":
+      return "TRANSFER_METADATA_PAYLOAD_MISMATCH";
+    default:
+      return "IMAGE_SIMILARITY_ONLY";
+  }
+}
+
+function evidenceToReasonCode(evidence: string): DuplicateDecisionReason {
+  switch (evidence) {
+    case "identical raw QR payload":
+      return "IDENTICAL_QR_PAYLOAD";
+    case "identical transfer metadata payload":
+      return "IDENTICAL_TRANSFER_METADATA_PAYLOAD";
+    default:
+      return "IMAGE_SIMILARITY_ONLY";
+  }
 }
 
 export function assessTransferSlipDuplicateCandidate(
@@ -80,7 +109,8 @@ export function assessTransferSlipDuplicateCandidate(
       result: "MATCH",
       conflicts,
       positiveEvidence: definitiveMatches,
-      notes: `Supported duplicate: ${definitiveMatches.join(", ")}`
+      notes: `Supported duplicate: ${definitiveMatches.join(", ")}`,
+      reasonCodes: definitiveMatches.map(evidenceToReasonCode)
     };
   }
 
@@ -90,7 +120,8 @@ export function assessTransferSlipDuplicateCandidate(
       result: "CONFLICT",
       conflicts,
       positiveEvidence: [],
-      notes: `Suppressed near-duplicate: ${conflicts.join(", ")}`
+      notes: `Suppressed near-duplicate: ${conflicts.join(", ")}`,
+      reasonCodes: conflicts.map(conflictToReasonCode)
     };
   }
 
@@ -98,6 +129,7 @@ export function assessTransferSlipDuplicateCandidate(
     result: "INSUFFICIENT_EVIDENCE",
     conflicts,
     positiveEvidence: [],
-    notes: "Insufficient structured evidence; rely on perceptual similarity"
+    notes: "Insufficient structured evidence; rely on perceptual similarity",
+    reasonCodes: ["IMAGE_SIMILARITY_ONLY"]
   };
 }

@@ -86,6 +86,8 @@ Stores one registry record per uploaded document image.
 | `slipVerification.notes` | string[] \| null | Safe notes describing local-only checks or explaining that no validation evidence was available. Notes must not imply payment completion, bank truth, recipient truth, or authenticity. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
+| `duplicateDecisionType` | enum \| null | `EXACT_DUPLICATE`, `LIKELY_DUPLICATE_REVIEW`, `NEW_UPLOAD`, `SUPPRESSED_NEAR_DUPLICATE`. Explanation field that makes duplicate outcome transparent in the UI without relying on brittle note-string parsing. `null` for legacy records. |
+| `duplicateDecisionReasons` | string[] | Machine-readable reason codes such as `AMOUNT_MISMATCH`, `RECIPIENT_MISMATCH`, `REFERENCE_MISMATCH`, `QR_PAYLOAD_MISMATCH`, `TRANSFER_METADATA_PAYLOAD_MISMATCH`, `IMAGE_SIMILARITY_ONLY`, `IDENTICAL_QR_PAYLOAD`, `IDENTICAL_TRANSFER_METADATA_PAYLOAD`. Empty array when no reasons apply. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
 | `similarityScore` | number \| null | `1` for exact duplicates; `1 - hammingDistance / 64` for likely duplicates. |
 | `reviewStatus` | enum | Human review state: `NOT_REQUIRED`, `PENDING`, `CONFIRMED_DUPLICATE`, `CONFIRMED_DISTINCT`. |

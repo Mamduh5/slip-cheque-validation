@@ -32,6 +32,7 @@
 - Staged upload progress indicator with disabled submit and clear stage labels.
 - Post-upload result summary on the document detail page derived from stored document fields, redirect-safe and refresh-safe.
 - Duplicate-decision transparency: a dedicated "Duplicate decision" card on the document detail page explaining exact duplicate, likely duplicate, new upload, and suppressed near-duplicate outcomes with structured-conflict reasons.
+- Structured duplicate-decision reason fields (`duplicateDecisionType`, `duplicateDecisionReasons`) stored on document records so the UI does not depend on brittle note-string parsing. Legacy records with only freeform notes still render via a compatibility fallback.
 - Dashboard suppression badges so users can visually distinguish suppressed near-duplicates from plain new uploads.
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.

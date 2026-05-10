@@ -5,7 +5,10 @@ import { ObjectId } from "mongodb";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeProcessingProfile } from "@/lib/document-types";
 import { getDb } from "@/lib/mongodb";
-import { resolveDuplicateDecision } from "@/lib/duplicate-detection";
+import {
+  resolveDuplicateDecision,
+  type SuppressedNearDuplicate
+} from "@/lib/duplicate-detection";
 import { processUploadedDocumentImage } from "@/lib/document-processing";
 import {
   hammingDistanceHex,
@@ -18,6 +21,7 @@ import { assessTransferSlipDuplicateCandidate } from "@/lib/transfer-slip-duplic
 import type {
   DocumentRecord,
   DocumentType,
+  DuplicateDecisionReason,
   DuplicateStatus,
   ReviewPairDecision,
   ReviewStatus,
@@ -114,6 +118,8 @@ export function buildUploadedDocumentRecord(input: {
     slipVerification: input.slipVerification,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
+    duplicateDecisionType: input.duplicateDecision.duplicateDecisionType,
+    duplicateDecisionReasons: input.duplicateDecision.duplicateDecisionReasons,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
     similarityScore: input.duplicateDecision.similarityScore,
     reviewStatus: reviewStatusForDuplicateDecision(input.duplicateDecision.duplicateStatus),
@@ -200,6 +206,7 @@ export interface DuplicateMatchResult {
   matchedDocumentId: string | null;
   similarityScore: number | null;
   suppressionNote?: string;
+  suppressionReasons?: DuplicateDecisionReason[];
 }
 
 export async function findDuplicateMatchForUser(input: {
@@ -306,7 +313,8 @@ export async function findDuplicateMatchForUser(input: {
     return {
       matchedDocumentId: null,
       similarityScore: null,
-      suppressionNote: firstConflict.notes
+      suppressionNote: firstConflict.notes,
+      suppressionReasons: firstConflict.reasonCodes
     };
   }
 
@@ -372,6 +380,12 @@ export async function createUploadedDocument(input: {
             matchedDocumentId: duplicateMatch.matchedDocumentId,
             similarityScore: duplicateMatch.similarityScore as number
           }
+        : null,
+    suppressedNearDuplicate:
+      duplicateMatch &&
+      duplicateMatch.matchedDocumentId == null &&
+      duplicateMatch.suppressionReasons
+        ? { duplicateDecisionReasons: duplicateMatch.suppressionReasons }
         : null
   });
   const originalObject = await putOriginalDocumentObject({

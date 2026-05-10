@@ -23,6 +23,8 @@ function makeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     slipVerification: null,
     status: "READY",
     duplicateStatus: "NEW",
+    duplicateDecisionType: null,
+    duplicateDecisionReasons: [],
     matchedDocumentId: null,
     similarityScore: null,
     reviewStatus: "NOT_REQUIRED",
@@ -97,6 +99,64 @@ describe("buildResultSummary", () => {
     const why = summary.find((s) => s.label === "Why");
 
     expect(why?.value).toBe("Suppressed because QR payload differed");
+  });
+
+  it("prefers structured decision type and reason codes over notes", () => {
+    const summary = buildResultSummary(
+      makeDocument({
+        duplicateStatus: "NEW",
+        duplicateDecisionType: "SUPPRESSED_NEAR_DUPLICATE",
+        duplicateDecisionReasons: ["AMOUNT_MISMATCH", "RECIPIENT_MISMATCH"],
+        notes: "Suppressed near-duplicate: different amount, different recipient"
+      })
+    );
+    const duplicate = summary.find((s) => s.label === "Duplicate check");
+    const why = summary.find((s) => s.label === "Why");
+
+    expect(duplicate?.value).toBe("Near-duplicate review suppressed");
+    expect(why?.value).toBe("Suppressed because amount differed and recipient differed");
+  });
+
+  it("uses structured reasons even when notes are absent", () => {
+    const summary = buildResultSummary(
+      makeDocument({
+        duplicateStatus: "NEW",
+        duplicateDecisionType: "SUPPRESSED_NEAR_DUPLICATE",
+        duplicateDecisionReasons: ["QR_PAYLOAD_MISMATCH"],
+        notes: null
+      })
+    );
+    const why = summary.find((s) => s.label === "Why");
+
+    expect(why?.value).toBe("Suppressed because QR payload differed");
+  });
+
+  it("shows exact duplicate from structured decision type", () => {
+    const summary = buildResultSummary(
+      makeDocument({
+        duplicateStatus: "EXACT_DUPLICATE",
+        duplicateDecisionType: "EXACT_DUPLICATE",
+        duplicateDecisionReasons: []
+      })
+    );
+    const duplicate = summary.find((s) => s.label === "Duplicate check");
+
+    expect(duplicate?.value).toBe("Exact duplicate found");
+    expect(duplicate?.tone).toBe("info");
+  });
+
+  it("shows likely duplicate review from structured decision type", () => {
+    const summary = buildResultSummary(
+      makeDocument({
+        duplicateStatus: "LIKELY_DUPLICATE",
+        duplicateDecisionType: "LIKELY_DUPLICATE_REVIEW",
+        duplicateDecisionReasons: ["IMAGE_SIMILARITY_ONLY"]
+      })
+    );
+    const duplicate = summary.find((s) => s.label === "Duplicate check");
+
+    expect(duplicate?.value).toBe("Likely duplicate — review needed");
+    expect(duplicate?.tone).toBe("warning");
   });
 
   it("shows confirmed duplicate review status", () => {

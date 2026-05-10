@@ -16,8 +16,42 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-function dashboardDuplicateSublabel(document: { duplicateStatus: string; notes?: string | null | undefined }): string | null {
+function dashboardDuplicateSublabel(document: {
+  duplicateStatus: string;
+  duplicateDecisionType?: string | null;
+  duplicateDecisionReasons?: string[];
+  notes?: string | null | undefined;
+}): string | null {
   if (document.duplicateStatus !== "NEW") return null;
+
+  // Prefer structured fields for new records
+  if (document.duplicateDecisionType === "SUPPRESSED_NEAR_DUPLICATE") {
+    const reasons = document.duplicateDecisionReasons ?? [];
+    if (reasons.length === 0) return "Suppressed near-duplicate";
+
+    // Map reason codes to short labels
+    const labels = reasons.map((r) => {
+      switch (r) {
+        case "AMOUNT_MISMATCH":
+          return "amount differed";
+        case "RECIPIENT_MISMATCH":
+          return "recipient differed";
+        case "REFERENCE_MISMATCH":
+          return "reference differed";
+        case "QR_PAYLOAD_MISMATCH":
+          return "QR payload differed";
+        case "TRANSFER_METADATA_PAYLOAD_MISMATCH":
+          return "metadata payload differed";
+        default:
+          return r.toLowerCase().replace(/_/g, " ");
+      }
+    });
+
+    if (labels.length === 1) return `Suppressed: ${labels[0]}`;
+    return `Suppressed: ${labels[0]}, ${labels[1]}${labels.length > 2 ? "+" : ""}`;
+  }
+
+  // Legacy fallback for older records without structured decision type
   if (!document.notes || !document.notes.startsWith("Suppressed near-duplicate")) return null;
 
   const reasons = parseSuppressionReasons(document.notes);

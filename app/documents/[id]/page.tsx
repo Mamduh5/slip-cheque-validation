@@ -8,6 +8,7 @@ import { ReviewStatusPill } from "@/components/review-status-pill";
 import {
   buildResultSummary,
   parseSuppressionReasons,
+  reasonCodeToLabel,
   toneClasses
 } from "@/lib/document-result-summary";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
@@ -19,11 +20,14 @@ import { requireUser } from "@/lib/session";
 function duplicateDecisionLabel(document: Awaited<ReturnType<typeof getDocumentForUser>>) {
   if (!document) return null;
 
-  if (document.duplicateStatus === "EXACT_DUPLICATE") {
+  // Prefer structured decision type when present (new records)
+  const decisionType = document.duplicateDecisionType;
+
+  if (decisionType === "EXACT_DUPLICATE" || document.duplicateStatus === "EXACT_DUPLICATE") {
     return { title: "Exact duplicate", description: "This upload is a byte-level exact match with another document.", tone: "info" as const };
   }
 
-  if (document.duplicateStatus === "LIKELY_DUPLICATE") {
+  if (decisionType === "LIKELY_DUPLICATE_REVIEW" || document.duplicateStatus === "LIKELY_DUPLICATE") {
     return {
       title: "Likely duplicate — review needed",
       description: "Image similarity suggests this may be the same document. A side-by-side comparison is available for your review.",
@@ -31,7 +35,28 @@ function duplicateDecisionLabel(document: Awaited<ReturnType<typeof getDocumentF
     };
   }
 
+  if (decisionType === "SUPPRESSED_NEAR_DUPLICATE") {
+    const reasons =
+      document.duplicateDecisionReasons.length > 0
+        ? document.duplicateDecisionReasons.map(reasonCodeToLabel)
+        : parseSuppressionReasons(document.notes ?? null);
+
+    const reasonText =
+      reasons.length === 1
+        ? `Structured evidence shows the ${reasons[0]}.`
+        : reasons.length > 1
+          ? `Structured evidence shows differences: ${reasons.join(", ")}.`
+          : "Structured evidence showed differences between the documents.";
+
+    return {
+      title: "Near-duplicate review suppressed",
+      description: `A visually similar candidate was found, but it was not flagged for review. ${reasonText} For transfer slips, structured metadata outweighs visual similarity in duplicate detection.`,
+      tone: "info" as const
+    };
+  }
+
   if (document.notes?.startsWith("Suppressed near-duplicate")) {
+    // Legacy fallback for older records without structured decision type
     const reasons = parseSuppressionReasons(document.notes);
     const reasonText =
       reasons.length === 1

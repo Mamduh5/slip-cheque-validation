@@ -73,6 +73,50 @@
 
 ## 2026-05-10
 
+### Structured Duplicate-Decision Reason Fields
+
+#### Changed
+
+- Added `duplicateDecisionType` and `duplicateDecisionReasons` fields to `DocumentRecord` in `lib/models.ts`.
+  - `duplicateDecisionType`: `EXACT_DUPLICATE`, `LIKELY_DUPLICATE_REVIEW`, `NEW_UPLOAD`, `SUPPRESSED_NEAR_DUPLICATE`.
+  - `duplicateDecisionReasons`: array of codes like `AMOUNT_MISMATCH`, `RECIPIENT_MISMATCH`, `REFERENCE_MISMATCH`, `QR_PAYLOAD_MISMATCH`, `TRANSFER_METADATA_PAYLOAD_MISMATCH`, `IMAGE_SIMILARITY_ONLY`, `IDENTICAL_QR_PAYLOAD`, `IDENTICAL_TRANSFER_METADATA_PAYLOAD`.
+- Updated `lib/transfer-slip-duplicate-assessment.ts` to emit `reasonCodes` alongside legacy `notes` in `TransferSlipDuplicateAssessment`.
+  - Added `conflictToReasonCode` and `evidenceToReasonCode` mappers.
+  - `MATCH` results emit positive evidence codes (`IDENTICAL_QR_PAYLOAD`, `IDENTICAL_TRANSFER_METADATA_PAYLOAD`).
+  - `CONFLICT` results emit conflict codes (`AMOUNT_MISMATCH`, etc.).
+  - `INSUFFICIENT_EVIDENCE` results emit `IMAGE_SIMILARITY_ONLY`.
+- Updated `lib/duplicate-detection.ts` to include `duplicateDecisionType` and `duplicateDecisionReasons` in `DuplicateDecision`.
+  - Added `SuppressedNearDuplicate` interface to pass suppression info into `resolveDuplicateDecision`.
+  - `resolveDuplicateDecision` now sets the correct decision type and reasons for all paths: exact duplicate, likely duplicate, suppressed near-duplicate, and new upload.
+- Updated `lib/documents.ts` to propagate structured suppression reasons from `findDuplicateMatchForUser` through `resolveDuplicateDecision` into the stored document record.
+- Updated `lib/document-result-summary.ts`:
+  - Added `reasonCodeToLabel` to map reason codes to human-readable phrases in one place.
+  - Added `getSuppressionReasons` helper that prefers `duplicateDecisionReasons` and falls back to `parseSuppressionReasons` for legacy records.
+  - `buildResultSummary` now checks `duplicateDecisionType` first and falls back to note parsing only for legacy records.
+- Updated `app/documents/[id]/page.tsx` duplicate-decision card to prefer structured fields over note parsing.
+- Updated `app/dashboard/page.tsx` suppression badge to prefer structured `duplicateDecisionType` and `duplicateDecisionReasons`.
+- Added tests:
+  - `tests/document-result-summary.test.ts`: 4 new tests for structured path (prefers structured over notes, works without notes, exact duplicate from type, likely duplicate from type).
+  - `tests/duplicate-detection.test.ts`: updated 4 existing tests to expect new fields.
+  - `tests/transfer-slip-duplicate-assessment.test.ts`: added `reasonCodes` assertions to 8 existing tests.
+  - `tests/documents.test.ts` and `tests/slip-verification-backfill.test.ts`: updated `makeDocument`/`legacyDocument` helpers to include new fields.
+
+#### Key Decisions
+
+- Kept the existing `notes` field as a human-readable companion but no longer treat it as the source of truth for UI rendering.
+- Legacy fallback is automatic: when `duplicateDecisionType` is `null`, the UI falls back to note parsing. No migration or backfill is required.
+- All reason code mapping is centralized in `reasonCodeToLabel` to prevent scattered string parsing across components.
+- This is data-shape hardening only: no new verification logic, no change to suppression rules, no external integration.
+
+#### Verification
+
+- `npm run test` - all 116 tests pass
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+## 2026-05-10
+
 ### Structure-Aware Transfer-Slip Duplicate Detection
 
 #### Changed

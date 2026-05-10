@@ -20,6 +20,24 @@ export const duplicateStatuses = [
   "ERROR"
 ] as const;
 
+export const duplicateDecisionTypes = [
+  "EXACT_DUPLICATE",
+  "LIKELY_DUPLICATE_REVIEW",
+  "NEW_UPLOAD",
+  "SUPPRESSED_NEAR_DUPLICATE"
+] as const;
+
+export const duplicateDecisionReasons = [
+  "AMOUNT_MISMATCH",
+  "RECIPIENT_MISMATCH",
+  "REFERENCE_MISMATCH",
+  "QR_PAYLOAD_MISMATCH",
+  "TRANSFER_METADATA_PAYLOAD_MISMATCH",
+  "IMAGE_SIMILARITY_ONLY",
+  "IDENTICAL_QR_PAYLOAD",
+  "IDENTICAL_TRANSFER_METADATA_PAYLOAD"
+] as const;
+
 export const reviewStatuses = [
   "NOT_REQUIRED",
   "PENDING",
@@ -74,6 +92,8 @@ export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
 export type DuplicateStatus = (typeof duplicateStatuses)[number];
+export type DuplicateDecisionType = (typeof duplicateDecisionTypes)[number];
+export type DuplicateDecisionReason = (typeof duplicateDecisionReasons)[number];
 export type ReviewStatus = (typeof reviewStatuses)[number];
 export type ReviewPairDecision = (typeof reviewPairDecisions)[number];
 export type QualityStatus = (typeof qualityStatuses)[number];
@@ -244,6 +264,8 @@ export interface DocumentRecord {
   slipVerification?: SlipVerificationAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
+  duplicateDecisionType: DuplicateDecisionType | null;
+  duplicateDecisionReasons: DuplicateDecisionReason[];
   matchedDocumentId: string | null;
   similarityScore: number | null;
   reviewStatus: ReviewStatus;

@@ -132,6 +132,8 @@ describe("document helpers", () => {
       qualityCheckedAt: now,
       duplicateDecision: {
         duplicateStatus: "NEW",
+        duplicateDecisionType: "NEW_UPLOAD",
+        duplicateDecisionReasons: [],
         matchedDocumentId: null,
         similarityScore: null
       }
@@ -199,6 +201,8 @@ describe("document helpers", () => {
       qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z"),
       duplicateDecision: {
         duplicateStatus: "EXACT_DUPLICATE",
+        duplicateDecisionType: "EXACT_DUPLICATE",
+        duplicateDecisionReasons: [],
         matchedDocumentId,
         similarityScore: 1
       }
@@ -249,6 +253,8 @@ describe("document helpers", () => {
       qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z"),
       duplicateDecision: {
         duplicateStatus: "LIKELY_DUPLICATE",
+        duplicateDecisionType: "LIKELY_DUPLICATE_REVIEW",
+        duplicateDecisionReasons: ["IMAGE_SIMILARITY_ONLY"],
         matchedDocumentId,
         similarityScore: 0.9375
       }
@@ -316,6 +322,8 @@ describe("document list filtering", () => {
         qualityCheckedAt: now,
         duplicateDecision: {
           duplicateStatus: "NEW",
+          duplicateDecisionType: "NEW_UPLOAD",
+          duplicateDecisionReasons: [],
           matchedDocumentId: null,
           similarityScore: null
         }
@@ -356,6 +364,8 @@ describe("document list filtering", () => {
         qualityCheckedAt: now,
         duplicateDecision: {
           duplicateStatus: "EXACT_DUPLICATE",
+          duplicateDecisionType: "EXACT_DUPLICATE",
+          duplicateDecisionReasons: [],
           matchedDocumentId: null,
           similarityScore: 1
         }
@@ -396,6 +406,8 @@ describe("document list filtering", () => {
         qualityCheckedAt: now,
         duplicateDecision: {
           duplicateStatus: "LIKELY_DUPLICATE",
+          duplicateDecisionType: "LIKELY_DUPLICATE_REVIEW",
+          duplicateDecisionReasons: ["IMAGE_SIMILARITY_ONLY"],
           matchedDocumentId: null,
           similarityScore: 0.9375
         }
@@ -436,6 +448,8 @@ describe("document list filtering", () => {
         qualityCheckedAt: now,
         duplicateDecision: {
           duplicateStatus: "NEW",
+          duplicateDecisionType: "NEW_UPLOAD",
+          duplicateDecisionReasons: [],
           matchedDocumentId: null,
           similarityScore: null
         }

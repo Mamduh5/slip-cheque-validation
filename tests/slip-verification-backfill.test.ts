@@ -37,6 +37,8 @@ function legacyDocument(input: Partial<DocumentRecord>): DocumentRecord {
     transferMetadata: null,
     status: "READY",
     duplicateStatus: "NEW",
+    duplicateDecisionType: null,
+    duplicateDecisionReasons: [],
     matchedDocumentId: null,
     similarityScore: null,
     reviewStatus: "NOT_REQUIRED",

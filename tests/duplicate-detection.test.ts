@@ -6,6 +6,8 @@ describe("resolveExactDuplicateDecision", () => {
   it("marks uploads as new when no existing document has the same exact hash", () => {
     expect(resolveExactDuplicateDecision(null)).toEqual({
       duplicateStatus: "NEW",
+      duplicateDecisionType: "NEW_UPLOAD",
+      duplicateDecisionReasons: [],
       matchedDocumentId: null,
       similarityScore: null
     });
@@ -16,6 +18,8 @@ describe("resolveExactDuplicateDecision", () => {
 
     expect(resolveExactDuplicateDecision({ _id: existingId })).toEqual({
       duplicateStatus: "EXACT_DUPLICATE",
+      duplicateDecisionType: "EXACT_DUPLICATE",
+      duplicateDecisionReasons: [],
       matchedDocumentId: String(existingId),
       similarityScore: 1
     });
@@ -34,6 +38,8 @@ describe("resolveExactDuplicateDecision", () => {
       })
     ).toEqual({
       duplicateStatus: "EXACT_DUPLICATE",
+      duplicateDecisionType: "EXACT_DUPLICATE",
+      duplicateDecisionReasons: [],
       matchedDocumentId: String(exactId),
       similarityScore: 1
     });
@@ -52,6 +58,8 @@ describe("resolveExactDuplicateDecision", () => {
       })
     ).toEqual({
       duplicateStatus: "LIKELY_DUPLICATE",
+      duplicateDecisionType: "LIKELY_DUPLICATE_REVIEW",
+      duplicateDecisionReasons: ["IMAGE_SIMILARITY_ONLY"],
       matchedDocumentId: nearId,
       similarityScore: 0.9375
     });

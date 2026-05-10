@@ -69,6 +69,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.result).toBe("MATCH");
     expect(result.positiveEvidence).toContain("identical raw QR payload");
     expect(result.conflicts).toHaveLength(0);
+    expect(result.reasonCodes).toEqual(["IDENTICAL_QR_PAYLOAD"]);
   });
 
   it("returns CONFLICT for different raw QR payloads", () => {
@@ -81,36 +82,40 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.conflicts).toContain("different raw QR payload");
     expect(result.positiveEvidence).toHaveLength(0);
     expect(result.notes).toContain("Suppressed near-duplicate");
+    expect(result.reasonCodes).toEqual(["QR_PAYLOAD_MISMATCH"]);
   });
 
   it("returns CONFLICT for different amounts", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("73.00", "0812345678", "REF001", "raw-a") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("40.00", "0812345678", "REF001", "raw-b") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("73.00", "0812345678", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("40.00", "0812345678", "REF001", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different amount");
+    expect(result.reasonCodes).toEqual(["AMOUNT_MISMATCH"]);
   });
 
   it("returns CONFLICT for different recipients", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", "raw-a") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0822222222", "REF001", "raw-b") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0822222222", "REF001", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different recipient");
+    expect(result.reasonCodes).toEqual(["RECIPIENT_MISMATCH"]);
   });
 
   it("returns CONFLICT for different transaction references", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", "raw-a") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF002", "raw-b") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF002", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different transaction reference");
+    expect(result.reasonCodes).toEqual(["REFERENCE_MISMATCH"]);
   });
 
   it("returns CONFLICT for different raw metadata payloads", () => {
@@ -121,6 +126,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different transfer metadata payload");
+    expect(result.reasonCodes).toEqual(["TRANSFER_METADATA_PAYLOAD_MISMATCH"]);
   });
 
   it("returns MATCH when definitive signals align (identical QR and raw payload)", () => {
@@ -132,6 +138,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.result).toBe("MATCH");
     expect(result.positiveEvidence).toContain("identical raw QR payload");
     expect(result.positiveEvidence).toContain("identical transfer metadata payload");
+    expect(result.reasonCodes).toEqual(["IDENTICAL_QR_PAYLOAD", "IDENTICAL_TRANSFER_METADATA_PAYLOAD"]);
   });
 
   it("returns INSUFFICIENT_EVIDENCE when only one side has structured data", () => {
@@ -143,6 +150,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
     expect(result.conflicts).toHaveLength(0);
     expect(result.positiveEvidence).toHaveLength(0);
+    expect(result.reasonCodes).toEqual(["IMAGE_SIMILARITY_ONLY"]);
   });
 
   it("returns INSUFFICIENT_EVIDENCE when both sides lack parsed metadata", () => {
@@ -152,6 +160,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     );
 
     expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.reasonCodes).toEqual(["IMAGE_SIMILARITY_ONLY"]);
   });
 
   it("returns CONFLICT when strong conflicts exist even if other fields match", () => {
@@ -163,5 +172,6 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different transaction reference");
     expect(result.conflicts).toContain("different transfer metadata payload");
+    expect(result.reasonCodes).toEqual(["TRANSFER_METADATA_PAYLOAD_MISMATCH", "REFERENCE_MISMATCH"]);
   });
 });

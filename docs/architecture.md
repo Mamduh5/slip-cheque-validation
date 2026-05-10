@@ -292,11 +292,26 @@ The dashboard list adds a small sky-blue badge under the filename for suppressed
 
 This helps users quickly distinguish suppressed near-duplicates from plain new uploads without opening each document.
 
-### Parsing stored notes
+### Structured duplicate-decision reason fields
 
-The system reuses the existing `notes` field that was already being populated during upload. Notes follow the format `Suppressed near-duplicate: {reason1}, {reason2}`. A small `parseSuppressionReasons` helper in `lib/document-result-summary.ts` normalizes these raw reason strings into human-readable phrases like "amount differed", "recipient differed", "QR payload differed", etc.
+The `DocumentRecord` now includes two dedicated explanation fields:
 
-This is explanation UX only: no new verification logic, no external integration, no new stored fields.
+- **`duplicateDecisionType`**: `EXACT_DUPLICATE`, `LIKELY_DUPLICATE_REVIEW`, `NEW_UPLOAD`, or `SUPPRESSED_NEAR_DUPLICATE`.
+- **`duplicateDecisionReasons`**: an array of machine-readable reason codes such as `AMOUNT_MISMATCH`, `RECIPIENT_MISMATCH`, `REFERENCE_MISMATCH`, `QR_PAYLOAD_MISMATCH`, `TRANSFER_METADATA_PAYLOAD_MISMATCH`, `IMAGE_SIMILARITY_ONLY`, `IDENTICAL_QR_PAYLOAD`, and `IDENTICAL_TRANSFER_METADATA_PAYLOAD`.
+
+These fields are populated at upload time by the duplicate decision engine in `lib/duplicate-detection.ts` and `lib/transfer-slip-duplicate-assessment.ts`. The UI (`lib/document-result-summary.ts`, `app/documents/[id]/page.tsx`, and `app/dashboard/page.tsx`) prefers structured fields when present and only falls back to parsing the legacy `notes` field for older records.
+
+Reason code mapping lives in one place: `reasonCodeToLabel` in `lib/document-result-summary.ts`.
+
+### Legacy fallback
+
+Older records that were created before structured reason fields existed still render correctly. The UI checks `duplicateDecisionType` first; when it is `null`, the system falls back to the existing `parseSuppressionReasons` helper that reads the `notes` field. This means:
+
+- New documents write structured reasons and render from them.
+- Legacy documents with only freeform notes continue to render acceptably.
+- No migration or backfill is required.
+
+This is data-shape and explanation UX hardening only: no new verification logic, no external integration.
 
 ## Browser E2E
 
