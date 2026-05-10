@@ -4,7 +4,8 @@ import { ReviewStatusPill } from "@/components/review-status-pill";
 import { DashboardFilters } from "@/components/dashboard-filters";
 import { formatDocumentType } from "@/lib/document-types";
 import { duplicateStatuses, documentTypes } from "@/lib/models";
-import { getRecentDocumentsForUser, type DocumentReviewFilter } from "@/lib/documents";
+import { getRecentDocumentsForUser } from "@/lib/documents";
+import { type DocumentReviewFilter } from "@/lib/formatters";
 import { requireUser } from "@/lib/session";
 
 function formatDate(date: Date) {

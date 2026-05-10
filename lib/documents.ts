@@ -1,3 +1,5 @@
+import "server-only";
+
 import crypto from "node:crypto";
 import { ObjectId } from "mongodb";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
@@ -17,6 +19,7 @@ import type {
 } from "@/lib/models";
 import { putOriginalDocumentObject } from "@/lib/object-storage";
 import type { DuplicateDecision } from "@/lib/duplicate-detection";
+import type { DocumentReviewFilter } from "@/lib/formatters";
 
 let indexesReady = false;
 
@@ -319,7 +322,6 @@ export async function createUploadedDocument(input: {
   return record;
 }
 
-export type DocumentReviewFilter = "all" | "pending" | "confirmed-duplicate" | "confirmed-distinct";
 
 export async function getRecentDocumentsForUser(
   userId: string,
@@ -528,43 +530,8 @@ export async function reviewLikelyDuplicateDocument(input: {
   return getDocumentForUser(input.documentId, input.userId);
 }
 
-export function formatDuplicateStatus(status: DuplicateStatus) {
-  const labels: Record<DuplicateStatus, string> = {
-    NOT_CHECKED: "Not checked",
-    PENDING: "Checking",
-    NEW: "New upload",
-    EXACT_DUPLICATE: "Exact duplicate",
-    LIKELY_DUPLICATE: "Likely duplicate",
-    DUPLICATE: "Duplicate",
-    POSSIBLE_DUPLICATE: "Possible duplicate",
-    ERROR: "Check failed"
-  };
-
-  return labels[status];
-}
-
-export function formatReviewStatus(status: ReviewStatus) {
-  const labels: Record<ReviewStatus, string> = {
-    NOT_REQUIRED: "Not required",
-    PENDING: "Pending review",
-    CONFIRMED_DUPLICATE: "Confirmed duplicate",
-    CONFIRMED_DISTINCT: "Confirmed distinct"
-  };
-
-  return labels[status];
-}
-
-export function formatQualityStatus(status: DocumentRecord["qualityStatus"]) {
-  const labels: Record<DocumentRecord["qualityStatus"], string> = {
-    PASS: "Good",
-    WARN: "Needs attention",
-    FAIL: "Unusable"
-  };
-
-  return labels[status];
-}
-
-export { formatDocumentType };
+export { formatDocumentType } from "@/lib/document-types";
+export { formatDuplicateStatus, formatReviewStatus, formatQualityStatus } from "@/lib/formatters";
 
 function reviewStatusForDuplicateDecision(status: DuplicateDecision["duplicateStatus"]): ReviewStatus {
   return status === "LIKELY_DUPLICATE" ? "PENDING" : "NOT_REQUIRED";

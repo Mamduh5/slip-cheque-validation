@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { duplicateStatuses, documentTypes } from "@/lib/models";
 import { formatDocumentType } from "@/lib/document-types";
-import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/documents";
+import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/formatters";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface DashboardFiltersProps {
