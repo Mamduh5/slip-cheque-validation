@@ -219,6 +219,8 @@ async function upload(bytes?: string, documentType?: DocumentType) {
         futureStages: string[];
       };
       qrCandidateAnalysis?: DocumentRecord["qrCandidateAnalysis"];
+      qrDecode?: DocumentRecord["qrDecode"];
+      transferMetadata?: DocumentRecord["transferMetadata"];
       slipVerification?: DocumentRecord["slipVerification"];
       error?: string;
     }
@@ -639,7 +641,7 @@ describe("document API integration boundaries", () => {
     });
   });
 
-  it("does not run QR-candidate analysis, QR decode, or transfer metadata parse for non-transfer-slip document types", async () => {
+  it("does not run QR-candidate analysis, QR decode, transfer metadata parse, or slip verification scaffold for non-transfer-slip document types", async () => {
     setSession("user-1");
 
     await upload("deposit slip qr-like image bytes", "DEPOSIT_PAYMENT_SLIP");
@@ -647,6 +649,49 @@ describe("document API integration boundaries", () => {
     expect(testState.documents[0].qrCandidateAnalysis).toBeNull();
     expect(testState.documents[0].qrDecode).toBeNull();
     expect(testState.documents[0].transferMetadata).toBeNull();
+    expect(testState.documents[0].slipVerification).toBeNull();
+  });
+
+  it("clears transfer-slip QR and slip-verification scaffold results on document type correction", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
+    expect(testState.documents[0].slipVerification).toMatchObject({
+      status: "COMPLETED",
+      result: "NOT_VERIFIED",
+      evidenceCategory: "NO_EVIDENCE"
+    });
+
+    const response = await updateDocument(
+      new Request("http://localhost/api/documents/id", {
+        method: "PATCH",
+        body: JSON.stringify({ documentType: "CHEQUE" })
+      }),
+      { params: Promise.resolve({ id: body.documentId as string }) }
+    );
+    const payload = (await response.json()) as {
+      documentType: string;
+      qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
+      qrDecode: DocumentRecord["qrDecode"];
+      transferMetadata: DocumentRecord["transferMetadata"];
+      slipVerification: DocumentRecord["slipVerification"];
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      documentType: "CHEQUE",
+      qrCandidateAnalysis: null,
+      qrDecode: null,
+      transferMetadata: null,
+      slipVerification: null
+    });
+    expect(testState.documents[0]).toMatchObject({
+      documentType: "CHEQUE",
+      qrCandidateAnalysis: null,
+      qrDecode: null,
+      transferMetadata: null,
+      slipVerification: null
+    });
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {
@@ -665,6 +710,7 @@ describe("document API integration boundaries", () => {
       documentType: string;
       documentTypeLabel: string;
       processingProfile: { name: string; branch: string };
+      slipVerification: DocumentRecord["slipVerification"];
       duplicateStatus: string;
       reviewStatus: string;
       qualityStatus: string;
@@ -680,6 +726,7 @@ describe("document API integration boundaries", () => {
       },
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
+      slipVerification: null,
       qualityStatus: "WARN"
     });
     expect(testState.documents[0]).toMatchObject({

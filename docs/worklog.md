@@ -2,6 +2,34 @@
 
 ## 2026-05-10
 
+### Slip Verification Runtime Scaffold
+
+#### Changed
+
+- Added a persisted `slipVerification` field for transfer-slip records.
+- Added `lib/slip-verification.ts` with a minimal scaffold result for `BANK_TRANSFER_SLIP` uploads.
+- The current scaffold records `stage: "SLIP_VERIFICATION"`, `status: "COMPLETED"`, `result: "NOT_VERIFIED"`, and `evidenceCategory: "NO_EVIDENCE"`.
+- Exposed `slipVerification` in upload/detail API responses and the document detail UI with safe no-evidence wording.
+- Cleared `slipVerification` during document-type correction because the image is not reprocessed in that flow.
+- Added route and model fixture coverage for transfer-slip persistence/exposure, non-slip null behavior, and correction clearing.
+- Updated README, architecture, roadmap, and data-model documentation.
+
+#### Key Decisions
+
+- The runtime scaffold is not real verification.
+- No local structural validation, external provider integration, bank truth check, OCR, or cheque parsing was added.
+- `slipVerification` remains separate from `qrDecode` and `transferMetadata`.
+- `verificationImplemented` remains false because the scaffold only records `NOT_VERIFIED` with `NO_EVIDENCE`.
+
+#### Verification
+
+- `npm run test` - all 58 tests pass
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+## 2026-05-10
+
 ### Changed
 
 - Added `docs/slip-verification-spec.md` as a design-only contract for future `SLIP_VERIFICATION`.

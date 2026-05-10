@@ -1,10 +1,10 @@
 # Slip Verification Specification
 
-This document defines the future `SLIP_VERIFICATION` stage boundary for bank transfer slips. It is a design contract only. No slip verification logic, bank/provider integration, OCR, queue, or new runtime service is implemented by this document.
+This document defines the `SLIP_VERIFICATION` stage boundary for bank transfer slips. The current runtime implementation is a safe scaffold only. No local structural verification logic, bank/provider integration, OCR, queue, or new runtime service is implemented by this document.
 
 ## Current Transfer-Slip Stage Boundary
 
-The current `BANK_TRANSFER_SLIP` path has three executed stages and one planned stage:
+The current `BANK_TRANSFER_SLIP` path has three executed QR/metadata stages and one safe verification scaffold:
 
 1. `QR_CANDIDATE`
    - Detects whether a plausible QR-like region exists in the normalized image.
@@ -20,8 +20,9 @@ The current `BANK_TRANSFER_SLIP` path has three executed stages and one planned 
    - Stores structured metadata as an interpretation of decoded text.
    - Does not verify authenticity, account truth, payment status, or bank truth.
 4. `SLIP_VERIFICATION`
-   - Planned only.
-   - Must not run until an implementation is explicitly added.
+   - Persists a runtime scaffold object only.
+   - Records `NOT_VERIFIED` with `NO_EVIDENCE`.
+   - Does not perform local structural validation or external truth verification.
    - Must not be implied by successful decode or parse.
 
 ## Definitions
@@ -70,9 +71,9 @@ Examples, if ever explicitly integrated later:
 
 External truth verification is not implemented now. Until it is implemented, the product must not display "verified payment", "confirmed transfer", or similar wording.
 
-## Future Stage Contract
+## Stage Contract
 
-A future `SLIP_VERIFICATION` implementation should consume only explicit prior-stage outputs and declared evidence sources.
+Any future `SLIP_VERIFICATION` implementation beyond the current no-evidence scaffold should consume only explicit prior-stage outputs and declared evidence sources.
 
 ### Required Inputs
 
@@ -91,11 +92,11 @@ Optional future inputs may include:
 
 ### Proposed Stage Statuses
 
-Future runtime statuses should be explicit and auditable:
+Runtime statuses should be explicit and auditable:
 
 - `NOT_APPLICABLE`: document type or profile does not support slip verification.
 - `SKIPPED`: required prior-stage inputs are unavailable or unsupported.
-- `COMPLETED`: verification checks ran and produced a result.
+- `COMPLETED`: the stage produced a result. In the current scaffold this means a no-evidence `NOT_VERIFIED` result was recorded, not that verification checks ran.
 - `FAILED`: verification could not complete due to system or provider error.
 
 ### Proposed Result Categories

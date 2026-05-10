@@ -87,14 +87,14 @@ The processing boundary includes a document-type processing profile so later sta
 
 Profiles define the current branch and future stage hints:
 
-- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE`, `QR_DECODE`, and `TRANSFER_METADATA_PARSE`, and keeps `SLIP_VERIFICATION` as a planned stage.
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and a minimal `SLIP_VERIFICATION` runtime scaffold that records no verification evidence.
 - `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
 - `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
 - `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
 
 The profile is stored on new document records as lightweight metadata and exposed by document APIs. Planned stages are contract metadata only. They are not OCR or verification results.
 
-The planned `SLIP_VERIFICATION` stage is governed by `docs/slip-verification-spec.md`. That spec separates raw decode, parsed metadata, local structural validation, and external truth verification before any runtime verification code is added.
+The `SLIP_VERIFICATION` boundary is governed by `docs/slip-verification-spec.md`. The current runtime field is a scaffold only; it records `NOT_VERIFIED` with `NO_EVIDENCE` and does not perform local structural validation or external truth verification.
 
 ## Transfer-Slip QR-Candidate Analysis
 
@@ -119,7 +119,7 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - If decoding fails, `qrDecode.result` is `NO_QR_DECODED`.
 - The stage stores `status`, `result`, `decodedAt`, `rawDecodedText`, `decodedTextLength`, `sourceImageType`, and notes.
 - **Raw decoded text is not verified. It is not treated as trustworthy payment data.**
-- Transfer metadata parsing is a separate stage after decode. Slip verification remains planned only.
+- Transfer metadata parsing is a separate stage after decode. Slip verification remains separate and currently records only a safe no-evidence scaffold.
 - Non-slip types do not run the stage.
 
 ## Transfer-Slip Metadata Parse
@@ -135,12 +135,13 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Unsupported formats produce clean `UNSUPPORTED_FORMAT` or `NO_STRUCTURED_METADATA` results instead of fake business fields.
 - Non-slip types do not run the stage.
 
-## Planned Slip Verification Boundary
+## Slip Verification Runtime Scaffold
 
-`SLIP_VERIFICATION` is not implemented. The design contract is documented in `docs/slip-verification-spec.md`.
+`SLIP_VERIFICATION` now has a minimal runtime scaffold for transfer-slip records. The design contract is documented in `docs/slip-verification-spec.md`.
 
 - Successful QR decode means raw QR content was extracted.
 - Successful transfer metadata parse means supported structure was interpreted from decoded QR content.
+- The current `slipVerification` field uses `status: "COMPLETED"`, `result: "NOT_VERIFIED"`, and `evidenceCategory: "NO_EVIDENCE"` for new transfer-slip uploads.
 - Local structural validation, if later implemented, can only say a payload is structurally consistent with supported rules.
 - External truth verification, if later implemented, requires a configured external evidence source and must identify what claim was checked.
 - Local structural consistency must not be labeled as bank/provider verification.
@@ -152,11 +153,11 @@ Owners can correct `documentType` after upload from the document detail page. Th
 
 Correction behavior is intentionally narrow:
 
-- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, and `updatedAt` are changed on the document record.
+- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, `slipVerification`, and `updatedAt` are changed on the document record.
 - Non-owned or missing documents return `404`.
 - Invalid type values return `400`.
 - Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.
-- Existing QR-candidate analysis, QR decode, and transfer metadata results are cleared on type correction because the document is not reprocessed in this v1 flow.
+- Existing QR-candidate analysis, QR decode, transfer metadata, and slip-verification scaffold results are cleared on type correction because the document is not reprocessed in this v1 flow.
 - The corrected type becomes the current source of truth for future type-aware stages.
 
 Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.

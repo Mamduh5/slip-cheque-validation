@@ -43,7 +43,7 @@ Stores one registry record per uploaded document image.
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
 | `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`, `qr-decode`, and `transfer-metadata-parse`. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
-| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE`, `QR_DECODE`, and `TRANSFER_METADATA_PARSE` as `ACTIVE`; verification remains `PLANNED`. Shared stages are marked `ACTIVE`. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE`, `QR_DECODE`, and `TRANSFER_METADATA_PARSE` as `ACTIVE`; `SLIP_VERIFICATION` remains planned as real verification even though a no-evidence scaffold field is persisted. Shared stages are marked `ACTIVE`. |
 | `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. Extraction and verification are currently false. |
 | `qrCandidateAnalysis.stage` | string \| null | Transfer-slip-only stage key, currently `QR_CANDIDATE`. Null or absent for non-slip records and older records. |
 | `qrCandidateAnalysis.algorithm` | string \| null | Currently `qr-candidate-heuristic-v1`. |
@@ -76,6 +76,13 @@ Stores one registry record per uploaded document image.
 | `transferMetadata.metadata.rawTopLevelTags` | object | Raw parsed top-level TLV tags for audit/debug use. |
 | `transferMetadata.notes` | string[] \| null | Short non-authoritative notes about parse behavior. |
 | `transferMetadata.warnings` | string[] \| null | Warnings for suspicious but parseable structure, such as unexpected amount formatting. |
+| `slipVerification.stage` | string \| null | Transfer-slip-only scaffold stage key, currently `SLIP_VERIFICATION`. Null or absent for non-slip records and older records. |
+| `slipVerification.algorithm` | string \| null | Currently `slip-verification-scaffold-v1`. |
+| `slipVerification.status` | enum \| null | Current scaffold uses `COMPLETED` for transfer slips to indicate the no-evidence result was recorded, not that verification logic ran. |
+| `slipVerification.result` | enum \| null | Current scaffold uses `NOT_VERIFIED` only. No success, mismatch, or external verification outcomes exist. |
+| `slipVerification.evidenceCategory` | enum \| null | Current scaffold uses `NO_EVIDENCE` only. `LOCAL_STRUCTURAL_CHECK` is reserved for future work and is not produced now. |
+| `slipVerification.evaluatedAt` | Date \| null | When the scaffold result was recorded. |
+| `slipVerification.notes` | string[] \| null | Safe notes that no local structural validation or external provider verification was performed. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
@@ -147,8 +154,8 @@ Future type-specific work can use this field for QR handling, cheque-specific ex
 
 Owners can correct `documentType` after upload. Corrections:
 
-- update only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, and `updatedAt`;
-- clear any existing `qrCandidateAnalysis`, `qrDecode`, and `transferMetadata` because the image is not reprocessed during correction;
+- update only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, `slipVerification`, and `updatedAt`;
+- clear any existing `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, and `slipVerification` because the image is not reprocessed during correction;
 - write a `DOCUMENT_TYPE_UPDATED` audit log with old type, new type, who changed it, and when;
 - do not recompute duplicate matching, quality assessment, normalized images, exact hashes, or perceptual hashes;
 - make the corrected type the current source of truth for future type-aware stages.
@@ -167,7 +174,7 @@ Transfer slips include stage contract entries:
 - `QR_CANDIDATE`: active QR-like region candidate analysis on the normalized derivative. No QR decoding is performed.
 - `QR_DECODE`: active QR payload decoding that stores raw decoded text without verification.
 - `TRANSFER_METADATA_PARSE`: active parsing of supported decoded transfer metadata without verification.
-- `SLIP_VERIFICATION`: planned verification stage governed by `docs/slip-verification-spec.md`; no runtime field exists yet.
+- `SLIP_VERIFICATION`: planned verification stage governed by `docs/slip-verification-spec.md`; current runtime stores only a `NOT_VERIFIED` / `NO_EVIDENCE` scaffold for transfer slips.
 
 Profiles document the branch, active shared stages, active transfer-slip decode/parse stages, and planned stage hints. They do not mean OCR, cheque parsing, slip verification, or bank verification has run.
 

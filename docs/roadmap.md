@@ -10,11 +10,12 @@
 - Explicit document-type intake for transfer slips, deposit/payment slips, cheques, and unknown documents.
 - Owner-only audited document-type correction after upload.
 - Type-aware processing profiles with a slip-first branch for QR-oriented work.
-- Transfer-slip stage contract with active QR candidate analysis, QR decode, and transfer metadata parse, plus planned later verification.
-- Design-only slip verification contract documenting decode vs parse vs local structural validation vs external truth verification.
+- Transfer-slip stage contract with active QR candidate analysis, QR decode, transfer metadata parse, and a safe `slipVerification` runtime scaffold, plus planned later real verification.
+- Slip verification contract documenting decode vs parse vs local structural validation vs external truth verification.
 - Executed transfer-slip QR-candidate analysis that records plausible QR-like regions.
 - Executed transfer-slip QR decode that extracts raw QR content without parsing or verifying business fields.
 - Executed transfer-slip metadata parsing that classifies decoded payloads and parses supported Thai QR payment payloads without verification.
+- Persisted transfer-slip `slipVerification` scaffold that currently records `NOT_VERIFIED` with `NO_EVIDENCE` only.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.
@@ -35,7 +36,7 @@
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
-- Add a non-executing `slipVerification` model or local structural-validation implementation only after the design contract in `docs/slip-verification-spec.md` is accepted.
+- Add local structural-validation implementation only after the runtime scaffold contract proves useful and safe.
 - Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
