@@ -41,18 +41,27 @@ Stores one registry record per uploaded document image.
 | `normalizedImage.algorithm` | string \| null | Currently `normalized-webp-grayscale-v1`. |
 | `processingProfile.name` | string | Type-aware processing profile name, such as `bank-transfer-slip-v1`. |
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
-| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`. |
+| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis` and `qr-decode`. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
-| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE` as `ACTIVE`; QR decode, metadata parse, and verification remain `PLANNED`. Shared stages are marked `ACTIVE`. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE` and `QR_DECODE` as `ACTIVE`; metadata parse and verification remain `PLANNED`. Shared stages are marked `ACTIVE`. |
 | `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. Extraction and verification are currently false. |
 | `qrCandidateAnalysis.stage` | string \| null | Transfer-slip-only stage key, currently `QR_CANDIDATE`. Null or absent for non-slip records and older records. |
 | `qrCandidateAnalysis.algorithm` | string \| null | Currently `qr-candidate-heuristic-v1`. |
 | `qrCandidateAnalysis.status` | enum \| null | `COMPLETED`, `FAILED`, `PENDING`, or `NOT_APPLICABLE`. New transfer-slip uploads normally use `COMPLETED` unless analysis fails. |
-| `qrCandidateAnalysis.result` | enum \| null | `CANDIDATE_FOUND`, `NO_CANDIDATE_FOUND`, or `ANALYSIS_SKIPPED`. This is not QR decoding. |
+| `qrCandidateAnalysis.result` | enum \| null | `CANDIDATE_FOUND`, `NO_CANDIDATE_FOUND`, or `ANALYSIS_SKIPPED`. This is candidate detection, not QR decoding. |
 | `qrCandidateAnalysis.checkedAt` | Date \| null | When candidate analysis ran. |
 | `qrCandidateAnalysis.candidateCount` | number \| null | Count of plausible QR-like windows retained by the heuristic. |
 | `qrCandidateAnalysis.bestCandidate` | object \| null | Approximate best candidate box and confidence in normalized-image coordinates when found. |
-| `qrCandidateAnalysis.notes` | string[] \| null | Short non-authoritative notes; no decoded payload or bank metadata is stored. |
+| `qrCandidateAnalysis.notes` | string[] \| null | Short non-authoritative notes about candidate detection. |
+| `qrDecode.stage` | string \| null | Transfer-slip-only stage key, currently `QR_DECODE`. Null or absent for non-slip records and older records. |
+| `qrDecode.algorithm` | string \| null | Currently `jsqr-decode-v1`. |
+| `qrDecode.status` | enum \| null | `COMPLETED`, `FAILED`, `SKIPPED`, or `NOT_APPLICABLE`. `SKIPPED` when no candidate exists; `COMPLETED` when decode was attempted. |
+| `qrDecode.result` | enum \| null | `QR_DECODED` or `NO_QR_DECODED`. This is raw QR content extraction, not business field parsing. |
+| `qrDecode.decodedAt` | Date \| null | When QR decode ran. |
+| `qrDecode.rawDecodedText` | string \| null | Raw decoded QR content when successful. Not parsed into bank/account/amount/reference fields. Not verified. |
+| `qrDecode.decodedTextLength` | number \| null | Length of raw decoded text when successful. |
+| `qrDecode.sourceImageType` | enum \| null | Currently `normalized-image` when decode was attempted; null when skipped. |
+| `qrDecode.notes` | string[] \| null | Short non-authoritative notes about decode attempt. No business interpretation is stored. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |

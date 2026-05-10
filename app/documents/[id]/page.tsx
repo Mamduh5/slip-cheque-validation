@@ -191,24 +191,58 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
         </div>
 
         {document.documentType === "BANK_TRANSFER_SLIP" ? (
-          <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">QR candidate analysis</dt>
-            <dd className="mt-1 text-sm font-medium text-slate-800">
-              {formatQrCandidateResult(document.qrCandidateAnalysis?.result)}
-            </dd>
-            <dd className="mt-1 text-sm text-slate-700">
-              {document.qrCandidateAnalysis?.status === "COMPLETED"
-                ? `Completed with ${document.qrCandidateAnalysis.candidateCount} candidate${document.qrCandidateAnalysis.candidateCount === 1 ? "" : "s"}. QR content was not decoded.`
-                : document.qrCandidateAnalysis?.status === "FAILED"
-                  ? "Analysis failed for this upload. QR content was not decoded."
-                  : "This record does not have QR-candidate analysis results. QR content was not decoded."}
-            </dd>
-            {document.qrCandidateAnalysis?.bestCandidate ? (
-              <dd className="mt-1 text-xs text-slate-500">
-                Best candidate confidence {Math.round(document.qrCandidateAnalysis.bestCandidate.confidence * 100)}%.
+          <>
+            <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">QR candidate analysis</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-800">
+                {formatQrCandidateResult(document.qrCandidateAnalysis?.result)}
               </dd>
-            ) : null}
-          </div>
+              <dd className="mt-1 text-sm text-slate-700">
+                {document.qrCandidateAnalysis?.status === "COMPLETED"
+                  ? `Completed with ${document.qrCandidateAnalysis.candidateCount} candidate${document.qrCandidateAnalysis.candidateCount === 1 ? "" : "s"}.`
+                  : document.qrCandidateAnalysis?.status === "FAILED"
+                    ? "Analysis failed for this upload."
+                    : "This record does not have QR-candidate analysis results."}
+              </dd>
+              {document.qrCandidateAnalysis?.bestCandidate ? (
+                <dd className="mt-1 text-xs text-slate-500">
+                  Best candidate confidence {Math.round(document.qrCandidateAnalysis.bestCandidate.confidence * 100)}%.
+                </dd>
+              ) : null}
+            </div>
+
+            <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">QR decode</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-800">
+                {document.qrDecode?.result === "QR_DECODED"
+                  ? "QR content decoded"
+                  : document.qrDecode?.result === "NO_QR_DECODED"
+                    ? "No QR content decoded"
+                    : "QR decode not available"}
+              </dd>
+              <dd className="mt-1 text-sm text-slate-700">
+                {document.qrDecode?.status === "COMPLETED" && document.qrDecode.result === "QR_DECODED"
+                  ? `Raw QR text was successfully decoded (${document.qrDecode.decodedTextLength} characters). This content has not been parsed or verified.`
+                  : document.qrDecode?.status === "COMPLETED" && document.qrDecode.result === "NO_QR_DECODED"
+                    ? "QR decode was attempted but no valid QR code was found."
+                    : document.qrDecode?.status === "SKIPPED"
+                      ? "QR decode was skipped because no plausible QR candidate was found."
+                      : document.qrDecode?.status === "NOT_APPLICABLE"
+                        ? "QR decode is not applicable for this document."
+                        : document.qrDecode?.status === "FAILED"
+                          ? "QR decode failed due to a processing error."
+                          : "This record does not have QR decode results."}
+              </dd>
+              {document.qrDecode?.rawDecodedText ? (
+                <dd className="mt-2 rounded border border-slate-200 bg-white p-2">
+                  <div className="text-xs font-medium text-slate-500">Raw decoded content (not parsed or verified):</div>
+                  <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-800">
+                    {document.qrDecode.rawDecodedText}
+                  </pre>
+                </dd>
+              ) : null}
+            </div>
+          </>
         ) : null}
 
         <div className="mt-3 rounded-md border border-line p-3">

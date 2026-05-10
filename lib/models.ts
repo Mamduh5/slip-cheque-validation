@@ -46,6 +46,9 @@ export const qrCandidateResults = [
   "CANDIDATE_FOUND"
 ] as const;
 
+export const qrDecodeStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED", "FAILED"] as const;
+export const qrDecodeOutcomes = ["NO_QR_DECODED", "QR_DECODED"] as const;
+
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
 export type DocumentStatus = (typeof documentStatuses)[number];
@@ -58,6 +61,8 @@ export type DocumentProcessingBranch = (typeof documentProcessingBranches)[numbe
 export type DocumentProcessingStageStatus = (typeof documentProcessingStageStatuses)[number];
 export type QrCandidateStageStatus = (typeof qrCandidateStageStatuses)[number];
 export type QrCandidateResult = (typeof qrCandidateResults)[number];
+export type QrDecodeStageStatus = (typeof qrDecodeStageStatuses)[number];
+export type QrDecodeOutcome = (typeof qrDecodeOutcomes)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -130,6 +135,18 @@ export interface QrCandidateAnalysisResult {
   notes: string[];
 }
 
+export interface QrDecodeAnalysisResult {
+  stage: "QR_DECODE";
+  algorithm: "jsqr-decode-v1";
+  status: QrDecodeStageStatus;
+  result: QrDecodeOutcome;
+  decodedAt: Date;
+  rawDecodedText: string | null;
+  decodedTextLength: number | null;
+  sourceImageType: "normalized-image" | "candidate-crop" | null;
+  notes: string[];
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -143,6 +160,7 @@ export interface DocumentRecord {
   normalizedImage: NormalizedImageMetadata | null;
   processingProfile?: DocumentProcessingProfileSnapshot;
   qrCandidateAnalysis?: QrCandidateAnalysisResult | null;
+  qrDecode?: QrDecodeAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;

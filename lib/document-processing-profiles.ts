@@ -37,8 +37,8 @@ const transferSlipFutureStagePlan = [
   {
     key: "QR_DECODE",
     label: "QR decode",
-    status: "PLANNED",
-    description: "Future stage to decode a candidate QR payload when present."
+    status: "ACTIVE",
+    description: "Attempts to decode QR content when a plausible QR candidate exists. Stores raw decoded text without business interpretation."
   },
   {
     key: "TRANSFER_METADATA_PARSE",
@@ -61,9 +61,9 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     branch: "TRANSFER_SLIP",
     family: "transfer-slip",
     description:
-      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, and conservative QR-candidate analysis. QR decoding and slip verification are not implemented.",
-    currentStages: [...sharedCurrentStages, "qr-candidate-analysis"],
-    futureStages: ["qr-decode", "printed-field-extraction", "transfer-slip-specific-validation"],
+      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, conservative QR-candidate analysis, and QR decoding. Transfer metadata parsing and slip verification are not implemented.",
+    currentStages: [...sharedCurrentStages, "qr-candidate-analysis", "qr-decode"],
+    futureStages: ["printed-field-extraction", "transfer-slip-specific-validation"],
     plannedStages: [...sharedActiveStagePlan, ...transferSlipFutureStagePlan],
     capabilities: {
       qrOrientedFuturePath: true,

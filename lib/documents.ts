@@ -75,6 +75,7 @@ export function buildUploadedDocumentRecord(input: {
   normalizedImage: DocumentRecord["normalizedImage"];
   processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
+  qrDecode: DocumentRecord["qrDecode"];
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -96,6 +97,7 @@ export function buildUploadedDocumentRecord(input: {
     normalizedImage: input.normalizedImage,
     processingProfile: input.processingProfile,
     qrCandidateAnalysis: input.qrCandidateAnalysis,
+    qrDecode: input.qrDecode,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
@@ -252,6 +254,7 @@ export async function createUploadedDocument(input: {
     normalizedImage: processedImage.normalizedImage,
     processingProfile: processedImage.processingProfile,
     qrCandidateAnalysis: processedImage.qrCandidateAnalysis,
+    qrDecode: processedImage.qrDecode,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,
@@ -378,6 +381,7 @@ export async function updateDocumentTypeForUser(input: {
         documentType: input.documentType,
         processingProfile: newProcessingProfile,
         qrCandidateAnalysis: null,
+        qrDecode: null,
         updatedAt: now
       }
     }

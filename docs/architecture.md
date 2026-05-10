@@ -56,7 +56,7 @@ documents/{userId}/{documentId}/normalized.webp
 5. Server computes a SHA-256 exact file hash.
 6. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
 7. The in-process document processing service receives the selected document type, decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
-8. For `BANK_TRANSFER_SLIP` only, the transfer-slip branch runs conservative QR-candidate analysis on the normalized derivative and records whether a QR-like region was found. It does not decode QR content.
+8. For `BANK_TRANSFER_SLIP` only, the transfer-slip branch runs conservative QR-candidate analysis on the normalized derivative and records whether a QR-like region was found, then attempts QR decode when a plausible candidate exists. Raw decoded text is stored without parsing or verifying business fields.
 9. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
 10. Original image bytes are stored unchanged in MinIO.
 11. A new document record is inserted into MongoDB for auditability.
@@ -74,7 +74,7 @@ Supported document types:
 - `CHEQUE`
 - `UNKNOWN`
 
-The processing boundary includes a document-type processing profile so later stages can add slip QR decoding, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
+The processing boundary includes a document-type processing profile so later stages can add transfer metadata parsing, cheque-specific extraction, or payment-slip handling without changing the stored type model. Transfer metadata parsing and slip verification are not implemented yet.
 
 ## Type-Aware Processing Boundary
 
@@ -87,7 +87,7 @@ The processing boundary includes a document-type processing profile so later sta
 
 Profiles define the current branch and future stage hints:
 
-- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE` analysis and keeps `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION` as planned stages.
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE` analysis and `QR_DECODE`, and keeps `TRANSFER_METADATA_PARSE` and `SLIP_VERIFICATION` as planned stages.
 - `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
 - `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
 - `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
@@ -104,7 +104,21 @@ The profile is stored on new document records as lightweight metadata and expose
 - `CANDIDATE_FOUND` means a plausible QR-like region was detected. It does not mean QR payloads were decoded or that a transfer is valid.
 - Non-slip types do not run the stage and keep their conservative profiles.
 
-The heuristic is intentionally explainable and lightweight. It can miss poor, cropped, or unusual QR regions, and it can produce false positives on dense high-contrast patterns. Later QR decoding should treat this as candidate triage, not proof.
+The heuristic is intentionally explainable and lightweight. It can miss poor, cropped, or unusual QR regions, and it can produce false positives on dense high-contrast patterns. QR decoding treats this as candidate triage, not proof.
+
+## Transfer-Slip QR Decode
+
+`QR_DECODE` is now a real executed transfer-slip stage. It only applies to `BANK_TRANSFER_SLIP` documents and runs after `QR_CANDIDATE`.
+
+- The decoder uses jsQR to attempt QR content extraction from the normalized image.
+- Decoding is only attempted when `QR_CANDIDATE` completes successfully with `CANDIDATE_FOUND`.
+- If no candidate exists, the stage is `SKIPPED`.
+- If decoding succeeds, `qrDecode.result` is `QR_DECODED` and `rawDecodedText` contains the extracted content.
+- If decoding fails, `qrDecode.result` is `NO_QR_DECODED`.
+- The stage stores `status`, `result`, `decodedAt`, `rawDecodedText`, `decodedTextLength`, `sourceImageType`, and notes.
+- **Raw decoded text is not parsed into business fields. It is not verified. It is not treated as trustworthy payment data.**
+- Transfer metadata parsing and slip verification remain planned only.
+- Non-slip types do not run the stage.
 
 ## Document-Type Correction
 
@@ -112,11 +126,11 @@ Owners can correct `documentType` after upload from the document detail page. Th
 
 Correction behavior is intentionally narrow:
 
-- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, and `updatedAt` are changed on the document record.
+- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, and `updatedAt` are changed on the document record.
 - Non-owned or missing documents return `404`.
 - Invalid type values return `400`.
 - Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.
-- Existing QR-candidate analysis is cleared on type correction because the document is not reprocessed in this v1 flow.
+- Existing QR-candidate analysis and QR decode results are cleared on type correction because the document is not reprocessed in this v1 flow.
 - The corrected type becomes the current source of truth for future type-aware stages.
 
 Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.

@@ -39,12 +39,12 @@ describe("document helpers", () => {
         },
         plannedStages: expect.arrayContaining([
           expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
-          expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
+          expect.objectContaining({ key: "QR_DECODE", status: "ACTIVE" }),
           expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
           expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
         ]),
-        currentStages: expect.arrayContaining(["qr-candidate-analysis"]),
-        futureStages: expect.arrayContaining(["qr-decode"])
+        currentStages: expect.arrayContaining(["qr-candidate-analysis", "qr-decode"]),
+        futureStages: expect.arrayContaining(["printed-field-extraction"])
       }
     });
     expect(getTypeAwareProcessingPlan("DEPOSIT_PAYMENT_SLIP")).toMatchObject({
@@ -109,6 +109,7 @@ describe("document helpers", () => {
       },
       processingProfile: getDocumentProcessingProfile("CHEQUE"),
       qrCandidateAnalysis: null,
+      qrDecode: null,
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
       qualityStatus: "PASS",
@@ -173,6 +174,7 @@ describe("document helpers", () => {
       },
       processingProfile: getDocumentProcessingProfile("UNKNOWN"),
       qrCandidateAnalysis: null,
+      qrDecode: null,
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "PASS",
@@ -220,6 +222,7 @@ describe("document helpers", () => {
       },
       processingProfile: getDocumentProcessingProfile("UNKNOWN"),
       qrCandidateAnalysis: null,
+      qrDecode: null,
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "WARN",

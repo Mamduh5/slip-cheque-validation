@@ -267,6 +267,44 @@ describe("document API integration boundaries", () => {
               notes: ["QR content was not decoded."]
             }
           : null,
+      qrDecode:
+        input.documentType === "BANK_TRANSFER_SLIP"
+          ? input.buffer.toString("utf8").includes("qr") && input.buffer.toString("utf8").includes("decoded")
+            ? {
+                stage: "QR_DECODE",
+                algorithm: "jsqr-decode-v1",
+                status: "COMPLETED",
+                result: "QR_DECODED",
+                decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+                rawDecodedText: "https://example.com/payment/12345",
+                decodedTextLength: 35,
+                sourceImageType: "normalized-image",
+                notes: ["QR content was successfully decoded from the normalized image."]
+              }
+            : input.buffer.toString("utf8").includes("qr")
+              ? {
+                  stage: "QR_DECODE",
+                  algorithm: "jsqr-decode-v1",
+                  status: "COMPLETED",
+                  result: "NO_QR_DECODED",
+                  decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+                  rawDecodedText: null,
+                  decodedTextLength: null,
+                  sourceImageType: "normalized-image",
+                  notes: ["QR decode was attempted on the normalized image but no valid QR code was found."]
+                }
+              : {
+                  stage: "QR_DECODE",
+                  algorithm: "jsqr-decode-v1",
+                  status: "SKIPPED",
+                  result: "NO_QR_DECODED",
+                  decodedAt: new Date("2026-05-08T10:00:00.000Z"),
+                  rawDecodedText: null,
+                  decodedTextLength: null,
+                  sourceImageType: null,
+                  notes: ["QR decode was skipped because no plausible QR candidate was found."]
+                }
+          : null,
       perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
       qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
       qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -378,7 +416,7 @@ describe("document API integration boundaries", () => {
     }
   });
 
-  it("exposes transfer-slip QR-candidate stage results without extraction results", async () => {
+  it("exposes transfer-slip QR-candidate and QR-decode stage results without extraction results", async () => {
     setSession("user-1");
 
     const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
@@ -395,6 +433,7 @@ describe("document API integration boundaries", () => {
         plannedStages: Array<{ key: string; status: string }>;
       };
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
+      qrDecode: DocumentRecord["qrDecode"];
     };
 
     expect(detail.processingProfile.capabilities).toMatchObject({
@@ -405,7 +444,7 @@ describe("document API integration boundaries", () => {
     expect(detail.processingProfile.plannedStages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
-        expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
+        expect.objectContaining({ key: "QR_DECODE", status: "ACTIVE" }),
         expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
         expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
       ])
@@ -416,15 +455,49 @@ describe("document API integration boundaries", () => {
       result: "CANDIDATE_FOUND",
       candidateCount: 1
     });
+    expect(detail.qrDecode).toMatchObject({
+      stage: "QR_DECODE",
+      status: "COMPLETED",
+      result: "NO_QR_DECODED"
+    });
   });
 
-  it("does not run QR-candidate analysis for non-transfer-slip document types", async () => {
+  it("successfully decodes QR content when candidate is found and QR is decodable", async () => {
     setSession("user-1");
 
-    const { body } = await upload("deposit slip qr-like image bytes", "DEPOSIT_PAYMENT_SLIP");
+    const { body } = await upload("transfer slip qr decoded image bytes", "BANK_TRANSFER_SLIP");
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as {
+      qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
+      qrDecode: DocumentRecord["qrDecode"];
+    };
 
-    expect(body.qrCandidateAnalysis).toBeNull();
+    expect(detail.qrCandidateAnalysis).toMatchObject({
+      stage: "QR_CANDIDATE",
+      status: "COMPLETED",
+      result: "CANDIDATE_FOUND"
+    });
+    expect(detail.qrDecode).toMatchObject({
+      stage: "QR_DECODE",
+      algorithm: "jsqr-decode-v1",
+      status: "COMPLETED",
+      result: "QR_DECODED",
+      rawDecodedText: "https://example.com/payment/12345",
+      decodedTextLength: 35,
+      sourceImageType: "normalized-image"
+    });
+    expect(testState.documents[0].qrDecode?.rawDecodedText).toBe("https://example.com/payment/12345");
+  });
+
+  it("does not run QR-candidate analysis or QR decode for non-transfer-slip document types", async () => {
+    setSession("user-1");
+
+    await upload("deposit slip qr-like image bytes", "DEPOSIT_PAYMENT_SLIP");
+
     expect(testState.documents[0].qrCandidateAnalysis).toBeNull();
+    expect(testState.documents[0].qrDecode).toBeNull();
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {

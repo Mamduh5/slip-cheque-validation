@@ -1,5 +1,40 @@
 # Worklog
 
+## 2026-05-10
+
+### Changed
+
+- Implemented `QR_DECODE` stage for bank transfer slips.
+- Added jsQR library for QR code decoding.
+- Created `lib/qr-decode.ts` with conservative QR decode logic that attempts decoding when a plausible QR candidate exists.
+- Updated `DocumentRecord` schema to include `qrDecode` field with stage status, result, raw decoded text, text length, source image type, and notes.
+- Updated document processing pipeline to run QR decode after QR candidate analysis for transfer slips.
+- Updated transfer-slip processing profile to mark `QR_DECODE` as ACTIVE.
+- Updated API routes to expose `qrDecode` data in document detail responses.
+- Updated document detail page UI to display QR decode results with clear messaging that content is not parsed or verified.
+- Added test coverage for QR decode success, failure, and skip scenarios.
+- Updated README, architecture, roadmap, and worklog documentation.
+
+### Key Decisions
+
+- QR decode is strictly technical: it extracts raw QR content without parsing business fields or verifying payment data.
+- Decoding only runs when `QR_CANDIDATE` completes with `CANDIDATE_FOUND`.
+- Raw decoded text is stored separately from future parsed transfer metadata to maintain clear separation of concerns.
+- Document type correction clears both `qrCandidateAnalysis` and `qrDecode` since records are not reprocessed.
+- Transfer metadata parsing and slip verification remain intentionally unimplemented.
+
+### Verification
+
+- `npm run test` - all 51 tests pass
+- `npm run typecheck`
+- `npm run lint`
+
+### Assumptions
+
+- jsQR is adequate for v1 QR decoding needs.
+- Normalized image provides sufficient quality for QR decode attempts.
+- Raw decoded text storage without parsing is acceptable for this phase.
+
 ## 2026-05-08
 
 ### Changed

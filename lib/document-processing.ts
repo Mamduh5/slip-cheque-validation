@@ -4,6 +4,7 @@ import { ImageQualityFailureError, assessImageQuality } from "@/lib/image-qualit
 import { calculateDHash } from "@/lib/perceptual-hash";
 import { putNormalizedDocumentObject } from "@/lib/object-storage";
 import { analyzeQrCandidateFromNormalizedImage } from "@/lib/qr-candidate-analysis";
+import { attemptQrDecode } from "@/lib/qr-decode";
 import type { DocumentRecord, DocumentType } from "@/lib/models";
 
 export class DocumentImageProcessingError extends Error {
@@ -18,6 +19,7 @@ export interface ProcessedDocumentImage {
   normalizedImage: NonNullable<DocumentRecord["normalizedImage"]>;
   processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
   qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
+  qrDecode: DocumentRecord["qrDecode"];
   perceptualHash: string;
   qualityStatus: DocumentRecord["qualityStatus"];
   qualityWarnings: DocumentRecord["qualityWarnings"];
@@ -59,12 +61,20 @@ export async function processUploadedDocumentImage(input: {
       processingPlan.specializedBranch === "slip"
         ? await analyzeQrCandidateFromNormalizedImage(normalized.buffer)
         : null;
+    const qrDecode =
+      processingPlan.specializedBranch === "slip"
+        ? await attemptQrDecode({
+            normalizedBuffer: normalized.buffer,
+            qrCandidateAnalysis
+          })
+        : null;
 
     return {
       normalizedObject,
       normalizedImage: normalized.metadata,
       processingProfile: processingPlan.profile,
       qrCandidateAnalysis,
+      qrDecode,
       perceptualHash,
       qualityStatus: quality.qualityStatus,
       qualityWarnings: quality.qualityWarnings,
