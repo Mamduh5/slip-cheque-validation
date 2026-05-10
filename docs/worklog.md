@@ -2,6 +2,43 @@
 
 ## 2026-05-10
 
+### Upload Progress and Result Summary
+
+#### Changed
+
+- Added staged upload progress states to `components/upload-form.tsx`.
+  - New `uploadStage` state with values `idle`, `uploading`, `processing`, `redirecting`.
+  - Submit button disabled during all active stages to prevent duplicate uploads.
+  - Visual progress indicator with spinner, stage label ("Uploading image…", "Processing document…", "Finalizing result…"), and three-segment progress bar.
+  - Network-level fetch errors are caught and surfaced with "Check your connection and try again."
+- Improved upload failure messaging:
+  - Quality failures show "Image rejected due to quality issues" header with warning list and retake guidance.
+  - Non-quality errors show "Upload failed" header.
+- Added post-upload result summary to `app/documents/[id]/page.tsx`.
+  - New "Upload result" summary banner derived entirely from the persisted `DocumentRecord`.
+  - Redirect-safe and refresh-safe because it reads stored fields, not ephemeral client state.
+  - Shows: duplicate outcome (exact/likely/new/suppressed), review status, quality warnings, transfer-slip stage results (QR decode, metadata parse, local structural check), and suppression notes.
+  - Color-coded by tone: positive (green), warning (orange), info (blue), neutral (slate).
+- Extracted pure result-summary builder to `lib/document-result-summary.ts` for testability.
+- Added 15 focused tests for result summary behavior: new upload, exact duplicate, likely duplicate, suppressed near-duplicate, confirmed duplicate/distinct, quality warnings singular/plural, transfer-slip stage results, non-slip exclusion, no-review hiding, no-quality hiding, and overclaiming-term guard.
+- Updated README, architecture, roadmap, and worklog documentation.
+
+#### Key Decisions
+
+- The result summary is rendered server-side on the document detail page from stored fields. This is the simplest redirect-safe/refresh-safe approach and avoids sessionStorage/query-param fragility.
+- All summary wording is conservative: "Structurally consistent" not "verified", "Likely duplicate" not "confirmed duplicate", "New upload (near-duplicate suppressed)" not "different transaction".
+- Non-slip types do not show transfer-slip stage fields in the summary.
+- The upload progress indicator uses text-based stages rather than byte-level progress because true network upload percentage is not cleanly available in the current fetch-based upload path.
+
+#### Verification
+
+- `npm run test` - all 105 tests pass (15 new result-summary tests)
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+
+## 2026-05-10
+
 ### Structure-Aware Transfer-Slip Duplicate Detection
 
 #### Changed

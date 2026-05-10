@@ -242,6 +242,30 @@ Client-side advisory hints are intentionally limited:
 
 If the server returns a quality failure such as an unusably small image, the user stays on the upload form, sees the server reason, and can retake or reselect without a dead end.
 
+## Upload Progress States
+
+The upload form provides staged progress feedback while the upload request is in flight:
+
+- **"Uploading image…"** — the network request is being sent.
+- **"Processing document…"** — the server has received the request and is processing.
+- **"Finalizing result…"** — the response has been received and the client is preparing to redirect.
+
+The submit button is disabled during all stages to prevent duplicate uploads. A visual stage bar shows progress through the three stages. Network errors are caught and surfaced with a clear retry message.
+
+## Post-Upload Result Summary
+
+After a successful upload, the user is redirected to `/documents/{id}`. The document detail page shows an "Upload result" summary banner derived entirely from the persisted document record. This makes it redirect-safe, refresh-safe, and bookmarkable.
+
+The summary communicates:
+
+- **Duplicate check**: exact duplicate, likely duplicate (review needed), new upload, or suppressed near-duplicate.
+- **Review**: pending, confirmed duplicate, or confirmed distinct.
+- **Quality**: warning count if warnings exist.
+- **Transfer-slip stages** (for `BANK_TRANSFER_SLIP` only): QR decode status, metadata parse status, and local structural check status.
+- **Notes**: suppression reason if a near-duplicate was suppressed by structured evidence.
+
+All wording is honest and conservative. It does not claim bank/provider verification, payment truth, or authenticity. The summary logic lives in `lib/document-result-summary.ts` as a pure function over `DocumentRecord`.
+
 ## Browser E2E
 
 The project uses Playwright for a deliberately small browser E2E layer. It is scoped to user interaction that unit tests cannot cover well:

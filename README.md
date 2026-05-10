@@ -15,7 +15,10 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Near-duplicate detection is implemented using a normalized image derivative and 64-bit dHash.
 - Likely duplicates have a separate human review workflow with side-by-side comparison.
 - Capture quality assessment records warning signals for small, blurry, dark, or bright images.
-- Upload includes light framing guidance, a pre-submit image preview with advisory client-side capture hints, and a retake/reselect flow.
+- Pre-submit upload preview with advisory client-side capture hints.
+- Lightweight framing guidance for paper-document photos.
+- Staged upload progress indicator showing "Uploading image…", "Processing document…", and "Finalizing result…" states with disabled submit to prevent duplicate uploads.
+- Post-upload result summary on the document detail page derived from stored fields: duplicate outcome, review status, quality warnings, and transfer-slip processing stage results. The summary is redirect-safe and refresh-safe because it reads the persisted document record.
 - Uploads require an explicit document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
 - Owners can correct a document type after upload; type changes are audited and do not alter duplicate, review, or quality status.
 - Bank transfer slips run conservative QR-candidate analysis, QR decode, and transfer-metadata parsing stages.

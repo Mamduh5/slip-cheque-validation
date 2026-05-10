@@ -5,6 +5,7 @@ import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
 import { ReviewStatusPill } from "@/components/review-status-pill";
+import { buildResultSummary, toneClasses } from "@/lib/document-result-summary";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeGuidance } from "@/lib/document-types";
 import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
@@ -132,6 +133,31 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             <QualityStatusPill status={document.qualityStatus} />
           </div>
         </div>
+
+        {/* Upload result summary — derived from stored fields, redirect-safe */}
+        {(() => {
+          const summary = buildResultSummary(document);
+          if (!summary || summary.length === 0) return null;
+          return (
+            <div
+              className="mt-4 rounded-lg border border-line bg-white p-4 shadow-sm"
+              data-testid="document-result-summary"
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Upload result</p>
+              <dl className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {summary.map((item) => (
+                  <div
+                    key={item.label}
+                    className={`rounded-md border p-2.5 text-sm ${toneClasses(item.tone)}`}
+                  >
+                    <dt className="text-xs font-medium opacity-80">{item.label}</dt>
+                    <dd className="mt-0.5 font-medium">{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        })()}
 
         {document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
           <div className="mt-6">

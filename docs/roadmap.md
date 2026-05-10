@@ -29,12 +29,13 @@
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
 - Structure-aware transfer-slip duplicate detection that uses QR decode and parsed transfer metadata to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
+- Staged upload progress indicator with disabled submit and clear stage labels.
+- Post-upload result summary on the document detail page derived from stored document fields, redirect-safe and refresh-safe.
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 
 ## Next Phase
 
-- Add richer upload progress and persisted post-upload result messaging.
 - Add a provider-specific CI workflow only when the target provider is known.
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.

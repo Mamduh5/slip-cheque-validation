@@ -12,11 +12,26 @@ import type { DocumentType, QualityStatus, QualityWarningCode, SourceType } from
 import { qualityWarningLabels } from "@/lib/quality-thresholds";
 import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
 
+type UploadStage = "idle" | "uploading" | "processing" | "redirecting";
+
 interface UploadResponse {
   documentId?: string;
   error?: string;
   qualityStatus?: QualityStatus;
   qualityWarnings?: QualityWarningCode[];
+}
+
+function stageLabel(stage: UploadStage): string {
+  switch (stage) {
+    case "uploading":
+      return "Uploading image…";
+    case "processing":
+      return "Processing document…";
+    case "redirecting":
+      return "Finalizing result…";
+    default:
+      return "";
+  }
 }
 
 export function UploadForm() {
@@ -28,7 +43,8 @@ export function UploadForm() {
   const [qualityWarnings, setQualityWarnings] = useState<QualityWarningCode[]>([]);
   const [selectedPreview, setSelectedPreview] = useState<LocalPreviewState | null>(null);
   const [isAnalyzingPreview, setIsAnalyzingPreview] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
+  const isSubmitting = uploadStage !== "idle";
   const selectedTypeGuidance = getDocumentTypeGuidance(documentType);
 
   useEffect(() => {
@@ -87,19 +103,28 @@ export function UploadForm() {
       return;
     }
 
-    setIsSubmitting(true);
+    setUploadStage("uploading");
 
     const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/documents", {
-      method: "POST",
-      body: formData
-    });
+    let response: Response;
+
+    try {
+      response = await fetch("/api/documents", {
+        method: "POST",
+        body: formData
+      });
+    } catch {
+      setUploadStage("idle");
+      setError("Upload failed. Check your connection and try again.");
+      return;
+    }
+
+    setUploadStage("processing");
 
     const payload = (await response.json().catch(() => null)) as UploadResponse | null;
 
-    setIsSubmitting(false);
-
     if (!response.ok || !payload?.documentId) {
+      setUploadStage("idle");
       setError(payload?.error ?? "Upload failed.");
       setQualityWarnings(payload?.qualityWarnings ?? []);
       return;
@@ -112,6 +137,7 @@ export function UploadForm() {
       );
     }
 
+    setUploadStage("redirecting");
     router.push(`/documents/${payload.documentId}`);
     router.refresh();
   }
@@ -278,23 +304,59 @@ export function UploadForm() {
           className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
           data-testid="upload-error-message"
         >
-          <p>{error}</p>
+          <p className="font-medium">
+            {qualityWarnings.length > 0 ? "Image rejected due to quality issues" : "Upload failed"}
+          </p>
+          <p className="mt-1">{error}</p>
           {qualityWarnings.length > 0 ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {qualityWarnings.map((warning) => (
-                <li key={warning}>{qualityWarningLabels[warning]}</li>
-              ))}
-            </ul>
+            <>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {qualityWarnings.map((warning) => (
+                  <li key={warning}>{qualityWarningLabels[warning]}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-red-700">
+                Retake or choose another image that meets the capture tips above.
+              </p>
+            </>
           ) : null}
         </div>
       ) : null}
+
+      {isSubmitting ? (
+        <div
+          className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+          data-testid="upload-progress-indicator"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
+            <span className="font-medium">{stageLabel(uploadStage)}</span>
+          </div>
+          <div className="mt-2 flex gap-1">
+            {(["uploading", "processing", "redirecting"] as UploadStage[]).map((stage) => (
+              <div
+                key={stage}
+                className={`h-1.5 flex-1 rounded-full ${
+                  uploadStage === stage ||
+                  ((["processing", "redirecting"] as UploadStage[]).includes(uploadStage) &&
+                    (["uploading", "processing"] as UploadStage[]).includes(stage)) ||
+                  (uploadStage === "redirecting" && stage === "uploading")
+                    ? "bg-sky-600"
+                    : "bg-sky-200"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <button
         className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         data-testid="upload-submit-button"
         disabled={isSubmitting || !selectedPreview}
       >
-        {isSubmitting ? "Uploading..." : selectedPreview ? "Upload selected image" : "Choose an image first"}
+        {isSubmitting ? stageLabel(uploadStage) : selectedPreview ? "Upload selected image" : "Choose an image first"}
       </button>
     </form>
   );
