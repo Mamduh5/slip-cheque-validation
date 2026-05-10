@@ -101,6 +101,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Likely duplicates are marked `LIKELY_DUPLICATE` when no exact match exists and an owner-owned perceptual hash is within Hamming distance `8`. `similarityScore` is `1 - distance / 64`.
 - Machine detection and human review are separate. `duplicateStatus` stores algorithm output; `reviewStatus` stores the user decision.
 - Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or mark not duplicate from the document detail page.
+- The dashboard supports filtering documents by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Reviewed document pairs are remembered owner-by-owner in `duplicate_review_pairs`, so the same exact pair does not keep appearing as unresolved after review.
 - Quality assessment is separate from duplicate and review state. Accepted uploads store `qualityStatus`, `qualityWarnings`, `qualityMetrics`, and `qualityCheckedAt`.
 - Most quality issues warn and continue. Clearly unusable tiny images are rejected with a capture-quality error before the duplicate pipeline runs.

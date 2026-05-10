@@ -326,6 +326,8 @@ export async function getRecentDocumentsForUser(
   input: {
     limit?: number;
     reviewFilter?: DocumentReviewFilter;
+    documentType?: DocumentType;
+    duplicateStatus?: DuplicateStatus;
   } = {}
 ) {
   await ensureDocumentIndexes();
@@ -334,6 +336,8 @@ export async function getRecentDocumentsForUser(
   const query: {
     userId: string;
     reviewStatus?: ReviewStatus;
+    documentType?: DocumentType;
+    duplicateStatus?: DuplicateStatus;
   } = { userId };
   const reviewFilter = input.reviewFilter ?? "all";
 
@@ -343,6 +347,14 @@ export async function getRecentDocumentsForUser(
     query.reviewStatus = "CONFIRMED_DUPLICATE";
   } else if (reviewFilter === "confirmed-distinct") {
     query.reviewStatus = "CONFIRMED_DISTINCT";
+  }
+
+  if (input.documentType) {
+    query.documentType = input.documentType;
+  }
+
+  if (input.duplicateStatus) {
+    query.duplicateStatus = input.duplicateStatus;
   }
 
   return db

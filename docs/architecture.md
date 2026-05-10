@@ -150,6 +150,10 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Local structural consistency must not be labeled as bank/provider verification.
 - Until an external truth source exists, UI/API language must continue to say parsed values are not verified.
 
+## Dashboard Filtering
+
+The dashboard supports server-side filtering of documents by `documentType`, `duplicateStatus`, and `reviewStatus`. Filtering is implemented via MongoDB queries scoped to the authenticated owner and uses URL search params for state. Filter state is managed by a client component that updates the URL, keeping the server-side rendering approach deterministic and owner-scoped. Empty states distinguish between "no documents yet" and "no documents match current filters".
+
 ## Document-Type Correction
 
 Owners can correct `documentType` after upload from the document detail page. The update is handled by `PATCH /api/documents/{id}` and is owner-scoped like the detail and original-image routes.

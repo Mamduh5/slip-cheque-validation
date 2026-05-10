@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { DocumentStatusPill } from "@/components/document-status-pill";
 import { ReviewStatusPill } from "@/components/review-status-pill";
+import { DashboardFilters } from "@/components/dashboard-filters";
 import { formatDocumentType } from "@/lib/document-types";
+import { duplicateStatuses, documentTypes } from "@/lib/models";
 import { getRecentDocumentsForUser, type DocumentReviewFilter } from "@/lib/documents";
 import { requireUser } from "@/lib/session";
 
@@ -13,25 +15,53 @@ function formatDate(date: Date) {
 }
 
 const reviewFilters: Array<{ label: string; value: DocumentReviewFilter }> = [
-  { label: "All documents", value: "all" },
-  { label: "Pending review", value: "pending" },
-  { label: "Confirmed duplicate", value: "confirmed-duplicate" },
-  { label: "Confirmed distinct", value: "confirmed-distinct" }
+  { label: "all", value: "all" },
+  { label: "pending", value: "pending" },
+  { label: "confirmed-duplicate", value: "confirmed-duplicate" },
+  { label: "confirmed-distinct", value: "confirmed-distinct" }
 ];
 
 function parseReviewFilter(value: string | undefined): DocumentReviewFilter {
   return reviewFilters.some((filter) => filter.value === value) ? (value as DocumentReviewFilter) : "all";
 }
 
+function parseDocumentTypeFilter(value: string | undefined): typeof documentTypes[number] | undefined {
+  if (value && documentTypes.includes(value as any)) {
+    return value as typeof documentTypes[number];
+  }
+  return undefined;
+}
+
+function parseDuplicateStatusFilter(value: string | undefined): typeof duplicateStatuses[number] | undefined {
+  if (value && duplicateStatuses.includes(value as any)) {
+    return value as typeof duplicateStatuses[number];
+  }
+  return undefined;
+}
+
+function hasActiveFilters(params: {
+  review: DocumentReviewFilter;
+  documentType?: typeof documentTypes[number];
+  duplicateStatus?: typeof duplicateStatuses[number];
+}): boolean {
+  return params.review !== "all" || !!params.documentType || !!params.duplicateStatus;
+}
+
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: Promise<{ review?: string }>;
+  searchParams?: Promise<{ review?: string; documentType?: string; duplicateStatus?: string }>;
 }) {
   const user = await requireUser();
   const resolvedSearchParams = await searchParams;
   const reviewFilter = parseReviewFilter(resolvedSearchParams?.review);
-  const documents = await getRecentDocumentsForUser(user.id, { reviewFilter });
+  const documentTypeFilter = parseDocumentTypeFilter(resolvedSearchParams?.documentType);
+  const duplicateStatusFilter = parseDuplicateStatusFilter(resolvedSearchParams?.duplicateStatus);
+  const documents = await getRecentDocumentsForUser(user.id, {
+    reviewFilter,
+    documentType: documentTypeFilter,
+    duplicateStatus: duplicateStatusFilter
+  });
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
@@ -50,34 +80,19 @@ export default async function DashboardPage({
         </Link>
       </div>
 
-      <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 text-sm" aria-label="Dashboard filters">
-        {reviewFilters.map((filter) => {
-          const href = filter.value === "all" ? "/dashboard" : `/dashboard?review=${filter.value}`;
-          const active = filter.value === reviewFilter;
-
-          return (
-            <Link
-              className={`shrink-0 rounded-md border px-3 py-2 ${
-                active
-                  ? "border-accent bg-accent text-white"
-                  : "border-line bg-white text-slate-700 hover:border-slate-400"
-              }`}
-              href={href}
-              key={filter.value}
-            >
-              {filter.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <DashboardFilters
+        reviewFilter={reviewFilter}
+        documentTypeFilter={documentTypeFilter}
+        duplicateStatusFilter={duplicateStatusFilter}
+      />
 
       {documents.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
-          <h2 className="text-xl font-semibold">No documents yet</h2>
+          <h2 className="text-xl font-semibold">No documents found</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">
-            {reviewFilter === "all"
-              ? "Upload a paper financial document image to create the first registry record."
-              : "No documents match this review filter."}
+            {hasActiveFilters({ review: reviewFilter, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter })
+              ? "No documents match the current filters."
+              : "Upload a paper financial document image to create the first registry record."}
           </p>
           <Link
             className="mt-5 inline-flex rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark"

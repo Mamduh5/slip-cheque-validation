@@ -28,6 +28,7 @@
 - CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
+- Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 
 ## Next Phase
@@ -38,7 +39,6 @@
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
 - Define external truth-provider requirements only if a real provider, credentials, data-retention policy, and claim semantics are selected.
-- Add document list filtering by type and status.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
 - Add richer review history and notes if users need audit comments.

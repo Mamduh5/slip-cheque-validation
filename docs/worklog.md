@@ -28,6 +28,35 @@
 
 ## 2026-05-10
 
+### Dashboard Document Filtering
+
+#### Changed
+
+- Added server-side filtering to the dashboard for `documentType`, `duplicateStatus`, and `reviewStatus`.
+- Extended `getRecentDocumentsForUser` in `lib/documents.ts` to accept `documentType` and `duplicateStatus` filter options alongside the existing `reviewFilter`.
+- Created `DashboardFilters` client component (`components/dashboard-filters.tsx`) with pill-style review filter buttons and dropdown selects for document type and duplicate status.
+- Updated dashboard page (`app/dashboard/page.tsx`) to use the new filter component and pass filter state via URL search params.
+- Added "Clear filters" action that appears when any filter is active.
+- Improved empty state to distinguish between "no documents yet" and "no documents match current filters".
+- Added focused tests for filtering by document type, duplicate status, review status, combined filters, empty results, owner scoping, and limit parameter in `tests/documents.test.ts`.
+
+#### Key Decisions
+
+- Filtering is server-side via MongoDB queries scoped to the authenticated owner, keeping the approach consistent with existing architecture.
+- Filter state is managed via URL search params, keeping the page bookmarkable and the server-side rendering deterministic.
+- The review filter uses pill-style buttons for quick access to common review states.
+- Document type and duplicate status use dropdown selects to accommodate more options.
+- No new verification semantics or external integrations were added; this is list UX only using existing stored fields.
+- Labels reflect stored state accurately (e.g., "All reviews" instead of "All documents" to clarify the review filter scope).
+
+#### Verification
+
+- `npm run test` - all 79 tests pass (8 new filtering tests added)
+- `npm run typecheck`
+- `npm run lint`
+
+## 2026-05-10
+
 ### CRC Checksum Validation for Local Structural Slip Verification
 
 #### Changed
