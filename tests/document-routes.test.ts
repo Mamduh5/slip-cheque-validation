@@ -271,7 +271,10 @@ describe("document API integration boundaries", () => {
     expect(body.documentTypeLabel).toBe("Cheque");
     expect(body.processingProfile).toMatchObject({
       name: "cheque-v1",
-      branch: "CHEQUE"
+      branch: "CHEQUE",
+      capabilities: {
+        qrOrientedFuturePath: false
+      }
     });
     expect(body.matchedDocumentId).toBeNull();
     expect(body.similarityScore).toBeNull();
@@ -281,7 +284,10 @@ describe("document API integration boundaries", () => {
       documentType: "CHEQUE",
       processingProfile: {
         name: "cheque-v1",
-        branch: "CHEQUE"
+        branch: "CHEQUE",
+        capabilities: {
+          qrOrientedFuturePath: false
+        }
       },
       status: "READY",
       duplicateStatus: "NEW",
@@ -320,7 +326,10 @@ describe("document API integration boundaries", () => {
     expect(detail.documentTypeLabel).toBe("Deposit/payment slip");
     expect(detail.processingProfile).toMatchObject({
       name: "deposit-payment-slip-v1",
-      branch: "PAYMENT_SLIP"
+      branch: "PAYMENT_SLIP",
+      capabilities: {
+        qrOrientedFuturePath: false
+      }
     });
   });
 
@@ -344,6 +353,34 @@ describe("document API integration boundaries", () => {
         branch
       });
     }
+  });
+
+  it("exposes transfer-slip QR-oriented planned stages without extraction results", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("transfer slip image bytes", "BANK_TRANSFER_SLIP");
+    const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
+      params: Promise.resolve({ id: body.documentId as string })
+    });
+    const detail = (await detailResponse.json()) as {
+      processingProfile: {
+        capabilities: { qrOrientedFuturePath: boolean; extractionImplemented: boolean };
+        plannedStages: Array<{ key: string; status: string }>;
+      };
+    };
+
+    expect(detail.processingProfile.capabilities).toMatchObject({
+      qrOrientedFuturePath: true,
+      extractionImplemented: false
+    });
+    expect(detail.processingProfile.plannedStages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "QR_CANDIDATE", status: "PLANNED" }),
+        expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
+        expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
+        expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
+      ])
+    );
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {

@@ -491,3 +491,35 @@
 - Profiles are lightweight metadata only; they do not execute specialized extraction stages.
 - Existing records without `processingProfile` rely on runtime fallback from `documentType` until backfilled.
 - Correcting a type updates the current profile but does not reprocess original or normalized assets.
+
+## 2026-05-10 Transfer-Slip QR Groundwork
+
+### Changed
+
+- Extended transfer-slip processing profile metadata with a planned QR-oriented stage contract.
+- Added planned transfer-slip stages: `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION`.
+- Added profile capability flags showing transfer slips are the QR-oriented future path while extraction and verification remain unimplemented.
+- Kept deposit/payment slip, cheque, and unknown profiles conservative with only shared active stages.
+- Exposed planned transfer-slip stage labels on document detail as future stages that are not executed yet.
+- Added tests for transfer-slip planned stage metadata, non-slip conservative capabilities, API exposure, and existing upload behavior.
+
+### Key Decisions
+
+- Stage entries are metadata/contracts only. No QR candidate detection, QR decoding, OCR, parsing, or bank verification was added.
+- Transfer slips remain the first specialized path.
+- Shared duplicate, review, and quality flows remain generic and unchanged.
+- Existing records without the newer profile shape still rely on runtime fallback where needed.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test:e2e`
+
+### Known Limitations
+
+- Planned stages do not produce results yet.
+- There is no QR library, QR payload parser, OCR engine, or verification integration.
+- The UI intentionally labels planned stages as not executed.

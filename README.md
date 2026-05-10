@@ -83,7 +83,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Uploads compute an exact SHA-256 hash and compare it with existing document records owned by the same user.
 - `documentType` is a durable user-selected intake field. It is separate from duplicate, review, and quality status and prepares the record for later type-specific processing.
 - Correcting `documentType` makes the new type the source of truth for future type-aware stages. Existing original/normalized assets and duplicate/review/quality decisions remain unchanged.
-- Upload processing now records a type-aware processing profile. Bank transfer slips use the first slip-specific branch, which currently still runs only shared quality, normalization, and duplicate checks.
+- Upload processing now records a type-aware processing profile. Bank transfer slips use the first slip-specific branch with planned QR-oriented stages, but currently still run only shared quality, normalization, and duplicate checks.
 - Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
 - The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.
 - The perceptual hash is 64-bit dHash computed from the normalized derivative. dHash was chosen because it is simple, deterministic, fast, and adequate for a conservative first near-duplicate signal.

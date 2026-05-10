@@ -163,6 +163,18 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Processing profile</dt>
           <dd className="mt-1 text-sm font-medium text-slate-800">{processingProfile.label}</dd>
           <dd className="mt-1 text-sm text-slate-700">{processingProfile.description}</dd>
+          {processingProfile.capabilities.qrOrientedFuturePath ? (
+            <dd className="mt-2 text-xs leading-5 text-slate-500">
+              <p>Planned transfer-slip stages are not executed yet:</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {processingProfile.plannedStages
+                  .filter((stage) => stage.status === "PLANNED")
+                  .map((stage) => (
+                    <li key={stage.key}>{stage.label}</li>
+                  ))}
+              </ul>
+            </dd>
+          ) : null}
         </div>
 
         <div className="mt-3 rounded-md border border-line p-3">

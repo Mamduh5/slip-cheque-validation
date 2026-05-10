@@ -12,38 +12,109 @@ const sharedCurrentStages = [
   "dhash-near-duplicate-check"
 ];
 
+const sharedActiveStagePlan = [
+  {
+    key: "SHARED_QUALITY",
+    label: "Shared quality assessment",
+    status: "ACTIVE",
+    description: "Runs capture-quality heuristics for accepted uploads."
+  },
+  {
+    key: "SHARED_FINGERPRINTING",
+    label: "Shared image fingerprinting",
+    status: "ACTIVE",
+    description: "Runs normalized-image generation, SHA-256 hashing, and dHash duplicate matching."
+  }
+] as const;
+
+const transferSlipFutureStagePlan = [
+  {
+    key: "QR_CANDIDATE",
+    label: "QR candidate detection",
+    status: "PLANNED",
+    description: "Future stage to locate possible QR regions in transfer slip photos."
+  },
+  {
+    key: "QR_DECODE",
+    label: "QR decode",
+    status: "PLANNED",
+    description: "Future stage to decode a candidate QR payload when present."
+  },
+  {
+    key: "TRANSFER_METADATA_PARSE",
+    label: "Transfer metadata parse",
+    status: "PLANNED",
+    description: "Future stage to parse decoded transfer-slip metadata into structured fields."
+  },
+  {
+    key: "SLIP_VERIFICATION",
+    label: "Slip verification",
+    status: "PLANNED",
+    description: "Future stage for validation checks after extraction exists."
+  }
+] as const;
+
 const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
   BANK_TRANSFER_SLIP: {
     name: "bank-transfer-slip-v1",
     label: "Transfer slip profile",
     branch: "TRANSFER_SLIP",
-    description: "Slip-first branch. Current runtime uses shared image quality and duplicate checks only.",
+    family: "transfer-slip",
+    description:
+      "Slip-first branch. Current runtime uses shared image quality and duplicate checks only; QR-oriented stages are planned but not run.",
     currentStages: sharedCurrentStages,
-    futureStages: ["qr-candidate-handling", "printed-field-extraction", "transfer-slip-specific-validation"]
+    futureStages: ["qr-candidate-handling", "printed-field-extraction", "transfer-slip-specific-validation"],
+    plannedStages: [...sharedActiveStagePlan, ...transferSlipFutureStagePlan],
+    capabilities: {
+      qrOrientedFuturePath: true,
+      extractionImplemented: false,
+      verificationImplemented: false
+    }
   },
   DEPOSIT_PAYMENT_SLIP: {
     name: "deposit-payment-slip-v1",
     label: "Deposit/payment slip profile",
     branch: "PAYMENT_SLIP",
+    family: "payment-slip",
     description: "Conservative payment-slip branch. Current runtime uses shared image quality and duplicate checks only.",
     currentStages: sharedCurrentStages,
-    futureStages: ["printed-field-extraction", "payment-slip-specific-validation"]
+    futureStages: ["printed-field-extraction", "payment-slip-specific-validation"],
+    plannedStages: [...sharedActiveStagePlan],
+    capabilities: {
+      qrOrientedFuturePath: false,
+      extractionImplemented: false,
+      verificationImplemented: false
+    }
   },
   CHEQUE: {
     name: "cheque-v1",
     label: "Cheque profile",
     branch: "CHEQUE",
+    family: "cheque",
     description: "Conservative cheque branch. Current runtime uses shared image quality and duplicate checks only.",
     currentStages: sharedCurrentStages,
-    futureStages: ["cheque-field-extraction", "cheque-layout-review-support"]
+    futureStages: ["cheque-field-extraction", "cheque-layout-review-support"],
+    plannedStages: [...sharedActiveStagePlan],
+    capabilities: {
+      qrOrientedFuturePath: false,
+      extractionImplemented: false,
+      verificationImplemented: false
+    }
   },
   UNKNOWN: {
     name: "generic-unknown-v1",
     label: "Generic document profile",
     branch: "GENERIC",
+    family: "generic",
     description: "Generic branch for unclear document types. Current runtime uses shared image quality and duplicate checks only.",
     currentStages: sharedCurrentStages,
-    futureStages: ["manual-type-correction", "type-specific-reprocessing-after-correction"]
+    futureStages: ["manual-type-correction", "type-specific-reprocessing-after-correction"],
+    plannedStages: [...sharedActiveStagePlan],
+    capabilities: {
+      qrOrientedFuturePath: false,
+      extractionImplemented: false,
+      verificationImplemented: false
+    }
   }
 };
 
@@ -96,6 +167,8 @@ function cloneProfile(profile: DocumentProcessingProfileSnapshot): DocumentProce
   return {
     ...profile,
     currentStages: [...profile.currentStages],
-    futureStages: [...profile.futureStages]
+    futureStages: [...profile.futureStages],
+    plannedStages: profile.plannedStages.map((stage) => ({ ...stage })),
+    capabilities: { ...profile.capabilities }
   };
 }

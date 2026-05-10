@@ -30,6 +30,18 @@ describe("document helpers", () => {
       profile: {
         name: "bank-transfer-slip-v1",
         branch: "TRANSFER_SLIP",
+        family: "transfer-slip",
+        capabilities: {
+          qrOrientedFuturePath: true,
+          extractionImplemented: false,
+          verificationImplemented: false
+        },
+        plannedStages: expect.arrayContaining([
+          expect.objectContaining({ key: "QR_CANDIDATE", status: "PLANNED" }),
+          expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
+          expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
+          expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
+        ]),
         futureStages: expect.arrayContaining(["qr-candidate-handling"])
       }
     });
@@ -39,7 +51,14 @@ describe("document helpers", () => {
     });
     expect(getTypeAwareProcessingPlan("CHEQUE")).toMatchObject({
       specializedBranch: "cheque",
-      profile: { branch: "CHEQUE" }
+      profile: {
+        branch: "CHEQUE",
+        capabilities: {
+          qrOrientedFuturePath: false,
+          extractionImplemented: false,
+          verificationImplemented: false
+        }
+      }
     });
     expect(getTypeAwareProcessingPlan("UNKNOWN")).toMatchObject({
       specializedBranch: "generic",

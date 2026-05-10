@@ -125,6 +125,7 @@ test.describe.serial("real-service upload completion", () => {
     await expect(page.getByRole("heading", { name: filename })).toBeVisible();
     await expect(page.getByText("Bank transfer slip").first()).toBeVisible();
     await expect(page.getByText("Transfer slip profile")).toBeVisible();
+    await expect(page.getByText("QR candidate detection")).toBeVisible();
     await expect(page.getByText("New upload").first()).toBeVisible();
     await expect(page.getByText(/Good|Needs attention/).first()).toBeVisible();
     await expect(page.getByAltText("Uploaded financial document preview")).toBeVisible();

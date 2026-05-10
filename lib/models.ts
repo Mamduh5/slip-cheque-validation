@@ -38,6 +38,7 @@ export const qualityWarningCodes = [
 ] as const;
 
 export const documentProcessingBranches = ["TRANSFER_SLIP", "PAYMENT_SLIP", "CHEQUE", "GENERIC"] as const;
+export const documentProcessingStageStatuses = ["ACTIVE", "PLANNED"] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
@@ -48,6 +49,7 @@ export type ReviewPairDecision = (typeof reviewPairDecisions)[number];
 export type QualityStatus = (typeof qualityStatuses)[number];
 export type QualityWarningCode = (typeof qualityWarningCodes)[number];
 export type DocumentProcessingBranch = (typeof documentProcessingBranches)[number];
+export type DocumentProcessingStageStatus = (typeof documentProcessingStageStatuses)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -84,9 +86,21 @@ export interface DocumentProcessingProfileSnapshot {
   name: string;
   label: string;
   branch: DocumentProcessingBranch;
+  family: "transfer-slip" | "payment-slip" | "cheque" | "generic";
   description: string;
   currentStages: string[];
   futureStages: string[];
+  plannedStages: Array<{
+    key: string;
+    label: string;
+    status: DocumentProcessingStageStatus;
+    description: string;
+  }>;
+  capabilities: {
+    qrOrientedFuturePath: boolean;
+    extractionImplemented: boolean;
+    verificationImplemented: boolean;
+  };
 }
 
 export interface DocumentRecord {

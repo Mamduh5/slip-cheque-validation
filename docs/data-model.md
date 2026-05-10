@@ -43,6 +43,8 @@ Stores one registry record per uploaded document image.
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
 | `processingProfile.currentStages` | string[] | Current enabled stages. All v1 types currently use shared quality, normalization, and duplicate stages. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips include planned QR-oriented stages marked `PLANNED`; shared stages are marked `ACTIVE`. |
+| `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path and whether extraction/verification are implemented. Extraction and verification are currently false. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
@@ -128,7 +130,14 @@ Owners can correct `documentType` after upload. Corrections:
 - `CHEQUE` uses `cheque-v1` on the `CHEQUE` branch.
 - `UNKNOWN` uses `generic-unknown-v1` on the `GENERIC` branch.
 
-Profiles currently document the branch and future stage hints only. They do not mean QR extraction, OCR, cheque parsing, or bank verification has run.
+Transfer slips include planned stage contract entries:
+
+- `QR_CANDIDATE`: future QR-region candidate handling.
+- `QR_DECODE`: future QR payload decoding.
+- `TRANSFER_METADATA_PARSE`: future parsing of decoded transfer metadata.
+- `SLIP_VERIFICATION`: future verification after extraction exists.
+
+Profiles currently document the branch, active shared stages, and future stage hints only. They do not mean QR extraction, OCR, cheque parsing, or bank verification has run.
 
 ## Duplicate-Check Fields
 

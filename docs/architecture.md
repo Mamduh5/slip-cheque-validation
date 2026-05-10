@@ -86,12 +86,12 @@ The processing boundary includes a document-type processing profile so later sta
 
 Profiles define the current branch and future stage hints:
 
-- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first planned specialized path; future work is likely QR candidate handling, printed-field extraction, and transfer-slip-specific validation.
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first planned specialized path. Its planned stage contract is `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION`.
 - `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
 - `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
 - `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
 
-The profile is stored on new document records as lightweight metadata and exposed by document APIs. It is a processing plan marker, not proof of content extraction or verification.
+The profile is stored on new document records as lightweight metadata and exposed by document APIs. Planned stages are contract metadata only. They are not QR decoding, OCR, parsing, or verification results.
 
 ## Document-Type Correction
 

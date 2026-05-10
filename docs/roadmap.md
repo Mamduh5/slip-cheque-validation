@@ -10,6 +10,7 @@
 - Explicit document-type intake for transfer slips, deposit/payment slips, cheques, and unknown documents.
 - Owner-only audited document-type correction after upload.
 - Type-aware processing profiles with a slip-first branch for future QR-oriented work.
+- Transfer-slip planned stage contract for QR candidate, QR decode, metadata parse, and later verification.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.
