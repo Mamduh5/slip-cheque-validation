@@ -70,7 +70,7 @@ Optional lightweight audit collection.
 | `action` | string | Event name. |
 | `targetType` | string | `document`, `user`, or `system`. |
 | `targetId` | string | Optional target id. |
-| `metadata` | object | Small contextual payload. |
+| `metadata` | object | Small contextual payload. Document-type corrections store old/new type, display labels, actor user id, and unchanged duplicate/review/quality status values. |
 | `createdAt` | Date | Event timestamp. |
 
 ## `duplicate_review_pairs`
@@ -107,6 +107,13 @@ The upload form shows type-specific guidance after selection, dashboard items an
 - `qualityStatus`: capture-quality signal.
 
 Future type-specific work can use this field for QR handling, cheque-specific extraction, or payment-slip handling. Those pipelines are intentionally not implemented yet.
+
+Owners can correct `documentType` after upload. Corrections:
+
+- update only `documentType` and `updatedAt`;
+- write a `DOCUMENT_TYPE_UPDATED` audit log with old type, new type, who changed it, and when;
+- do not recompute duplicate matching, quality assessment, normalized images, exact hashes, or perceptual hashes;
+- make the corrected type the current source of truth for future type-aware stages.
 
 ## Duplicate-Check Fields
 

@@ -128,13 +128,26 @@ test.describe.serial("real-service upload completion", () => {
     await expect(page.getByText(/Good|Needs attention/).first()).toBeVisible();
     await expect(page.getByAltText("Uploaded financial document preview")).toBeVisible();
 
+    await page.getByRole("button", { name: "Change document type" }).click();
+    await page.getByTestId("correct-document-type-CHEQUE").check({ force: true });
+    const correctionResponse = page.waitForResponse(
+      (response) => response.url().includes("/api/documents/") && response.request().method() === "PATCH"
+    );
+    await page.getByRole("button", { name: "Save type" }).click();
+    expect((await correctionResponse).status()).toBe(200);
+    await expect(page.getByTestId("document-type-correction")).toContainText("Cheque");
+    await expect(page.getByTestId("document-type-correction")).toContainText("does not verify contents");
+    await page.getByRole("link", { name: "Back to dashboard" }).click();
+    await expect(page.getByText(filename)).toBeVisible();
+    await expect(page.getByText("Cheque").first()).toBeVisible();
+
     const document = await getE2eDocumentByFilename(filename);
 
     expect(document).toBeTruthy();
     expect(document).toMatchObject({
       userId: "e2e-user",
       originalFilename: filename,
-      documentType: "BANK_TRANSFER_SLIP",
+      documentType: "CHEQUE",
       duplicateStatus: "NEW",
       reviewStatus: "NOT_REQUIRED",
       status: "READY"

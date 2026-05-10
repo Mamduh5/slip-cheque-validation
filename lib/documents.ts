@@ -326,6 +326,64 @@ export async function getDocumentForUser(id: string, userId: string) {
   });
 }
 
+export async function updateDocumentTypeForUser(input: {
+  documentId: string;
+  userId: string;
+  documentType: DocumentType;
+}) {
+  await ensureDocumentIndexes();
+
+  const document = await getDocumentForUser(input.documentId, input.userId);
+
+  if (!document?._id) {
+    return null;
+  }
+
+  if (document.documentType === input.documentType) {
+    return document;
+  }
+
+  const now = new Date();
+  const db = await getDb();
+  const oldDocumentType = document.documentType;
+  const oldDuplicateStatus = document.duplicateStatus;
+  const oldReviewStatus = document.reviewStatus;
+  const oldQualityStatus = document.qualityStatus;
+
+  await db.collection<DocumentRecord>("documents").updateOne(
+    {
+      _id: document._id,
+      userId: input.userId
+    },
+    {
+      $set: {
+        documentType: input.documentType,
+        updatedAt: now
+      }
+    }
+  );
+
+  await db.collection("audit_logs").insertOne({
+    userId: input.userId,
+    action: "DOCUMENT_TYPE_UPDATED",
+    targetType: "document",
+    targetId: String(document._id),
+    metadata: {
+      oldDocumentType,
+      oldDocumentTypeLabel: formatDocumentType(oldDocumentType),
+      newDocumentType: input.documentType,
+      newDocumentTypeLabel: formatDocumentType(input.documentType),
+      changedByUserId: input.userId,
+      unchangedDuplicateStatus: oldDuplicateStatus,
+      unchangedReviewStatus: oldReviewStatus,
+      unchangedQualityStatus: oldQualityStatus
+    },
+    createdAt: now
+  });
+
+  return getDocumentForUser(input.documentId, input.userId);
+}
+
 export class DocumentReviewError extends Error {
   constructor(message: string, public status: number) {
     super(message);

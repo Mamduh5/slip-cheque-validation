@@ -423,3 +423,35 @@
 - Users can choose the wrong document type; there is no automated type suggestion yet.
 - Future type-specific extraction pipelines are represented only by a lightweight profile boundary.
 - Existing documents with older or missing type values would need a migration/backfill before production data import.
+
+## 2026-05-10 Document-Type Correction
+
+### Changed
+
+- Added owner-only `PATCH /api/documents/{id}` support for document-type correction.
+- Added a document detail correction panel with change, save, cancel, success, and error states.
+- Kept correction scope narrow: only `documentType` and `updatedAt` change on the document record.
+- Added `DOCUMENT_TYPE_UPDATED` audit records with old type, new type, display labels, actor user id, and unchanged duplicate/review/quality statuses.
+- Updated the real-service Playwright upload test to correct the type after upload and verify the dashboard shows the corrected type.
+- Added route tests for owner update, non-owner rejection, invalid type rejection, audit logging, and unchanged duplicate/review/quality state.
+
+### Key Decisions
+
+- Document type remains user-managed; the app still does not infer type from image content.
+- The corrected type becomes the current source of truth for future type-aware processing.
+- Existing original/normalized assets, hashes, duplicate status, review status, and quality status are not recomputed during correction.
+- No OCR, QR extraction, cheque parsing, bank verification, queue, microservice, crop tool, camera overlay, or automatic type inference was added.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test:e2e`
+
+### Known Limitations
+
+- There is no audit-history UI yet; correction events are stored in `audit_logs`.
+- A user can still choose the wrong type again.
+- Existing documents with missing or legacy type values still need migration/backfill before production data import.

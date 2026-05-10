@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { ObjectId } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GET as getDocument } from "../app/api/documents/[id]/route";
+import { GET as getDocument, PATCH as updateDocument } from "../app/api/documents/[id]/route";
 import { GET as getOriginalDocument } from "../app/api/documents/[id]/original/route";
 import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
@@ -294,6 +294,95 @@ describe("document API integration boundaries", () => {
 
     expect(detail.documentType).toBe("DEPOSIT_PAYMENT_SLIP");
     expect(detail.documentTypeLabel).toBe("Deposit/payment slip");
+  });
+
+  it("allows the owner to update document type without changing duplicate review or quality state", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("warn image bytes", "CHEQUE");
+    const before = testState.documents[0];
+    const response = await updateDocument(
+      new Request("http://localhost/api/documents/id", {
+        method: "PATCH",
+        body: JSON.stringify({ documentType: "BANK_TRANSFER_SLIP" })
+      }),
+      { params: Promise.resolve({ id: body.documentId as string }) }
+    );
+    const payload = (await response.json()) as {
+      documentType: string;
+      documentTypeLabel: string;
+      duplicateStatus: string;
+      reviewStatus: string;
+      qualityStatus: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      documentType: "BANK_TRANSFER_SLIP",
+      documentTypeLabel: "Bank transfer slip",
+      duplicateStatus: "NEW",
+      reviewStatus: "NOT_REQUIRED",
+      qualityStatus: "WARN"
+    });
+    expect(testState.documents[0]).toMatchObject({
+      documentType: "BANK_TRANSFER_SLIP",
+      duplicateStatus: before.duplicateStatus,
+      matchedDocumentId: before.matchedDocumentId,
+      similarityScore: before.similarityScore,
+      reviewStatus: before.reviewStatus,
+      qualityStatus: before.qualityStatus,
+      qualityWarnings: before.qualityWarnings
+    });
+    expect(testState.auditLogs).toContainEqual(
+      expect.objectContaining({
+        userId: "user-1",
+        action: "DOCUMENT_TYPE_UPDATED",
+        targetId: body.documentId,
+        metadata: expect.objectContaining({
+          oldDocumentType: "CHEQUE",
+          newDocumentType: "BANK_TRANSFER_SLIP",
+          changedByUserId: "user-1",
+          unchangedDuplicateStatus: "NEW",
+          unchangedReviewStatus: "NOT_REQUIRED",
+          unchangedQualityStatus: "WARN"
+        })
+      })
+    );
+  });
+
+  it("does not expose another user's document type update target", async () => {
+    setSession("owner-user");
+    const { body } = await upload("owner image bytes", "CHEQUE");
+
+    setSession("other-user");
+    const response = await updateDocument(
+      new Request("http://localhost/api/documents/id", {
+        method: "PATCH",
+        body: JSON.stringify({ documentType: "UNKNOWN" })
+      }),
+      { params: Promise.resolve({ id: body.documentId as string }) }
+    );
+
+    expect(response.status).toBe(404);
+    expect(testState.documents[0].documentType).toBe("CHEQUE");
+  });
+
+  it("rejects invalid document type updates", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("owner image bytes", "CHEQUE");
+    const response = await updateDocument(
+      new Request("http://localhost/api/documents/id", {
+        method: "PATCH",
+        body: JSON.stringify({ documentType: "PASSPORT" })
+      }),
+      { params: Promise.resolve({ id: body.documentId as string }) }
+    );
+    const payload = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Choose a valid document type.");
+    expect(testState.documents[0].documentType).toBe("CHEQUE");
   });
 
   it("creates a new EXACT_DUPLICATE record linked to the earliest owned match", async () => {

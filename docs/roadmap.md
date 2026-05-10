@@ -8,6 +8,7 @@
 - Protected dashboard and upload pages.
 - Original image upload storage.
 - Explicit document-type intake for transfer slips, deposit/payment slips, cheques, and unknown documents.
+- Owner-only audited document-type correction after upload.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
 - Human review workflow for likely duplicates.

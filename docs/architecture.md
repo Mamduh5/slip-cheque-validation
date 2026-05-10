@@ -75,6 +75,20 @@ Supported document types:
 
 The processing boundary includes a small document-type profile so later stages can add slip QR handling, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
 
+## Document-Type Correction
+
+Owners can correct `documentType` after upload from the document detail page. The update is handled by `PATCH /api/documents/{id}` and is owner-scoped like the detail and original-image routes.
+
+Correction behavior is intentionally narrow:
+
+- Only `documentType` and `updatedAt` are changed on the document record.
+- Non-owned or missing documents return `404`.
+- Invalid type values return `400`.
+- Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.
+- The corrected type becomes the current source of truth for future type-aware stages.
+
+Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.
+
 Exact-match selection is deterministic: matching candidates are sorted by `createdAt ASC` and then `_id ASC`. The pending upload's generated id is excluded from the lookup, so the current upload cannot become its own match. If several exact matches already exist for the same owner, new duplicates link to the earliest record by that ordering.
 
 ## Normalized Image And Perceptual Hashing

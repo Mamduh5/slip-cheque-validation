@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DocumentTypeCorrection } from "@/components/document-type-correction";
 import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
@@ -123,7 +124,6 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {[
-            ["Document type", formatDocumentType(document.documentType)],
             ["Source", document.sourceType],
             ["Processing status", document.status],
             ["MIME type", document.mimeType],
@@ -149,6 +149,8 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             </div>
           ))}
         </div>
+
+        <DocumentTypeCorrection documentId={String(document._id)} currentDocumentType={document.documentType} />
 
         <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Type-specific intake note</dt>
