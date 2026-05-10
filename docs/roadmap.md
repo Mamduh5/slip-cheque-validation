@@ -15,7 +15,7 @@
 - Executed transfer-slip QR-candidate analysis that records plausible QR-like regions.
 - Executed transfer-slip QR decode that extracts raw QR content without parsing or verifying business fields.
 - Executed transfer-slip metadata parsing that classifies decoded payloads and parses supported Thai QR payment payloads without verification.
-- Persisted transfer-slip `slipVerification` results for local-only supported Thai QR structural checks, with safe no-evidence fallback outcomes.
+- Persisted transfer-slip `slipVerification` results for local-only supported Thai QR structural checks, including CRC-16/CCITT-FALSE checksum validation, with safe no-evidence fallback outcomes.
 - Optional idempotent `slipVerification` backfill command for older transfer-slip records, with lazy-compatible read behavior before backfill.
 - Exact duplicate detection using SHA-256 file hashes.
 - Normalized image derivative generation and dHash near-duplicate detection.
@@ -50,7 +50,7 @@
 - Better client-side camera guidance, preview cropping, and corner framing aids.
 - Cluster-level duplicate review behavior beyond pair memory.
 - Broader transfer payload parsing formats beyond the initial Thai QR payment support.
-- Slip verification for bank transfer slips.
+- External truth verification for bank transfer slips (requires a real provider, credentials, and claim semantics).
 - OCR-assisted field extraction.
 - Cheque-specific field extraction.
 - Review workflow for possible duplicates.

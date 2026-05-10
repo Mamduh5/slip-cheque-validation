@@ -58,7 +58,7 @@ Implemented checks for supported Thai QR payment metadata:
 - PromptPay target identifier is present for PromptPay payloads.
 - Biller id and reference 1 are present for bill-payment payloads.
 - Amount format is syntactically valid if present.
-- CRC tag is present. The current local check does not compute CRC validity.
+- CRC tag is present and its checksum is validated using CRC-16/CCITT-FALSE over the payload with the CRC value replaced by `0000`. A mismatch makes the result `STRUCTURALLY_INCONSISTENT`.
 
 Local structural validation can support only a statement like "structurally consistent with supported format". It cannot support a statement that a real payment happened, that a bank account exists, or that a slip is authentic.
 
@@ -182,6 +182,8 @@ The current live model uses the stage/status/result/evidence/timestamp/notes sub
 - Parsed: "Structured metadata parsed from decoded QR content".
 - Local structural check passed: "Structurally consistent with supported format".
 - Local structural check failed: "Structural inconsistency found".
+- Local checksum passed: "Local checksum check passed".
+- Local checksum failed: "Local checksum inconsistency found".
 - External verification passed: "Externally verified by configured provider".
 - Unsupported: "Unsupported for verification".
 - Not verified: "Not verified" or "No verification evidence available".

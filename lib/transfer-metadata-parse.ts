@@ -29,6 +29,7 @@ export function attemptTransferMetadataParse(input: {
       payloadFormat: "UNKNOWN_FORMAT",
       parsedAt,
       metadata: null,
+      rawPayload: null,
       notes: ["Transfer metadata parse was not attempted because QR decode results are not available."],
       warnings: []
     };
@@ -43,6 +44,7 @@ export function attemptTransferMetadataParse(input: {
       payloadFormat: "UNKNOWN_FORMAT",
       parsedAt,
       metadata: null,
+      rawPayload: null,
       notes: ["Transfer metadata parse was skipped because no decoded QR payload is available."],
       warnings: []
     };
@@ -55,6 +57,7 @@ export function attemptTransferMetadataParse(input: {
     return unsupportedFormatResult({
       parsedAt,
       payloadFormat,
+      rawPayload,
       notes: ["Decoded QR payload is a generic URL and was not treated as transfer metadata."]
     });
   }
@@ -68,6 +71,7 @@ export function attemptTransferMetadataParse(input: {
       payloadFormat,
       parsedAt,
       metadata: null,
+      rawPayload,
       notes: ["Decoded QR payload is plain text without a supported structured transfer metadata format."],
       warnings: []
     };
@@ -77,6 +81,7 @@ export function attemptTransferMetadataParse(input: {
     return unsupportedFormatResult({
       parsedAt,
       payloadFormat,
+      rawPayload,
       notes: ["Decoded QR payload did not match a supported transfer metadata format."]
     });
   }
@@ -92,6 +97,7 @@ export function attemptTransferMetadataParse(input: {
       payloadFormat,
       parsedAt,
       metadata: null,
+      rawPayload,
       notes: ["Decoded QR payload was classified as Thai QR payment, but structured metadata parsing failed."],
       warnings: []
     };
@@ -105,6 +111,7 @@ export function attemptTransferMetadataParse(input: {
     payloadFormat,
     parsedAt,
     metadata: parsedMetadata.metadata,
+    rawPayload,
     notes: ["Structured metadata was parsed from decoded QR content. Parsed values are not verified."],
     warnings: parsedMetadata.warnings
   };
@@ -133,6 +140,7 @@ export function classifyDecodedPayload(rawPayload: string): TransferMetadataPayl
 function unsupportedFormatResult(input: {
   parsedAt: Date;
   payloadFormat: TransferMetadataPayloadFormat;
+  rawPayload: string;
   notes: string[];
 }): TransferMetadataParseAnalysisResult {
   return {
@@ -143,6 +151,7 @@ function unsupportedFormatResult(input: {
     payloadFormat: input.payloadFormat,
     parsedAt: input.parsedAt,
     metadata: null,
+    rawPayload: input.rawPayload,
     notes: input.notes,
     warnings: []
   };

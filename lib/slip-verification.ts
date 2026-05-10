@@ -47,6 +47,7 @@ export function attemptSlipVerification(input: {
 
   return validateThaiQrPaymentStructure({
     metadata: input.transferMetadata.metadata,
+    rawPayload: input.transferMetadata.rawPayload,
     parseWarnings: input.transferMetadata.warnings,
     evaluatedAt
   });
@@ -54,6 +55,7 @@ export function attemptSlipVerification(input: {
 
 function validateThaiQrPaymentStructure(input: {
   metadata: TransferMetadataFields;
+  rawPayload: string | null;
   parseWarnings: string[];
   evaluatedAt: Date;
 }): SlipVerificationAnalysisResult {
@@ -82,13 +84,16 @@ function validateThaiQrPaymentStructure(input: {
     passed: merchantAccountInfo !== null,
     issues
   });
-  recordPresenceCheck({
-    label: "CRC tag is present.",
-    passed: isNonEmpty(metadata.crc),
-    issues
-  });
+
+  const crcResult = validateCrcChecksum({ rawPayload: input.rawPayload, crcValue: metadata.crc });
+  if (crcResult.status === "MISSING") {
+    issues.push("CRC tag (63) is missing from the payload.");
+  } else if (crcResult.status === "INVALID") {
+    issues.push(`CRC checksum mismatch: computed ${crcResult.computed}, expected ${crcResult.expected}.`);
+  }
+
   checks.push(
-    "Checked EMV payload indicator, Thai country/currency tags, merchant account information, target/reference fields, optional amount syntax, and CRC tag presence."
+    "Checked EMV payload indicator, Thai country/currency tags, merchant account information, target/reference fields, optional amount syntax, and CRC checksum."
   );
 
   if (metadata.amount !== null && !/^\d+(\.\d{1,2})?$/.test(metadata.amount)) {
@@ -130,6 +135,54 @@ function validateThaiQrPaymentStructure(input: {
   });
 }
 
+function validateCrcChecksum(input: {
+  rawPayload: string | null;
+  crcValue: string | null;
+}):
+  | { status: "MISSING"; computed: null; expected: null }
+  | { status: "VALID"; computed: string; expected: string }
+  | { status: "INVALID"; computed: string; expected: string }
+  | { status: "UNAVAILABLE"; computed: null; expected: null } {
+  if (!input.rawPayload || !isNonEmpty(input.crcValue)) {
+    return { status: "MISSING", computed: null, expected: null };
+  }
+
+  const crcValue = input.crcValue;
+  const crcTagWithValue = "6304" + crcValue;
+  const crcIndex = input.rawPayload.lastIndexOf(crcTagWithValue);
+
+  if (crcIndex === -1) {
+    return { status: "MISSING", computed: null, expected: null };
+  }
+
+  const payloadForCrc =
+    input.rawPayload.slice(0, crcIndex + 4) + "0000" + input.rawPayload.slice(crcIndex + 8);
+  const computedCrc = crc16CcittFalse(payloadForCrc);
+  const computedCrcHex = computedCrc.toString(16).toUpperCase().padStart(4, "0");
+
+  if (computedCrcHex === crcValue) {
+    return { status: "VALID", computed: computedCrcHex, expected: crcValue };
+  }
+
+  return { status: "INVALID", computed: computedCrcHex, expected: crcValue };
+}
+
+function crc16CcittFalse(data: string): number {
+  let crc = 0xffff;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
+      crc &= 0xffff;
+    }
+  }
+  return crc;
+}
+
 function buildLocalStructuralResult(input: {
   result: "STRUCTURALLY_CONSISTENT" | "STRUCTURALLY_INCONSISTENT";
   evaluatedAt: Date;
@@ -160,6 +213,6 @@ function recordPresenceCheck(input: { label: string; passed: boolean; issues: st
   }
 }
 
-function isNonEmpty(value: string | null) {
+function isNonEmpty(value: string | null): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }

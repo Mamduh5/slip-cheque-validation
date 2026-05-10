@@ -211,6 +211,7 @@ export interface TransferMetadataParseAnalysisResult {
   payloadFormat: TransferMetadataPayloadFormat;
   parsedAt: Date;
   metadata: TransferMetadataFields | null;
+  rawPayload: string | null;
   notes: string[];
   warnings: string[];
 }

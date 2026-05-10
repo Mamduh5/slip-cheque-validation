@@ -28,6 +28,32 @@
 
 ## 2026-05-10
 
+### CRC Checksum Validation for Local Structural Slip Verification
+
+#### Changed
+
+- Added deterministic CRC-16/CCITT-False checksum validation to local structural slip verification.
+- `transferMetadata.rawPayload` is now persisted so `SLIP_VERIFICATION` can validate the decoded QR payload against its CRC tag.
+- CRC mismatch now produces `STRUCTURALLY_INCONSISTENT` with `LOCAL_STRUCTURAL_CHECK`.
+- Missing CRC tag is now treated as a structural inconsistency.
+- Updated slip-verification spec, architecture, data-model, roadmap, and README documentation.
+- Added focused tests for valid CRC, invalid CRC, and missing CRC.
+
+#### Key Decisions
+
+- CRC validation is local-only and deterministic. It does not imply payment completion, bank truth, or slip authenticity.
+- A CRC mismatch only means the payload fails the EMV checksum rule; it does not mean the payment is invalid or fraudulent.
+- The CRC is computed over the raw payload with the CRC value replaced by `0000`.
+- Legacy records without `rawPayload` are not recomputed; the existing backfill remains a no-evidence legacy-shape normalization path.
+
+#### Verification
+
+- `npm run test` - all 71 tests pass
+- `npm run typecheck`
+- `npm run lint`
+
+## 2026-05-10
+
 ### Operations Runbook
 
 #### Changed

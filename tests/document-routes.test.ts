@@ -13,7 +13,7 @@ import { attemptTransferMetadataParse } from "../lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
 
 const thaiPromptPayPayload =
-  "00020101021229370016A000000677010111011300668123456785802TH53037645406100.005909TEST SHOP6007BANGKOK6304ABCD";
+  "00020101021229370016A000000677010111011300668123456785802TH53037645406100.005909TEST SHOP6007BANGKOK63047938";
 
 const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,

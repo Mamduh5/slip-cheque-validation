@@ -74,6 +74,7 @@ Stores one registry record per uploaded document image.
 | `transferMetadata.metadata.countryCode` | string \| null | Country tag from the supported QR payload when present. |
 | `transferMetadata.metadata.currencyCode` | string \| null | Currency tag from the supported QR payload when present. |
 | `transferMetadata.metadata.rawTopLevelTags` | object | Raw parsed top-level TLV tags for audit/debug use. |
+| `transferMetadata.rawPayload` | string \| null | The raw decoded QR payload string used for parsing and CRC checksum validation. |
 | `transferMetadata.notes` | string[] \| null | Short non-authoritative notes about parse behavior. |
 | `transferMetadata.warnings` | string[] \| null | Warnings for suspicious but parseable structure, such as unexpected amount formatting. |
 | `slipVerification.stage` | string \| null | Transfer-slip-only scaffold stage key, currently `SLIP_VERIFICATION`. Null or absent for non-slip records and older records. |
