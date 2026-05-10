@@ -33,16 +33,18 @@ describe("document helpers", () => {
         family: "transfer-slip",
         capabilities: {
           qrOrientedFuturePath: true,
+          qrCandidateAnalysisImplemented: true,
           extractionImplemented: false,
           verificationImplemented: false
         },
         plannedStages: expect.arrayContaining([
-          expect.objectContaining({ key: "QR_CANDIDATE", status: "PLANNED" }),
+          expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
           expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
           expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
           expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
         ]),
-        futureStages: expect.arrayContaining(["qr-candidate-handling"])
+        currentStages: expect.arrayContaining(["qr-candidate-analysis"]),
+        futureStages: expect.arrayContaining(["qr-decode"])
       }
     });
     expect(getTypeAwareProcessingPlan("DEPOSIT_PAYMENT_SLIP")).toMatchObject({
@@ -55,6 +57,7 @@ describe("document helpers", () => {
         branch: "CHEQUE",
         capabilities: {
           qrOrientedFuturePath: false,
+          qrCandidateAnalysisImplemented: false,
           extractionImplemented: false,
           verificationImplemented: false
         }
@@ -105,6 +108,7 @@ describe("document helpers", () => {
         algorithm: "normalized-webp-grayscale-v1"
       },
       processingProfile: getDocumentProcessingProfile("CHEQUE"),
+      qrCandidateAnalysis: null,
       exactHash: "abc123",
       perceptualHash: "0000000000000000",
       qualityStatus: "PASS",
@@ -168,6 +172,7 @@ describe("document helpers", () => {
         algorithm: "normalized-webp-grayscale-v1"
       },
       processingProfile: getDocumentProcessingProfile("UNKNOWN"),
+      qrCandidateAnalysis: null,
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "PASS",
@@ -214,6 +219,7 @@ describe("document helpers", () => {
         algorithm: "normalized-webp-grayscale-v1"
       },
       processingProfile: getDocumentProcessingProfile("UNKNOWN"),
+      qrCandidateAnalysis: null,
       exactHash: "abc123",
       perceptualHash: "ffffffffffffffff",
       qualityStatus: "WARN",

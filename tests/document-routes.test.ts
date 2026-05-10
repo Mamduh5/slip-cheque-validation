@@ -214,6 +214,7 @@ async function upload(bytes?: string, documentType?: DocumentType) {
         branch: string;
         futureStages: string[];
       };
+      qrCandidateAnalysis?: DocumentRecord["qrCandidateAnalysis"];
       error?: string;
     }
   };
@@ -244,6 +245,28 @@ describe("document API integration boundaries", () => {
         algorithm: "normalized-webp-grayscale-v1"
       },
       processingProfile: getDocumentProcessingProfile(input.documentType),
+      qrCandidateAnalysis:
+        input.documentType === "BANK_TRANSFER_SLIP"
+          ? {
+              stage: "QR_CANDIDATE",
+              algorithm: "qr-candidate-heuristic-v1",
+              status: "COMPLETED",
+              result: input.buffer.toString("utf8").includes("qr") ? "CANDIDATE_FOUND" : "NO_CANDIDATE_FOUND",
+              checkedAt: new Date("2026-05-08T10:00:00.000Z"),
+              candidateCount: input.buffer.toString("utf8").includes("qr") ? 1 : 0,
+              bestCandidate: input.buffer.toString("utf8").includes("qr")
+                ? {
+                    x: 8,
+                    y: 8,
+                    width: 56,
+                    height: 56,
+                    confidence: 0.82,
+                    source: "normalized-image"
+                  }
+                : null,
+              notes: ["QR content was not decoded."]
+            }
+          : null,
       perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
       qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
       qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -355,32 +378,53 @@ describe("document API integration boundaries", () => {
     }
   });
 
-  it("exposes transfer-slip QR-oriented planned stages without extraction results", async () => {
+  it("exposes transfer-slip QR-candidate stage results without extraction results", async () => {
     setSession("user-1");
 
-    const { body } = await upload("transfer slip image bytes", "BANK_TRANSFER_SLIP");
+    const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
     const detailResponse = await getDocument(new Request("http://localhost/api/documents/id"), {
       params: Promise.resolve({ id: body.documentId as string })
     });
     const detail = (await detailResponse.json()) as {
       processingProfile: {
-        capabilities: { qrOrientedFuturePath: boolean; extractionImplemented: boolean };
+        capabilities: {
+          qrOrientedFuturePath: boolean;
+          qrCandidateAnalysisImplemented: boolean;
+          extractionImplemented: boolean;
+        };
         plannedStages: Array<{ key: string; status: string }>;
       };
+      qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
     };
 
     expect(detail.processingProfile.capabilities).toMatchObject({
       qrOrientedFuturePath: true,
+      qrCandidateAnalysisImplemented: true,
       extractionImplemented: false
     });
     expect(detail.processingProfile.plannedStages).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: "QR_CANDIDATE", status: "PLANNED" }),
+        expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
         expect.objectContaining({ key: "QR_DECODE", status: "PLANNED" }),
         expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "PLANNED" }),
         expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
       ])
     );
+    expect(detail.qrCandidateAnalysis).toMatchObject({
+      stage: "QR_CANDIDATE",
+      status: "COMPLETED",
+      result: "CANDIDATE_FOUND",
+      candidateCount: 1
+    });
+  });
+
+  it("does not run QR-candidate analysis for non-transfer-slip document types", async () => {
+    setSession("user-1");
+
+    const { body } = await upload("deposit slip qr-like image bytes", "DEPOSIT_PAYMENT_SLIP");
+
+    expect(body.qrCandidateAnalysis).toBeNull();
+    expect(testState.documents[0].qrCandidateAnalysis).toBeNull();
   });
 
   it("allows the owner to update document type without changing duplicate review or quality state", async () => {

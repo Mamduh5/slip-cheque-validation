@@ -41,10 +41,18 @@ Stores one registry record per uploaded document image.
 | `normalizedImage.algorithm` | string \| null | Currently `normalized-webp-grayscale-v1`. |
 | `processingProfile.name` | string | Type-aware processing profile name, such as `bank-transfer-slip-v1`. |
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
-| `processingProfile.currentStages` | string[] | Current enabled stages. All v1 types currently use shared quality, normalization, and duplicate stages. |
+| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
-| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips include planned QR-oriented stages marked `PLANNED`; shared stages are marked `ACTIVE`. |
-| `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path and whether extraction/verification are implemented. Extraction and verification are currently false. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE` as `ACTIVE`; QR decode, metadata parse, and verification remain `PLANNED`. Shared stages are marked `ACTIVE`. |
+| `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. Extraction and verification are currently false. |
+| `qrCandidateAnalysis.stage` | string \| null | Transfer-slip-only stage key, currently `QR_CANDIDATE`. Null or absent for non-slip records and older records. |
+| `qrCandidateAnalysis.algorithm` | string \| null | Currently `qr-candidate-heuristic-v1`. |
+| `qrCandidateAnalysis.status` | enum \| null | `COMPLETED`, `FAILED`, `PENDING`, or `NOT_APPLICABLE`. New transfer-slip uploads normally use `COMPLETED` unless analysis fails. |
+| `qrCandidateAnalysis.result` | enum \| null | `CANDIDATE_FOUND`, `NO_CANDIDATE_FOUND`, or `ANALYSIS_SKIPPED`. This is not QR decoding. |
+| `qrCandidateAnalysis.checkedAt` | Date \| null | When candidate analysis ran. |
+| `qrCandidateAnalysis.candidateCount` | number \| null | Count of plausible QR-like windows retained by the heuristic. |
+| `qrCandidateAnalysis.bestCandidate` | object \| null | Approximate best candidate box and confidence in normalized-image coordinates when found. |
+| `qrCandidateAnalysis.notes` | string[] \| null | Short non-authoritative notes; no decoded payload or bank metadata is stored. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
@@ -116,7 +124,8 @@ Future type-specific work can use this field for QR handling, cheque-specific ex
 
 Owners can correct `documentType` after upload. Corrections:
 
-- update only `documentType`, `processingProfile`, and `updatedAt`;
+- update only `documentType`, `processingProfile`, `qrCandidateAnalysis`, and `updatedAt`;
+- clear any existing `qrCandidateAnalysis` because the image is not reprocessed during correction;
 - write a `DOCUMENT_TYPE_UPDATED` audit log with old type, new type, who changed it, and when;
 - do not recompute duplicate matching, quality assessment, normalized images, exact hashes, or perceptual hashes;
 - make the corrected type the current source of truth for future type-aware stages.
@@ -130,14 +139,22 @@ Owners can correct `documentType` after upload. Corrections:
 - `CHEQUE` uses `cheque-v1` on the `CHEQUE` branch.
 - `UNKNOWN` uses `generic-unknown-v1` on the `GENERIC` branch.
 
-Transfer slips include planned stage contract entries:
+Transfer slips include stage contract entries:
 
-- `QR_CANDIDATE`: future QR-region candidate handling.
+- `QR_CANDIDATE`: active QR-like region candidate analysis on the normalized derivative. No QR decoding is performed.
 - `QR_DECODE`: future QR payload decoding.
 - `TRANSFER_METADATA_PARSE`: future parsing of decoded transfer metadata.
 - `SLIP_VERIFICATION`: future verification after extraction exists.
 
-Profiles currently document the branch, active shared stages, and future stage hints only. They do not mean QR extraction, OCR, cheque parsing, or bank verification has run.
+Profiles document the branch, active shared stages, transfer-slip QR-candidate analysis, and future stage hints. They do not mean QR decoding, OCR, cheque parsing, or bank verification has run.
+
+## Transfer-Slip QR-Candidate Fields
+
+`qrCandidateAnalysis` is only populated for new `BANK_TRANSFER_SLIP` records processed after the QR-candidate stage was added. The stage uses the normalized derivative and an explainable high-contrast square-window heuristic to record whether a plausible QR-like region exists.
+
+`CANDIDATE_FOUND` means the image may contain a QR-like region. It does not mean the QR payload was read, parsed, or verified. `NO_CANDIDATE_FOUND` means the heuristic did not find a plausible region, not that the original slip has no QR code.
+
+Non-slip types keep `qrCandidateAnalysis` null. Existing records without this field should be treated as not analyzed.
 
 ## Duplicate-Check Fields
 

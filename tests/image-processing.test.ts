@@ -9,6 +9,7 @@ import {
   selectBestPerceptualMatch,
   similarityScoreFromHammingDistance
 } from "../lib/perceptual-hash";
+import { analyzeQrCandidateFromNormalizedImage } from "../lib/qr-candidate-analysis";
 
 async function createTestImage(input: { width: number; height: number; left?: number; right?: number }) {
   const left = input.left ?? 32;
@@ -43,6 +44,66 @@ async function createSolidImage(input: { width: number; height: number; value: n
     raw: {
       width: input.width,
       height: input.height,
+      channels: 3
+    }
+  })
+    .png()
+    .toBuffer();
+}
+
+async function createTransferSlipLikeImageWithQrCandidate() {
+  const width = 900;
+  const height = 650;
+  const pixels = Buffer.alloc(width * height * 3, 246);
+  const qrX = 560;
+  const qrY = 120;
+  const moduleSize = 10;
+  const modules = 17;
+
+  function setBlock(x: number, y: number, size: number, value: number) {
+    for (let yy = y; yy < y + size; yy += 1) {
+      for (let xx = x; xx < x + size; xx += 1) {
+        if (xx < 0 || xx >= width || yy < 0 || yy >= height) {
+          continue;
+        }
+
+        const offset = (yy * width + xx) * 3;
+        pixels[offset] = value;
+        pixels[offset + 1] = value;
+        pixels[offset + 2] = value;
+      }
+    }
+  }
+
+  for (let y = 80; y < 570; y += 1) {
+    setBlock(80, y, 2, 218);
+    setBlock(820, y, 2, 218);
+  }
+
+  for (let x = 80; x < 822; x += 1) {
+    setBlock(x, 80, 2, 218);
+    setBlock(x, 570, 2, 218);
+  }
+
+  for (let row = 0; row < modules; row += 1) {
+    for (let col = 0; col < modules; col += 1) {
+      const inFinder =
+        (row < 7 && col < 7) ||
+        (row < 7 && col >= modules - 7) ||
+        (row >= modules - 7 && col < 7);
+      const finderRing =
+        inFinder &&
+        (row % 6 === 0 || col % 6 === 0 || (row % 6 >= 2 && row % 6 <= 4 && col % 6 >= 2 && col % 6 <= 4));
+      const dataModule = (row * 3 + col * 5 + row * col) % 4 < 2;
+      const value = finderRing || (!inFinder && dataModule) ? 8 : 246;
+      setBlock(qrX + col * moduleSize, qrY + row * moduleSize, moduleSize, value);
+    }
+  }
+
+  return sharp(pixels, {
+    raw: {
+      width,
+      height,
       channels: 3
     }
   })
@@ -165,5 +226,40 @@ describe("image normalization and perceptual hashing", () => {
 
     expect(sharpAssessment.qualityMetrics.sharpness).toBeGreaterThan(blurredAssessment.qualityMetrics.sharpness);
     expect(blurredAssessment.qualityWarnings).toContain("BLURRY_IMAGE");
+  });
+
+  it("finds a plausible QR candidate in a normalized transfer-slip image without decoding content", async () => {
+    const source = await createTransferSlipLikeImageWithQrCandidate();
+    const normalized = await normalizeDocumentImage(source);
+    const analysis = await analyzeQrCandidateFromNormalizedImage(
+      normalized.buffer,
+      new Date("2026-05-08T10:00:00.000Z")
+    );
+
+    expect(analysis).toMatchObject({
+      stage: "QR_CANDIDATE",
+      algorithm: "qr-candidate-heuristic-v1",
+      status: "COMPLETED",
+      result: "CANDIDATE_FOUND"
+    });
+    expect(analysis.candidateCount).toBeGreaterThan(0);
+    expect(analysis.bestCandidate?.confidence).toBeGreaterThanOrEqual(0.52);
+    expect(analysis.notes.join(" ")).toContain("not decoded");
+  });
+
+  it("records no QR candidate for a plain normalized document image", async () => {
+    const source = await createSolidImage({ width: 900, height: 650, value: 246 });
+    const normalized = await normalizeDocumentImage(source);
+    const analysis = await analyzeQrCandidateFromNormalizedImage(
+      normalized.buffer,
+      new Date("2026-05-08T10:00:00.000Z")
+    );
+
+    expect(analysis).toMatchObject({
+      status: "COMPLETED",
+      result: "NO_CANDIDATE_FOUND",
+      candidateCount: 0,
+      bestCandidate: null
+    });
   });
 });

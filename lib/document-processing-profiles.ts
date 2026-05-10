@@ -31,8 +31,8 @@ const transferSlipFutureStagePlan = [
   {
     key: "QR_CANDIDATE",
     label: "QR candidate detection",
-    status: "PLANNED",
-    description: "Future stage to locate possible QR regions in transfer slip photos."
+    status: "ACTIVE",
+    description: "Runs conservative QR-like region analysis for transfer slip photos without decoding QR content."
   },
   {
     key: "QR_DECODE",
@@ -61,12 +61,13 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     branch: "TRANSFER_SLIP",
     family: "transfer-slip",
     description:
-      "Slip-first branch. Current runtime uses shared image quality and duplicate checks only; QR-oriented stages are planned but not run.",
-    currentStages: sharedCurrentStages,
-    futureStages: ["qr-candidate-handling", "printed-field-extraction", "transfer-slip-specific-validation"],
+      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, and conservative QR-candidate analysis. QR decoding and slip verification are not implemented.",
+    currentStages: [...sharedCurrentStages, "qr-candidate-analysis"],
+    futureStages: ["qr-decode", "printed-field-extraction", "transfer-slip-specific-validation"],
     plannedStages: [...sharedActiveStagePlan, ...transferSlipFutureStagePlan],
     capabilities: {
       qrOrientedFuturePath: true,
+      qrCandidateAnalysisImplemented: true,
       extractionImplemented: false,
       verificationImplemented: false
     }
@@ -82,6 +83,7 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     plannedStages: [...sharedActiveStagePlan],
     capabilities: {
       qrOrientedFuturePath: false,
+      qrCandidateAnalysisImplemented: false,
       extractionImplemented: false,
       verificationImplemented: false
     }
@@ -97,6 +99,7 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     plannedStages: [...sharedActiveStagePlan],
     capabilities: {
       qrOrientedFuturePath: false,
+      qrCandidateAnalysisImplemented: false,
       extractionImplemented: false,
       verificationImplemented: false
     }
@@ -112,6 +115,7 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     plannedStages: [...sharedActiveStagePlan],
     capabilities: {
       qrOrientedFuturePath: false,
+      qrCandidateAnalysisImplemented: false,
       extractionImplemented: false,
       verificationImplemented: false
     }

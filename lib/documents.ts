@@ -74,6 +74,7 @@ export function buildUploadedDocumentRecord(input: {
   normalizedObject: DocumentRecord["normalizedObject"];
   normalizedImage: DocumentRecord["normalizedImage"];
   processingProfile: NonNullable<DocumentRecord["processingProfile"]>;
+  qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -94,6 +95,7 @@ export function buildUploadedDocumentRecord(input: {
     normalizedObject: input.normalizedObject,
     normalizedImage: input.normalizedImage,
     processingProfile: input.processingProfile,
+    qrCandidateAnalysis: input.qrCandidateAnalysis,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     matchedDocumentId: input.duplicateDecision.matchedDocumentId,
@@ -249,6 +251,7 @@ export async function createUploadedDocument(input: {
     normalizedObject: processedImage.normalizedObject,
     normalizedImage: processedImage.normalizedImage,
     processingProfile: processedImage.processingProfile,
+    qrCandidateAnalysis: processedImage.qrCandidateAnalysis,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,
@@ -275,6 +278,13 @@ export async function createUploadedDocument(input: {
       documentTypeLabel: formatDocumentType(record.documentType),
       processingProfileName: record.processingProfile?.name,
       processingProfileBranch: record.processingProfile?.branch,
+      qrCandidateAnalysis: record.qrCandidateAnalysis
+        ? {
+            status: record.qrCandidateAnalysis.status,
+            result: record.qrCandidateAnalysis.result,
+            candidateCount: record.qrCandidateAnalysis.candidateCount
+          }
+        : null,
       perceptualHash: record.perceptualHash,
       matchedDocumentId: record.matchedDocumentId,
       qualityStatus: record.qualityStatus,
@@ -367,6 +377,7 @@ export async function updateDocumentTypeForUser(input: {
       $set: {
         documentType: input.documentType,
         processingProfile: newProcessingProfile,
+        qrCandidateAnalysis: null,
         updatedAt: now
       }
     }
@@ -384,6 +395,7 @@ export async function updateDocumentTypeForUser(input: {
       newDocumentTypeLabel: formatDocumentType(input.documentType),
       oldProcessingProfileName: oldProcessingProfile.name,
       newProcessingProfileName: newProcessingProfile.name,
+      qrCandidateAnalysisReset: document.qrCandidateAnalysis ? true : false,
       changedByUserId: input.userId,
       unchangedDuplicateStatus: oldDuplicateStatus,
       unchangedReviewStatus: oldReviewStatus,

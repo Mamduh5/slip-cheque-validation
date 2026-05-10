@@ -56,13 +56,14 @@ documents/{userId}/{documentId}/normalized.webp
 5. Server computes a SHA-256 exact file hash.
 6. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
 7. The in-process document processing service receives the selected document type, decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
-8. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
-9. Original image bytes are stored unchanged in MinIO.
-10. A new document record is inserted into MongoDB for auditability.
-11. If no match exists, `duplicateStatus` is `NEW`.
-12. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
-13. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
-14. User is redirected to `/documents/{id}`.
+8. For `BANK_TRANSFER_SLIP` only, the transfer-slip branch runs conservative QR-candidate analysis on the normalized derivative and records whether a QR-like region was found. It does not decode QR content.
+9. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
+10. Original image bytes are stored unchanged in MinIO.
+11. A new document record is inserted into MongoDB for auditability.
+12. If no match exists, `duplicateStatus` is `NEW`.
+13. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
+14. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
+15. User is redirected to `/documents/{id}`.
 
 `documentType` is user-selected and durable. It is not inferred from image content and is separate from machine duplicate status, human review status, and capture quality status.
 
@@ -73,11 +74,11 @@ Supported document types:
 - `CHEQUE`
 - `UNKNOWN`
 
-The processing boundary includes a document-type processing profile so later stages can add slip QR handling, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
+The processing boundary includes a document-type processing profile so later stages can add slip QR decoding, cheque-specific extraction, or payment-slip handling without changing the stored type model. Those future stages are not implemented yet.
 
 ## Type-Aware Processing Boundary
 
-`lib/document-processing-profiles.ts` is the single dispatch point for document-type-aware processing. The current runtime still uses shared intake stages for every type:
+`lib/document-processing-profiles.ts` is the single dispatch point for document-type-aware processing. The current runtime uses shared intake stages for every type:
 
 - capture-quality assessment;
 - normalized image generation;
@@ -86,12 +87,24 @@ The processing boundary includes a document-type processing profile so later sta
 
 Profiles define the current branch and future stage hints:
 
-- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first planned specialized path. Its planned stage contract is `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION`.
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE` analysis and keeps `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION` as planned stages.
 - `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
 - `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
 - `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
 
 The profile is stored on new document records as lightweight metadata and exposed by document APIs. Planned stages are contract metadata only. They are not QR decoding, OCR, parsing, or verification results.
+
+## Transfer-Slip QR-Candidate Analysis
+
+`QR_CANDIDATE` is now a real executed transfer-slip stage. It only applies to `BANK_TRANSFER_SLIP` documents.
+
+- The analyzer reads the normalized grayscale derivative, not the raw original.
+- It scans small square windows for high-contrast, QR-like transition patterns.
+- It stores `qrCandidateAnalysis.status`, `result`, `checkedAt`, `candidateCount`, an optional approximate best-candidate box in normalized-image coordinates, and short notes.
+- `CANDIDATE_FOUND` means a plausible QR-like region was detected. It does not mean QR payloads were decoded or that a transfer is valid.
+- Non-slip types do not run the stage and keep their conservative profiles.
+
+The heuristic is intentionally explainable and lightweight. It can miss poor, cropped, or unusual QR regions, and it can produce false positives on dense high-contrast patterns. Later QR decoding should treat this as candidate triage, not proof.
 
 ## Document-Type Correction
 
@@ -99,10 +112,11 @@ Owners can correct `documentType` after upload from the document detail page. Th
 
 Correction behavior is intentionally narrow:
 
-- Only `documentType`, `processingProfile`, and `updatedAt` are changed on the document record.
+- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, and `updatedAt` are changed on the document record.
 - Non-owned or missing documents return `404`.
 - Invalid type values return `400`.
 - Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.
+- Existing QR-candidate analysis is cleared on type correction because the document is not reprocessed in this v1 flow.
 - The corrected type becomes the current source of truth for future type-aware stages.
 
 Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.

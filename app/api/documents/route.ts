@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     documentType: record.documentType,
     documentTypeLabel: formatDocumentType(record.documentType),
     processingProfile: record.processingProfile,
+    qrCandidateAnalysis: record.qrCandidateAnalysis ?? null,
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,

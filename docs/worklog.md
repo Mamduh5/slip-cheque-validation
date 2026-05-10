@@ -523,3 +523,34 @@
 - Planned stages do not produce results yet.
 - There is no QR library, QR payload parser, OCR engine, or verification integration.
 - The UI intentionally labels planned stages as not executed.
+
+## 2026-05-10 Transfer-Slip QR-Candidate Stage
+
+### Changed
+
+- Added `lib/qr-candidate-analysis.ts` with a conservative normalized-image heuristic for QR-like square regions.
+- Made `QR_CANDIDATE` an active transfer-slip stage while keeping `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_VERIFICATION` planned only.
+- Persisted `qrCandidateAnalysis` on new transfer-slip document records with status, result, timestamp, candidate count, optional best-candidate box, confidence, and notes.
+- Kept non-slip document types conservative; they do not run QR-candidate analysis.
+- Exposed QR-candidate analysis in upload/detail API responses and added a small document-detail note that QR content was not decoded.
+- Cleared QR-candidate analysis on document-type correction because correction does not reprocess the image.
+- Added tests for the heuristic, no-candidate behavior, transfer-slip route exposure, non-slip behavior, and updated profile metadata.
+
+### Key Decisions
+
+- The stage uses the normalized grayscale WebP derivative so it aligns with the existing image-processing pipeline.
+- The heuristic checks high-contrast square windows and transition density. It is explainable and lightweight, but not a QR reader.
+- `CANDIDATE_FOUND` is a triage signal only. It does not mean payload extraction, transfer metadata parsing, or bank verification happened.
+- No QR decoding, OCR, cheque parsing, bank verification, queue, microservice, automatic type inference, camera overlay, or crop tooling was added.
+
+### Verification
+
+- `npm run test`
+- `npm run typecheck`
+
+### Known Limitations
+
+- The heuristic can miss small, blurred, cropped, rotated, or low-contrast QR regions.
+- Dense high-contrast non-QR patterns can still look QR-like.
+- Candidate boxes are approximate normalized-image coordinates and are not yet exposed as crop artifacts.
+- Existing records do not have backfilled QR-candidate analysis.

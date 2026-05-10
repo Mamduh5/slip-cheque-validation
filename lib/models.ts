@@ -39,6 +39,12 @@ export const qualityWarningCodes = [
 
 export const documentProcessingBranches = ["TRANSFER_SLIP", "PAYMENT_SLIP", "CHEQUE", "GENERIC"] as const;
 export const documentProcessingStageStatuses = ["ACTIVE", "PLANNED"] as const;
+export const qrCandidateStageStatuses = ["NOT_APPLICABLE", "PENDING", "COMPLETED", "FAILED"] as const;
+export const qrCandidateResults = [
+  "ANALYSIS_SKIPPED",
+  "NO_CANDIDATE_FOUND",
+  "CANDIDATE_FOUND"
+] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
@@ -50,6 +56,8 @@ export type QualityStatus = (typeof qualityStatuses)[number];
 export type QualityWarningCode = (typeof qualityWarningCodes)[number];
 export type DocumentProcessingBranch = (typeof documentProcessingBranches)[number];
 export type DocumentProcessingStageStatus = (typeof documentProcessingStageStatuses)[number];
+export type QrCandidateStageStatus = (typeof qrCandidateStageStatuses)[number];
+export type QrCandidateResult = (typeof qrCandidateResults)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -98,9 +106,28 @@ export interface DocumentProcessingProfileSnapshot {
   }>;
   capabilities: {
     qrOrientedFuturePath: boolean;
+    qrCandidateAnalysisImplemented: boolean;
     extractionImplemented: boolean;
     verificationImplemented: boolean;
   };
+}
+
+export interface QrCandidateAnalysisResult {
+  stage: "QR_CANDIDATE";
+  algorithm: "qr-candidate-heuristic-v1";
+  status: QrCandidateStageStatus;
+  result: QrCandidateResult;
+  checkedAt: Date;
+  candidateCount: number;
+  bestCandidate: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    confidence: number;
+    source: "normalized-image";
+  } | null;
+  notes: string[];
 }
 
 export interface DocumentRecord {
@@ -115,6 +142,7 @@ export interface DocumentRecord {
   normalizedObject: StoredObjectRef | null;
   normalizedImage: NormalizedImageMetadata | null;
   processingProfile?: DocumentProcessingProfileSnapshot;
+  qrCandidateAnalysis?: QrCandidateAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   matchedDocumentId: string | null;

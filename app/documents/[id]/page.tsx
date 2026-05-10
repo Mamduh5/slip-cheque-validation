@@ -43,6 +43,18 @@ function matchDescription(status: string) {
   return "Matched with";
 }
 
+function formatQrCandidateResult(result: string | undefined) {
+  if (result === "CANDIDATE_FOUND") {
+    return "Plausible QR candidate found";
+  }
+
+  if (result === "NO_CANDIDATE_FOUND") {
+    return "No plausible QR candidate found";
+  }
+
+  return "QR candidate analysis not available";
+}
+
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
@@ -165,17 +177,39 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           <dd className="mt-1 text-sm text-slate-700">{processingProfile.description}</dd>
           {processingProfile.capabilities.qrOrientedFuturePath ? (
             <dd className="mt-2 text-xs leading-5 text-slate-500">
-              <p>Planned transfer-slip stages are not executed yet:</p>
+              <p>Transfer-slip stage status:</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 {processingProfile.plannedStages
-                  .filter((stage) => stage.status === "PLANNED")
                   .map((stage) => (
-                    <li key={stage.key}>{stage.label}</li>
+                    <li key={stage.key}>
+                      {stage.label}: {stage.status === "ACTIVE" ? "active" : "planned"}
+                    </li>
                   ))}
               </ul>
             </dd>
           ) : null}
         </div>
+
+        {document.documentType === "BANK_TRANSFER_SLIP" ? (
+          <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">QR candidate analysis</dt>
+            <dd className="mt-1 text-sm font-medium text-slate-800">
+              {formatQrCandidateResult(document.qrCandidateAnalysis?.result)}
+            </dd>
+            <dd className="mt-1 text-sm text-slate-700">
+              {document.qrCandidateAnalysis?.status === "COMPLETED"
+                ? `Completed with ${document.qrCandidateAnalysis.candidateCount} candidate${document.qrCandidateAnalysis.candidateCount === 1 ? "" : "s"}. QR content was not decoded.`
+                : document.qrCandidateAnalysis?.status === "FAILED"
+                  ? "Analysis failed for this upload. QR content was not decoded."
+                  : "This record does not have QR-candidate analysis results. QR content was not decoded."}
+            </dd>
+            {document.qrCandidateAnalysis?.bestCandidate ? (
+              <dd className="mt-1 text-xs text-slate-500">
+                Best candidate confidence {Math.round(document.qrCandidateAnalysis.bestCandidate.confidence * 100)}%.
+              </dd>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-3 rounded-md border border-line p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Matched document</dt>
