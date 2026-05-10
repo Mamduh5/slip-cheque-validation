@@ -90,8 +90,8 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Uploads compute an exact SHA-256 hash and compare it with existing document records owned by the same user.
 - `documentType` is a durable user-selected intake field. It is separate from duplicate, review, and quality status and prepares the record for later type-specific processing.
 - Correcting `documentType` makes the new type the source of truth for future type-aware stages. Existing original/normalized assets and duplicate/review/quality decisions remain unchanged, and transfer-slip QR-candidate, QR-decode, transfer-metadata, and slip-verification scaffold results are cleared because the record is not reprocessed during correction.
-- Upload processing records a type-aware processing profile. Bank transfer slips use the first slip-specific branch and now run QR-candidate analysis, QR decode, transfer metadata parsing, and a minimal `slipVerification` scaffold after normalized-image generation; actual verification remains planned only.
-- Older transfer-slip records may have `slipVerification` missing or null. The read path displays them safely, and the optional backfill command only adds the no-evidence scaffold without touching duplicate, review, quality, QR, or transfer-metadata fields.
+- Upload processing records a type-aware processing profile. Bank transfer slips use the first slip-specific branch and now run QR-candidate analysis, QR decode, transfer metadata parsing, and local-only structural `slipVerification` for supported Thai QR payment metadata after normalized-image generation; external bank/provider verification remains unimplemented.
+- Older transfer-slip records may have `slipVerification` missing or null, or may have the older no-evidence scaffold. The read path displays them safely, and the optional backfill command only adds the no-evidence scaffold without touching duplicate, review, quality, QR, or transfer-metadata fields.
 - Slip verification terminology is intentionally strict: raw decode, parsed metadata, local structural checks, and external truth verification must remain separate.
 - Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
 - The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.
@@ -114,14 +114,14 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, quality warnings/failures, upload preview helper behavior, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
-Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, and conservative non-slip profile behavior.
+Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, local-only structural slip validation, and conservative non-slip profile behavior.
 
 Playwright covers the focused browser-critical upload path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, recovery after a controlled server `422` quality failure, and one real successful upload through MongoDB and MinIO. Run it locally with `npm run test:e2e`; use `npm run test:e2e:ci` for a CI-style run with final cleanup.
 
 ## Intentionally Not Implemented Yet
 
 - OCR or image-based field extraction.
-- Real slip verification beyond the `NOT_VERIFIED` / `NO_EVIDENCE` runtime scaffold.
+- External bank/provider slip verification beyond local structural consistency checks.
 - Cheque verification or clearing integration.
 - Admin workflows, profile management, and document deletion.
 - Background workers or queue-based processing.

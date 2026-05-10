@@ -5,7 +5,7 @@ import { calculateDHash } from "@/lib/perceptual-hash";
 import { putNormalizedDocumentObject } from "@/lib/object-storage";
 import { analyzeQrCandidateFromNormalizedImage } from "@/lib/qr-candidate-analysis";
 import { attemptQrDecode } from "@/lib/qr-decode";
-import { buildSlipVerificationScaffold } from "@/lib/slip-verification";
+import { attemptSlipVerification } from "@/lib/slip-verification";
 import { attemptTransferMetadataParse } from "@/lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType } from "@/lib/models";
 
@@ -80,7 +80,9 @@ export async function processUploadedDocumentImage(input: {
         : null;
     const slipVerification =
       processingPlan.specializedBranch === "slip"
-        ? buildSlipVerificationScaffold()
+        ? attemptSlipVerification({
+            transferMetadata
+          })
         : null;
 
     return {

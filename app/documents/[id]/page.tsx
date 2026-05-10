@@ -84,6 +84,14 @@ function formatSlipVerificationResult(result: string | undefined) {
     return "Unsupported for verification";
   }
 
+  if (result === "STRUCTURALLY_CONSISTENT") {
+    return "Locally structurally consistent";
+  }
+
+  if (result === "STRUCTURALLY_INCONSISTENT") {
+    return "Local structural inconsistency found";
+  }
+
   return "Slip verification not available";
 }
 
@@ -350,6 +358,12 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                   : document.slipVerification?.status === "COMPLETED" &&
                       document.slipVerification.result === "UNSUPPORTED"
                     ? "This slip is unsupported for verification. Parsed metadata, if present, remains unverified."
+                    : document.slipVerification?.status === "COMPLETED" &&
+                        document.slipVerification.result === "STRUCTURALLY_CONSISTENT"
+                      ? "Locally consistent with supported Thai QR payment structure. This is not bank/provider verification."
+                      : document.slipVerification?.status === "COMPLETED" &&
+                          document.slipVerification.result === "STRUCTURALLY_INCONSISTENT"
+                        ? "Local structural checks found inconsistencies in the supported Thai QR payment metadata. This is not bank/provider verification."
                     : document.slipVerification?.status === "SKIPPED"
                       ? "Slip verification was skipped. Parsed metadata, if present, remains unverified."
                       : document.slipVerification?.status === "NOT_APPLICABLE"

@@ -77,12 +77,12 @@ Stores one registry record per uploaded document image.
 | `transferMetadata.notes` | string[] \| null | Short non-authoritative notes about parse behavior. |
 | `transferMetadata.warnings` | string[] \| null | Warnings for suspicious but parseable structure, such as unexpected amount formatting. |
 | `slipVerification.stage` | string \| null | Transfer-slip-only scaffold stage key, currently `SLIP_VERIFICATION`. Null or absent for non-slip records and older records. |
-| `slipVerification.algorithm` | string \| null | Currently `slip-verification-scaffold-v1`. |
-| `slipVerification.status` | enum \| null | Current scaffold uses `COMPLETED` for transfer slips to indicate the no-evidence result was recorded, not that verification logic ran. |
-| `slipVerification.result` | enum \| null | Current scaffold uses `NOT_VERIFIED` only. No success, mismatch, or external verification outcomes exist. |
-| `slipVerification.evidenceCategory` | enum \| null | Current scaffold uses `NO_EVIDENCE` only. `LOCAL_STRUCTURAL_CHECK` is reserved for future work and is not produced now. |
+| `slipVerification.algorithm` | string \| null | `slip-verification-local-structural-v1` for local structural checks; `slip-verification-scaffold-v1` for no-evidence fallback/backfill records. |
+| `slipVerification.status` | enum \| null | `COMPLETED` when a result is recorded; `SKIPPED` when supported metadata is unavailable. |
+| `slipVerification.result` | enum \| null | `STRUCTURALLY_CONSISTENT` or `STRUCTURALLY_INCONSISTENT` for local-only supported Thai QR checks; `UNSUPPORTED` or `NOT_VERIFIED` for safe non-verification outcomes. No external verification outcome exists. |
+| `slipVerification.evidenceCategory` | enum \| null | `LOCAL_STRUCTURAL_CHECK` only when local structural validation ran; `NO_EVIDENCE` when no supported local validation ran. |
 | `slipVerification.evaluatedAt` | Date \| null | When the scaffold result was recorded. |
-| `slipVerification.notes` | string[] \| null | Safe notes that no local structural validation or external provider verification was performed. |
+| `slipVerification.notes` | string[] \| null | Safe notes describing local-only checks or explaining that no validation evidence was available. Notes must not imply payment completion, bank truth, recipient truth, or authenticity. |
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
@@ -174,9 +174,9 @@ Transfer slips include stage contract entries:
 - `QR_CANDIDATE`: active QR-like region candidate analysis on the normalized derivative. No QR decoding is performed.
 - `QR_DECODE`: active QR payload decoding that stores raw decoded text without verification.
 - `TRANSFER_METADATA_PARSE`: active parsing of supported decoded transfer metadata without verification.
-- `SLIP_VERIFICATION`: planned verification stage governed by `docs/slip-verification-spec.md`; current runtime stores only a `NOT_VERIFIED` / `NO_EVIDENCE` scaffold for transfer slips.
+- `SLIP_VERIFICATION`: active local-only structural validation for parsed supported Thai QR payment metadata, governed by `docs/slip-verification-spec.md`; external truth verification remains unimplemented.
 
-Profiles document the branch, active shared stages, active transfer-slip decode/parse stages, and planned stage hints. They do not mean OCR, cheque parsing, slip verification, or bank verification has run.
+Profiles document the branch, active shared stages, active transfer-slip decode/parse stages, local-only structural slip validation, and future external-verification hints. They do not mean OCR, cheque parsing, bank/provider verification, payment completion, or slip authenticity checks have run.
 
 ## Slip Verification Backfill Policy
 

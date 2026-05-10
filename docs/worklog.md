@@ -2,6 +2,32 @@
 
 ## 2026-05-10
 
+### Local Structural Slip Verification
+
+#### Changed
+
+- Added `slip-verification-local-structural-v1` for supported Thai QR payment metadata.
+- `SLIP_VERIFICATION` now records `STRUCTURALLY_CONSISTENT` or `STRUCTURALLY_INCONSISTENT` with `LOCAL_STRUCTURAL_CHECK` only when local structural checks run.
+- Unsupported or unavailable metadata remains safe with `UNSUPPORTED` or `NOT_VERIFIED` and `NO_EVIDENCE`.
+- Updated the transfer-slip processing profile and detail-page wording to describe local structural results without implying bank/provider verification.
+- Added focused tests for consistent, inconsistent, unsupported, non-slip, API exposure, and legacy null behavior.
+- Updated README, architecture, roadmap, data-model, and slip-verification spec documentation.
+
+#### Key Decisions
+
+- Local structural validation checks parsed Thai QR payment structure only.
+- The checks do not confirm payment completion, bank truth, recipient truth, amount truth, or slip authenticity.
+- No external provider integration, OCR, cheque parsing, queue, service split, or migration was added.
+- The existing backfill remains a no-evidence legacy-shape normalization path and does not recompute structural results.
+
+#### Verification
+
+- `npm run test` - all 69 tests pass
+- `npm run typecheck`
+- `npm run lint`
+
+## 2026-05-10
+
 ### Operations Runbook
 
 #### Changed

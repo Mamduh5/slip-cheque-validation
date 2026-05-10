@@ -49,9 +49,9 @@ const transferSlipFutureStagePlan = [
   {
     key: "SLIP_VERIFICATION",
     label: "Slip verification",
-    status: "PLANNED",
+    status: "ACTIVE",
     description:
-      "Future stage for explicitly scoped verification. Local structural checks and external truth verification must remain separate."
+      "Runs local-only structural validation for supported Thai QR payment metadata. External truth verification remains unimplemented."
   }
 ] as const;
 
@@ -62,15 +62,21 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     branch: "TRANSFER_SLIP",
     family: "transfer-slip",
     description:
-      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, conservative QR-candidate analysis, QR decoding, and transfer metadata parsing. Slip verification is not implemented.",
-    currentStages: [...sharedCurrentStages, "qr-candidate-analysis", "qr-decode", "transfer-metadata-parse"],
-    futureStages: ["transfer-slip-specific-validation"],
+      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, conservative QR-candidate analysis, QR decoding, transfer metadata parsing, and local-only structural slip validation for supported Thai QR payment metadata.",
+    currentStages: [
+      ...sharedCurrentStages,
+      "qr-candidate-analysis",
+      "qr-decode",
+      "transfer-metadata-parse",
+      "slip-verification-local-structural"
+    ],
+    futureStages: ["external-truth-verification"],
     plannedStages: [...sharedActiveStagePlan, ...transferSlipFutureStagePlan],
     capabilities: {
       qrOrientedFuturePath: true,
       qrCandidateAnalysisImplemented: true,
       extractionImplemented: false,
-      verificationImplemented: false
+      verificationImplemented: true
     }
   },
   DEPOSIT_PAYMENT_SLIP: {

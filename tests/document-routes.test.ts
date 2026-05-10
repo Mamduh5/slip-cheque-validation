@@ -8,6 +8,7 @@ import { POST as uploadDocument } from "../app/api/documents/route";
 import { getDocumentProcessingProfile } from "../lib/document-processing-profiles";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
+import { attemptSlipVerification } from "../lib/slip-verification";
 import { attemptTransferMetadataParse } from "../lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
 
@@ -312,20 +313,12 @@ function buildMockTransferMetadata(documentType: DocumentType, buffer: Buffer): 
     : null;
 }
 
-function buildMockSlipVerification(documentType: DocumentType): DocumentRecord["slipVerification"] {
+function buildMockSlipVerification(documentType: DocumentType, transferMetadata: DocumentRecord["transferMetadata"]): DocumentRecord["slipVerification"] {
   return documentType === "BANK_TRANSFER_SLIP"
-    ? {
-        stage: "SLIP_VERIFICATION",
-        algorithm: "slip-verification-scaffold-v1",
-        status: "COMPLETED",
-        result: "NOT_VERIFIED",
-        evidenceCategory: "NO_EVIDENCE",
-        evaluatedAt: new Date("2026-05-08T10:00:00.000Z"),
-        notes: [
-          "Slip verification runtime scaffold recorded with no verification evidence.",
-          "No local structural validation or external provider verification has been performed."
-        ]
-      }
+    ? attemptSlipVerification({
+        transferMetadata: transferMetadata ?? null,
+        evaluatedAt: new Date("2026-05-08T10:00:00.000Z")
+      })
     : null;
 }
 
@@ -341,55 +334,59 @@ describe("document API integration boundaries", () => {
       documentId: string;
       documentType: DocumentType;
       buffer: Buffer;
-    }) => ({
-      normalizedObject: {
-        bucket: "document-images",
-        key: `documents/${input.userId}/${input.documentId}/normalized.webp`
-      },
-      normalizedImage: {
-        width: 32,
-        height: 24,
-        mimeType: "image/webp",
-        fileSize: 128,
-        algorithm: "normalized-webp-grayscale-v1"
-      },
-      processingProfile: getDocumentProcessingProfile(input.documentType),
-      qrCandidateAnalysis:
-        input.documentType === "BANK_TRANSFER_SLIP"
-          ? {
-              stage: "QR_CANDIDATE",
-              algorithm: "qr-candidate-heuristic-v1",
-              status: "COMPLETED",
-              result: input.buffer.toString("utf8").includes("qr") ? "CANDIDATE_FOUND" : "NO_CANDIDATE_FOUND",
-              checkedAt: new Date("2026-05-08T10:00:00.000Z"),
-              candidateCount: input.buffer.toString("utf8").includes("qr") ? 1 : 0,
-              bestCandidate: input.buffer.toString("utf8").includes("qr")
-                ? {
-                    x: 8,
-                    y: 8,
-                    width: 56,
-                    height: 56,
-                    confidence: 0.82,
-                    source: "normalized-image"
-                  }
-                : null,
-              notes: ["QR content was not decoded."]
-            }
-          : null,
-      qrDecode: buildMockQrDecode(input.documentType, input.buffer),
-      transferMetadata: buildMockTransferMetadata(input.documentType, input.buffer),
-      slipVerification: buildMockSlipVerification(input.documentType),
-      perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
-      qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
-      qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
-      qualityMetrics: {
-        width: 1000,
-        height: 800,
-        meanLuminance: 128,
-        sharpness: input.buffer.toString("utf8").includes("warn") ? 12 : 120
-      },
-      qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z")
-    }));
+    }) => {
+      const transferMetadata = buildMockTransferMetadata(input.documentType, input.buffer);
+
+      return {
+        normalizedObject: {
+          bucket: "document-images",
+          key: `documents/${input.userId}/${input.documentId}/normalized.webp`
+        },
+        normalizedImage: {
+          width: 32,
+          height: 24,
+          mimeType: "image/webp",
+          fileSize: 128,
+          algorithm: "normalized-webp-grayscale-v1"
+        },
+        processingProfile: getDocumentProcessingProfile(input.documentType),
+        qrCandidateAnalysis:
+          input.documentType === "BANK_TRANSFER_SLIP"
+            ? {
+                stage: "QR_CANDIDATE",
+                algorithm: "qr-candidate-heuristic-v1",
+                status: "COMPLETED",
+                result: input.buffer.toString("utf8").includes("qr") ? "CANDIDATE_FOUND" : "NO_CANDIDATE_FOUND",
+                checkedAt: new Date("2026-05-08T10:00:00.000Z"),
+                candidateCount: input.buffer.toString("utf8").includes("qr") ? 1 : 0,
+                bestCandidate: input.buffer.toString("utf8").includes("qr")
+                  ? {
+                      x: 8,
+                      y: 8,
+                      width: 56,
+                      height: 56,
+                      confidence: 0.82,
+                      source: "normalized-image"
+                    }
+                  : null,
+                notes: ["QR content was not decoded."]
+              }
+            : null,
+        qrDecode: buildMockQrDecode(input.documentType, input.buffer),
+        transferMetadata,
+        slipVerification: buildMockSlipVerification(input.documentType, transferMetadata),
+        perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
+        qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
+        qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
+        qualityMetrics: {
+          width: 1000,
+          height: 800,
+          meanLuminance: 128,
+          sharpness: input.buffer.toString("utf8").includes("warn") ? 12 : 120
+        },
+        qualityCheckedAt: new Date("2026-05-08T10:00:00.000Z")
+      };
+    });
     testState.getOriginalDocumentObject.mockReset();
     testState.getOriginalDocumentObject.mockResolvedValue(Readable.from([Buffer.from("image")]));
   });
@@ -522,7 +519,7 @@ describe("document API integration boundaries", () => {
         expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
         expect.objectContaining({ key: "QR_DECODE", status: "ACTIVE" }),
         expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "ACTIVE" }),
-        expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
+        expect.objectContaining({ key: "SLIP_VERIFICATION", status: "ACTIVE" })
       ])
     );
     expect(detail.qrCandidateAnalysis).toMatchObject({
@@ -544,7 +541,7 @@ describe("document API integration boundaries", () => {
     expect(detail.slipVerification).toMatchObject({
       stage: "SLIP_VERIFICATION",
       algorithm: "slip-verification-scaffold-v1",
-      status: "COMPLETED",
+      status: "SKIPPED",
       result: "NOT_VERIFIED",
       evidenceCategory: "NO_EVIDENCE"
     });
@@ -584,6 +581,7 @@ describe("document API integration boundaries", () => {
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
       qrDecode: DocumentRecord["qrDecode"];
       transferMetadata: DocumentRecord["transferMetadata"];
+      slipVerification: DocumentRecord["slipVerification"];
     };
 
     expect(detail.qrCandidateAnalysis).toMatchObject({
@@ -608,9 +606,15 @@ describe("document API integration boundaries", () => {
       payloadFormat: "GENERIC_URL",
       metadata: null
     });
+    expect(detail.slipVerification).toMatchObject({
+      stage: "SLIP_VERIFICATION",
+      status: "COMPLETED",
+      result: "UNSUPPORTED",
+      evidenceCategory: "NO_EVIDENCE"
+    });
   });
 
-  it("persists parsed transfer metadata for supported decoded Thai QR payloads", async () => {
+  it("persists parsed transfer metadata and local structural validation for supported decoded Thai QR payloads", async () => {
     setSession("user-1");
 
     const { body } = await upload("transfer slip qr thai image bytes", "BANK_TRANSFER_SLIP");
@@ -619,6 +623,7 @@ describe("document API integration boundaries", () => {
     });
     const detail = (await detailResponse.json()) as {
       transferMetadata: DocumentRecord["transferMetadata"];
+      slipVerification: DocumentRecord["slipVerification"];
     };
 
     expect(detail.transferMetadata).toMatchObject({
@@ -638,6 +643,14 @@ describe("document API integration boundaries", () => {
         }
       }
     });
+    expect(detail.slipVerification).toMatchObject({
+      stage: "SLIP_VERIFICATION",
+      algorithm: "slip-verification-local-structural-v1",
+      status: "COMPLETED",
+      result: "STRUCTURALLY_CONSISTENT",
+      evidenceCategory: "LOCAL_STRUCTURAL_CHECK"
+    });
+    expect(detail.slipVerification?.notes.join(" ")).toContain("does not confirm payment completion");
     expect(testState.documents[0].transferMetadata?.metadata?.merchantAccountInfo?.targetIdentifier).toBe("0066812345678");
   });
 
@@ -650,6 +663,7 @@ describe("document API integration boundaries", () => {
     });
     const detail = (await detailResponse.json()) as {
       transferMetadata: DocumentRecord["transferMetadata"];
+      slipVerification: DocumentRecord["slipVerification"];
     };
 
     expect(detail.transferMetadata).toMatchObject({
@@ -657,6 +671,11 @@ describe("document API integration boundaries", () => {
       result: "NO_STRUCTURED_METADATA",
       payloadFormat: "PLAIN_TEXT",
       metadata: null
+    });
+    expect(detail.slipVerification).toMatchObject({
+      status: "SKIPPED",
+      result: "NOT_VERIFIED",
+      evidenceCategory: "NO_EVIDENCE"
     });
   });
 
@@ -676,7 +695,7 @@ describe("document API integration boundaries", () => {
 
     const { body } = await upload("transfer slip qr image bytes", "BANK_TRANSFER_SLIP");
     expect(testState.documents[0].slipVerification).toMatchObject({
-      status: "COMPLETED",
+      status: "SKIPPED",
       result: "NOT_VERIFIED",
       evidenceCategory: "NO_EVIDENCE"
     });

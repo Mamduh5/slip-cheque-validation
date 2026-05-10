@@ -62,7 +62,12 @@ export const transferMetadataPayloadFormats = [
   "UNKNOWN_FORMAT"
 ] as const;
 export const slipVerificationStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED"] as const;
-export const slipVerificationResults = ["NOT_VERIFIED", "UNSUPPORTED"] as const;
+export const slipVerificationResults = [
+  "NOT_VERIFIED",
+  "UNSUPPORTED",
+  "STRUCTURALLY_CONSISTENT",
+  "STRUCTURALLY_INCONSISTENT"
+] as const;
 export const slipVerificationEvidenceCategories = ["NO_EVIDENCE", "LOCAL_STRUCTURAL_CHECK"] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
@@ -212,7 +217,7 @@ export interface TransferMetadataParseAnalysisResult {
 
 export interface SlipVerificationAnalysisResult {
   stage: "SLIP_VERIFICATION";
-  algorithm: "slip-verification-scaffold-v1";
+  algorithm: "slip-verification-scaffold-v1" | "slip-verification-local-structural-v1";
   status: SlipVerificationStageStatus;
   result: SlipVerificationResult;
   evidenceCategory: SlipVerificationEvidenceCategory;

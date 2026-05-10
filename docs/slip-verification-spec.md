@@ -1,10 +1,10 @@
 # Slip Verification Specification
 
-This document defines the `SLIP_VERIFICATION` stage boundary for bank transfer slips. The current runtime implementation is a safe scaffold only. No local structural verification logic, bank/provider integration, OCR, queue, or new runtime service is implemented by this document.
+This document defines the `SLIP_VERIFICATION` stage boundary for bank transfer slips. The current runtime implementation includes local-only structural validation for supported Thai QR payment metadata plus safe no-evidence fallbacks. No bank/provider integration, OCR, queue, external truth verification, or new runtime service is implemented by this document.
 
 ## Current Transfer-Slip Stage Boundary
 
-The current `BANK_TRANSFER_SLIP` path has three executed QR/metadata stages and one safe verification scaffold:
+The current `BANK_TRANSFER_SLIP` path has three executed QR/metadata stages and one local-only structural verification stage:
 
 1. `QR_CANDIDATE`
    - Detects whether a plausible QR-like region exists in the normalized image.
@@ -20,10 +20,10 @@ The current `BANK_TRANSFER_SLIP` path has three executed QR/metadata stages and 
    - Stores structured metadata as an interpretation of decoded text.
    - Does not verify authenticity, account truth, payment status, or bank truth.
 4. `SLIP_VERIFICATION`
-   - Persists a runtime scaffold object only.
-   - Records `NOT_VERIFIED` with `NO_EVIDENCE`.
-   - Does not perform local structural validation or external truth verification.
-   - Must not be implied by successful decode or parse.
+   - Runs local-only structural validation only when `transferMetadata` is parsed as supported Thai QR payment metadata.
+   - Can record `STRUCTURALLY_CONSISTENT` or `STRUCTURALLY_INCONSISTENT` with `LOCAL_STRUCTURAL_CHECK`.
+   - Uses `NOT_VERIFIED` or `UNSUPPORTED` with `NO_EVIDENCE` when supported local checks cannot run.
+   - Does not perform external truth verification and must not be implied by successful decode or parse alone.
 
 ## Definitions
 
@@ -49,12 +49,16 @@ Parsed metadata is structured interpretation of supported decoded payloads.
 
 Local structural validation means checks that can be performed entirely inside the app using already stored decoded/parsed data.
 
-Examples:
+Implemented checks for supported Thai QR payment metadata:
 
-- Required tags are present for a supported payload family.
-- Amount format is syntactically valid.
-- Currency and country tags are internally consistent with the supported payload family.
-- Parsed fields required by the stage contract are present.
+- EMV payload format indicator is present and equals `01`.
+- Country code is present and equals `TH`.
+- Currency code is present and equals `764`.
+- Thai QR merchant account information is present.
+- PromptPay target identifier is present for PromptPay payloads.
+- Biller id and reference 1 are present for bill-payment payloads.
+- Amount format is syntactically valid if present.
+- CRC tag is present. The current local check does not compute CRC validity.
 
 Local structural validation can support only a statement like "structurally consistent with supported format". It cannot support a statement that a real payment happened, that a bank account exists, or that a slip is authentic.
 
@@ -73,7 +77,7 @@ External truth verification is not implemented now. Until it is implemented, the
 
 ## Stage Contract
 
-Any future `SLIP_VERIFICATION` implementation beyond the current no-evidence scaffold should consume only explicit prior-stage outputs and declared evidence sources.
+`SLIP_VERIFICATION` consumes only explicit prior-stage outputs and declared evidence sources. The current local implementation consumes parsed `transferMetadata` only.
 
 ### Required Inputs
 
@@ -96,7 +100,7 @@ Runtime statuses should be explicit and auditable:
 
 - `NOT_APPLICABLE`: document type or profile does not support slip verification.
 - `SKIPPED`: required prior-stage inputs are unavailable or unsupported.
-- `COMPLETED`: the stage produced a result. In the current scaffold this means a no-evidence `NOT_VERIFIED` result was recorded, not that verification checks ran.
+- `COMPLETED`: the stage produced a result. This can mean local structural checks ran, an unsupported payload was classified, or a no-evidence fallback was recorded.
 - `FAILED`: verification could not complete due to system or provider error.
 
 ### Proposed Result Categories
@@ -115,7 +119,7 @@ Future result names should avoid overclaiming:
 
 ### Evidence Sources
 
-A future verification record should identify its evidence category:
+A verification record identifies its evidence category:
 
 - `LOCAL_STRUCTURAL_CHECK`
   - Implemented entirely in app logic.
@@ -134,7 +138,7 @@ A future verification record should identify its evidence category:
 
 ### Proposed Output Shape
 
-A future `slipVerification` field should remain separate from `qrDecode` and `transferMetadata`.
+The `slipVerification` field remains separate from `qrDecode` and `transferMetadata`.
 
 Suggested shape:
 
@@ -168,7 +172,7 @@ type SlipVerification = {
 };
 ```
 
-This shape is a design sketch, not a live model.
+The current live model uses the stage/status/result/evidence/timestamp/notes subset of this shape.
 
 ## Safe UI And API Terminology
 
@@ -207,7 +211,6 @@ Do not use these for raw decode, parsed metadata, or local-only checks:
 
 The following remain intentionally unimplemented:
 
-- `SLIP_VERIFICATION` runtime logic.
 - Bank/provider API integration.
 - Payment status verification.
 - Account holder, recipient, or amount truth verification.
@@ -219,7 +222,6 @@ The following remain intentionally unimplemented:
 
 When implementation becomes appropriate, do it in this order:
 
-1. Add a non-invasive `slipVerification` model with `NOT_VERIFIED` / `SKIPPED` outcomes only.
-2. Add local structural checks, explicitly labeled as local-only.
-3. Add UI/API presentation for local structural results with safe language.
-4. Only later add external provider integration if a real provider, credentials, data-retention policy, and claim semantics are defined.
+1. Keep local structural checks explicitly labeled as local-only.
+2. Add broader local checks only when they are deterministic and derived from already parsed fields.
+3. Only later add external provider integration if a real provider, credentials, data-retention policy, and claim semantics are defined.

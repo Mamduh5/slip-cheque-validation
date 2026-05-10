@@ -35,16 +35,16 @@ describe("document helpers", () => {
           qrOrientedFuturePath: true,
           qrCandidateAnalysisImplemented: true,
           extractionImplemented: false,
-          verificationImplemented: false
+          verificationImplemented: true
         },
         plannedStages: expect.arrayContaining([
           expect.objectContaining({ key: "QR_CANDIDATE", status: "ACTIVE" }),
           expect.objectContaining({ key: "QR_DECODE", status: "ACTIVE" }),
           expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "ACTIVE" }),
-          expect.objectContaining({ key: "SLIP_VERIFICATION", status: "PLANNED" })
+          expect.objectContaining({ key: "SLIP_VERIFICATION", status: "ACTIVE" })
         ]),
-        currentStages: expect.arrayContaining(["qr-candidate-analysis", "qr-decode", "transfer-metadata-parse"]),
-        futureStages: expect.arrayContaining(["transfer-slip-specific-validation"])
+        currentStages: expect.arrayContaining(["qr-candidate-analysis", "qr-decode", "transfer-metadata-parse", "slip-verification-local-structural"]),
+        futureStages: expect.arrayContaining(["external-truth-verification"])
       }
     });
     expect(getTypeAwareProcessingPlan("DEPOSIT_PAYMENT_SLIP")).toMatchObject({

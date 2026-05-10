@@ -135,17 +135,17 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Unsupported formats produce clean `UNSUPPORTED_FORMAT` or `NO_STRUCTURED_METADATA` results instead of fake business fields.
 - Non-slip types do not run the stage.
 
-## Slip Verification Runtime Scaffold
+## Slip Verification Runtime
 
-`SLIP_VERIFICATION` now has a minimal runtime scaffold for transfer-slip records. The design contract is documented in `docs/slip-verification-spec.md`.
+`SLIP_VERIFICATION` now runs local-only structural validation for supported Thai QR payment metadata and otherwise falls back to safe no-evidence outcomes. The design contract is documented in `docs/slip-verification-spec.md`.
 
 - Successful QR decode means raw QR content was extracted.
 - Successful transfer metadata parse means supported structure was interpreted from decoded QR content.
-- The current `slipVerification` field uses `status: "COMPLETED"`, `result: "NOT_VERIFIED"`, and `evidenceCategory: "NO_EVIDENCE"` for new transfer-slip uploads.
+- For parsed supported Thai QR payment metadata, `slipVerification` can use `result: "STRUCTURALLY_CONSISTENT"` or `result: "STRUCTURALLY_INCONSISTENT"` with `evidenceCategory: "LOCAL_STRUCTURAL_CHECK"`.
 - Legacy transfer-slip records with missing or null `slipVerification` remain readable. API responses coalesce missing values to `null`, and the UI shows safe "not available" wording instead of implying verification.
 - Backfill is optional and operational, not automatic at startup. `npm run backfill:slip-verification -- --dry-run` reports eligible records; `npm run backfill:slip-verification` updates only `BANK_TRANSFER_SLIP` records where `slipVerification` is missing or null. The operator checklist is in `docs/operations.md`.
-- The backfill sets only `slipVerification` to the same no-evidence scaffold used for new uploads. It does not modify duplicate, review, quality, QR-candidate, QR-decode, or transfer-metadata fields.
-- Local structural validation, if later implemented, can only say a payload is structurally consistent with supported rules.
+- The existing backfill sets only `slipVerification` to the older no-evidence scaffold for legacy shape normalization. It does not recompute local structural results and does not modify duplicate, review, quality, QR-candidate, QR-decode, or transfer-metadata fields.
+- Local structural validation checks only parsed structure: EMV payload indicator, Thai country/currency tags, Thai QR merchant account information, subtype-specific target/reference fields, optional amount syntax, and CRC tag presence.
 - External truth verification, if later implemented, requires a configured external evidence source and must identify what claim was checked.
 - Local structural consistency must not be labeled as bank/provider verification.
 - Until an external truth source exists, UI/API language must continue to say parsed values are not verified.
