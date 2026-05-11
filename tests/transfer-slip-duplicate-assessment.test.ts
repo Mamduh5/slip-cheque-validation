@@ -709,6 +709,92 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.conflicts).toContain("image-read different date/time");
   });
 
+  it("does not raise recipient conflict when titles differ (e.g. นาย vs no title)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "นาย สมชาย ใจดี", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "สมชาย ใจดี", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.conflicts).not.toContain("image-read different recipient");
+  });
+
+  it("does not raise recipient conflict when OCR fragmentation differs (fragmented vs compact)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "น า ย ส ม ช า ย ใ จ ดี", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "นาย สมชาย ใจดี", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.conflicts).not.toContain("image-read different recipient");
+  });
+
+  it("does not raise recipient conflict when นางสาว and น.ส. titles differ for same name", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "นางสาว มาลี รักดี", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "น.ส. มาลี รักดี", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.conflicts).not.toContain("image-read different recipient");
+  });
+
+  it("raises recipient conflict when receiver names are clearly different after normalization", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "นาย สมชาย ใจดี", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "นาง มาลี รักดี", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different recipient");
+  });
+
+  it("does not raise sender conflict when fragmented and compact OCR forms match after normalization", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ senderName: { value: "นาง ประไพ ดีงาม", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ senderName: { value: "ประไพ ดีงาม", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.conflicts).not.toContain("image-read different sender");
+  });
+
   it("regression: suppresses when only amount and reference differ (common real-slip scenario)", () => {
     const slipA = {
       qrDecode: makeQrDecode(null),

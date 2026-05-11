@@ -1,5 +1,5 @@
 import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
-import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare } from "@/lib/slip-ocr-normalization";
+import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare, compareThaiNames } from "@/lib/slip-ocr-normalization";
 
 export interface TransferSlipDuplicateAssessment {
   result: "MATCH" | "CONFLICT" | "INSUFFICIENT_EVIDENCE";
@@ -162,24 +162,26 @@ export function assessTransferSlipDuplicateCandidate(
 
     // --- Tier 2: supporting fields ---
 
-    // Receiver name
+    // Receiver name — uses Thai name normalization (title stripping, fragmentation collapse)
+    // and conservative comparison. EXACT and CLOSE are treated as same person; only DIFFERENT
+    // raises a conflict.
     if (isHighConfidence(newImg.receiverName) && isHighConfidence(candImg.receiverName)) {
-      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
+      if (compareThaiNames(newImg.receiverName.value, candImg.receiverName.value) === "DIFFERENT") {
         imgDirectConflicts.push("image-read different recipient");
       }
     } else if (isMediumConfidence(newImg.receiverName) && isMediumConfidence(candImg.receiverName)) {
-      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
+      if (compareThaiNames(newImg.receiverName.value, candImg.receiverName.value) === "DIFFERENT") {
         imgContributing.push("image-read different recipient");
       }
     }
 
-    // Sender name
+    // Sender name — supporting role; same Thai name normalization and comparison.
     if (isHighConfidence(newImg.senderName) && isHighConfidence(candImg.senderName)) {
-      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
+      if (compareThaiNames(newImg.senderName.value, candImg.senderName.value) === "DIFFERENT") {
         imgDirectConflicts.push("image-read different sender");
       }
     } else if (isMediumConfidence(newImg.senderName) && isMediumConfidence(candImg.senderName)) {
-      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
+      if (compareThaiNames(newImg.senderName.value, candImg.senderName.value) === "DIFFERENT") {
         imgContributing.push("image-read different sender");
       }
     }

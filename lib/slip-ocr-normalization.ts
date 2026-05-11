@@ -62,6 +62,103 @@ export function normalizeReferenceForCompare(value: string | null): string {
 }
 
 /**
+ * Normalize a Thai person or company name for comparison.
+ *
+ * Applies the following transformations (comparison path only — stored value unchanged):
+ *  1. Common OCR misread: nikhahit (U+0E4D) + sara-a (U+0E32) → sara-am (U+0E33)
+ *  2. Strip leading Thai honorific title prefix: น.ส., นางสาว, นาง, นาย
+ *     (including OCR dot-space variants like "น . ส .")
+ *  3. Collapse ALL spaces between adjacent Thai characters, eliminating both
+ *     OCR spacing fragmentation ("น า ย" → "นาย") and inconsistent word spacing.
+ *  4. Strip leading/trailing punctuation noise.
+ *  5. Normalize internal whitespace; lowercase (Thai is caseless; affects Latin only).
+ *
+ * Examples:
+ *   normalizeThaiNameForCompare("นาย สมชาย ใจดี")        → "สมชายใจดี"
+ *   normalizeThaiNameForCompare("น า ย ส ม ช า ย ใ จ ดี") → "สมชายใจดี"
+ *   normalizeThaiNameForCompare("นางสาว มาลี รักดี")     → "มาลีรักดี"
+ *   normalizeThaiNameForCompare("น.ส. มาลี รักดี")       → "มาลีรักดี"
+ *   normalizeThaiNameForCompare("น . ส . มาลี รักดี")    → "มาลีรักดี"
+ *   normalizeThaiNameForCompare("นาง ประไพ ดีงาม")       → "ประไพดีงาม"
+ *   normalizeThaiNameForCompare(null)                    → ""
+ */
+export function normalizeThaiNameForCompare(value: string | null): string {
+  if (!value) return "";
+  let v = value.trim();
+
+  // 1. Fix OCR misread: nikhahit + sara-a → sara-am
+  v = v.replace(/\u0E4D\u0E32/g, "\u0E33").replace(/\u0E4D \u0E32/g, "\u0E33");
+
+  // 2. Collapse all spaces between adjacent Thai characters FIRST.
+  //    Applied iteratively until stable to handle long fragmented runs.
+  //    Done before title stripping so fragmented titles (e.g. "น า ย" → "นาย")
+  //    become compact and can be matched by the title-strip patterns below.
+  //    Also collapses word-boundary spacing ("สมชาย ใจดี" → "สมชายใจดี").
+  //    Note: dot-separated Thai chars ("น . ส .") are NOT collapsed by this step
+  //    since dots break the Thai-whitespace-Thai adjacency pattern.
+  let prev = "";
+  do {
+    prev = v;
+    v = v.replace(/([\u0E00-\u0E7F])\s+([\u0E00-\u0E7F])/g, "$1$2");
+  } while (v !== prev);
+
+  // 3. Strip leading Thai honorific title prefix.
+  //    น.ส. pattern handled first (has dots); then multi-char titles by desc length.
+  //    \s* after each title also handles OCR that drops the space between title and
+  //    name (e.g. "นายสมชาย" with no separator). This is intentionally aggressive
+  //    since these are comparison-only normalizations and the edge case of a name
+  //    that begins with title characters never occurs in transfer-slip OCR.
+  v = v.replace(/^น\s*\.\s*ส\s*\.\s*/u, "");
+  v = v.replace(/^นางสาว\s*/u, "");
+  v = v.replace(/^นาง\s*/u, "");
+  v = v.replace(/^นาย\s*/u, "");
+
+  // 4. Strip leading/trailing punctuation noise
+  v = v.replace(/^[\s\-.,;:'"()\[\]]+/, "").replace(/[\s\-.,;:'"()\[\]]+$/, "");
+
+  // 5. Normalize whitespace and lowercase
+  return v.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * Result of a Thai name comparison used during duplicate assessment.
+ *
+ *  - EXACT        — Normalized forms are identical.
+ *  - CLOSE        — One name is a prefix of the other (≥4 chars): covers OCR truncation.
+ *  - DIFFERENT    — Names are clearly different after normalization.
+ *  - INSUFFICIENT — At least one normalized name is empty; cannot compare.
+ */
+export type ThaiNameCompareResult = "EXACT" | "CLOSE" | "DIFFERENT" | "INSUFFICIENT";
+
+/**
+ * Compare two raw OCR-extracted Thai names for duplicate-assessment purposes.
+ *
+ * Both values are normalized via normalizeThaiNameForCompare before comparison.
+ * The comparison is conservative: CLOSE is only returned for genuine OCR truncation
+ * (one name is a full prefix of the other, min 4 chars), not for arbitrary partial
+ * matches. EXACT and CLOSE are both treated as "same person" by the caller; only
+ * DIFFERENT raises a conflict.
+ *
+ * @param a - Raw stored OCR name value from one document.
+ * @param b - Raw stored OCR name value from another document.
+ */
+export function compareThaiNames(a: string | null, b: string | null): ThaiNameCompareResult {
+  const na = normalizeThaiNameForCompare(a);
+  const nb = normalizeThaiNameForCompare(b);
+
+  if (!na || !nb) return "INSUFFICIENT";
+  if (na === nb) return "EXACT";
+
+  // Conservative prefix check: one name is a prefix of the other (OCR truncation).
+  // Require the shorter form to be at least 4 chars to avoid spurious micro-prefix matches.
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer = na.length <= nb.length ? nb : na;
+  if (shorter.length >= 4 && longer.startsWith(shorter)) return "CLOSE";
+
+  return "DIFFERENT";
+}
+
+/**
  * Normalize a Thai date/time string for comparison.
  *
  * Thai bank slip OCR frequently fragments month abbreviations by inserting spaces

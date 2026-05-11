@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractFieldsFromOcrText } from "../lib/slip-image-read";
-import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare } from "../lib/slip-ocr-normalization";
+import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare, normalizeThaiNameForCompare, compareThaiNames } from "../lib/slip-ocr-normalization";
 
 describe("extractFieldsFromOcrText", () => {
   it("extracts amount from Amount line", () => {
@@ -287,5 +287,124 @@ describe("normalizeThaiDateTimeForCompare", () => {
 
   it("does not alter slash date format", () => {
     expect(normalizeThaiDateTimeForCompare("11/05/2026 10:21:00")).toBe("11/05/2026 10:21:00");
+  });
+});
+
+describe("normalizeThaiNameForCompare", () => {
+  it("returns empty string for null", () => {
+    expect(normalizeThaiNameForCompare(null)).toBe("");
+  });
+
+  it("returns empty string for empty string", () => {
+    expect(normalizeThaiNameForCompare("")).toBe("");
+  });
+
+  it("strips นาย title prefix", () => {
+    expect(normalizeThaiNameForCompare("นาย สมชาย ใจดี")).toBe("สมชายใจดี");
+  });
+
+  it("strips นาง title prefix", () => {
+    expect(normalizeThaiNameForCompare("นาง ประไพ ดีงาม")).toBe("ประไพดีงาม");
+  });
+
+  it("strips นางสาว title prefix (before partial นาง match)", () => {
+    expect(normalizeThaiNameForCompare("นางสาว มาลี รักดี")).toBe("มาลีรักดี");
+  });
+
+  it("strips น.ส. title prefix with dots", () => {
+    expect(normalizeThaiNameForCompare("น.ส. มาลี รักดี")).toBe("มาลีรักดี");
+  });
+
+  it("strips น . ส . title prefix with OCR dot-space fragmentation", () => {
+    expect(normalizeThaiNameForCompare("น . ส . มาลี รักดี")).toBe("มาลีรักดี");
+  });
+
+  it("collapses OCR-fragmented Thai characters", () => {
+    expect(normalizeThaiNameForCompare("น า ย ส ม ช า ย ใ จ ดี")).toBe("สมชายใจดี");
+  });
+
+  it("collapses word-boundary spaces between Thai chars", () => {
+    expect(normalizeThaiNameForCompare("สมชาย ใจดี")).toBe("สมชายใจดี");
+  });
+
+  it("fragmented and compact Thai name produce same normalized form", () => {
+    const fragmented = normalizeThaiNameForCompare("น า ย ส ม ช า ย ใ จ ดี");
+    const compact = normalizeThaiNameForCompare("นาย สมชาย ใจดี");
+    expect(fragmented).toBe(compact);
+  });
+
+  it("นาง and นางสาว forms of the same name produce same normalized form", () => {
+    const a = normalizeThaiNameForCompare("นางสาว มาลี รักดี");
+    const b = normalizeThaiNameForCompare("น.ส. มาลี รักดี");
+    expect(a).toBe(b);
+  });
+
+  it("aggressively strips นาย prefix even without a following space (comparison-only)", () => {
+    // After Thai-Thai collapse, title stripping uses \s* so it fires even when OCR
+    // dropped the space between title and name. This is intentional and safe for
+    // comparison-only normalization — "นายXXX" without a space never appears as a
+    // real non-title name in transfer-slip OCR.
+    expect(normalizeThaiNameForCompare("นายสมชาย")).toBe("สมชาย");
+  });
+
+  it("fixes OCR nikhahit+sara-a misread to sara-am", () => {
+    // U+0E4D U+0E32 → U+0E33 (nikhahit + sara-a → sara-am)
+    const ocrNoisy = normalizeThaiNameForCompare("สม\u0E4D\u0E32ร์");
+    const correct = normalizeThaiNameForCompare("สม\u0E33ร์");
+    expect(ocrNoisy).toBe(correct);
+  });
+
+  it("strips leading punctuation noise", () => {
+    expect(normalizeThaiNameForCompare(". สมชาย ใจดี")).toBe("สมชายใจดี");
+    expect(normalizeThaiNameForCompare("- มาลี")).toBe("มาลี");
+  });
+
+  it("lowercases Latin characters in mixed names", () => {
+    expect(normalizeThaiNameForCompare("Alice Smith")).toBe("alice smith");
+  });
+
+  it("leaves Latin-only name whitespace intact (no Thai-Thai space collapse)", () => {
+    expect(normalizeThaiNameForCompare("Alice Smith")).toBe("alice smith");
+  });
+});
+
+describe("compareThaiNames", () => {
+  it("returns INSUFFICIENT for null inputs", () => {
+    expect(compareThaiNames(null, null)).toBe("INSUFFICIENT");
+    expect(compareThaiNames("สมชาย ใจดี", null)).toBe("INSUFFICIENT");
+    expect(compareThaiNames(null, "สมชาย ใจดี")).toBe("INSUFFICIENT");
+  });
+
+  it("returns EXACT for identical names", () => {
+    expect(compareThaiNames("สมชาย ใจดี", "สมชาย ใจดี")).toBe("EXACT");
+  });
+
+  it("returns EXACT for same name with different titles", () => {
+    expect(compareThaiNames("นาย สมชาย ใจดี", "สมชาย ใจดี")).toBe("EXACT");
+    expect(compareThaiNames("นางสาว มาลี รักดี", "น.ส. มาลี รักดี")).toBe("EXACT");
+  });
+
+  it("returns EXACT for fragmented vs compact OCR forms", () => {
+    expect(compareThaiNames("น า ย ส ม ช า ย ใ จ ดี", "นาย สมชาย ใจดี")).toBe("EXACT");
+  });
+
+  it("returns CLOSE when one name is a prefix of the other (OCR truncation)", () => {
+    // First name only vs full name
+    expect(compareThaiNames("สมชาย", "สมชาย ใจดี")).toBe("CLOSE");
+    expect(compareThaiNames("สมชายใจดี", "สมชาย")).toBe("CLOSE");
+  });
+
+  it("returns DIFFERENT for clearly different names", () => {
+    expect(compareThaiNames("สมชาย ใจดี", "มาลี รักดี")).toBe("DIFFERENT");
+    expect(compareThaiNames("Alice Smith", "Bob Jones")).toBe("DIFFERENT");
+  });
+
+  it("does not return CLOSE for very short prefix matches (< 4 chars)", () => {
+    expect(compareThaiNames("สม", "สมชายใจดี")).toBe("DIFFERENT");
+  });
+
+  it("returns INSUFFICIENT when one input normalizes to empty (title only, no actual name)", () => {
+    // "นาย" alone strips to "" after title removal → cannot compare
+    expect(compareThaiNames("นาย", "สมชาย")).toBe("INSUFFICIENT");
   });
 });

@@ -239,6 +239,16 @@ Before comparing extracted field values in the duplicate assessment, values are 
 - Both fragmented and compact OCR representations of the same date/time map to the same canonical form, preventing false conflicts caused purely by tesseract spacing behaviour.
 - Non-Thai formats (ISO, slash-date, time-only) are not affected.
 
+**Thai name normalization** (`normalizeThaiNameForCompare`) and **comparison** (`compareThaiNames`):
+- Applies at comparison time only; stored raw OCR values are never mutated.
+- Strips leading honorific title prefixes — `นาย` (Mr), `นาง` (Mrs), `นางสาว`/`น.ส.` (Miss) — including OCR dot-space variants like `น . ส .`. `นางสาว` is tested before `นาง` to avoid partial stripping.
+- Fixes the common tesseract Thai misread: nikhahit (U+0E4D) + sara-a (U+0E32) is replaced by sara-am (U+0E33).
+- Collapses **all** spaces between adjacent Thai characters iteratively. This simultaneously handles OCR spacing fragmentation (`น า ย` → `นาย`) and inconsistent word-boundary spacing (`สมชาย ใจดี` → `สมชายใจดี`). Both forms produce the same canonical token for comparison.
+- Strips leading/trailing punctuation noise and normalizes remaining whitespace.
+- `compareThaiNames` returns `EXACT` (normalized strings identical), `CLOSE` (one normalized form is a prefix of the other and ≥4 chars — covers OCR truncation of long names), or `DIFFERENT`. `INSUFFICIENT` is returned when either normalized form is empty.
+- Only `DIFFERENT` raises a duplicate conflict. `EXACT` and `CLOSE` are both treated as "same person".
+- Confidence scores for name fields are not affected. The `CLOSE` path does not claim higher extraction quality; it only avoids false conflicts caused by OCR truncation.
+
 These normalizations do not affect confidence scores and do not claim that values are verified. They improve comparison reliability without over-claiming extraction quality.
 
 ## Capture Quality
