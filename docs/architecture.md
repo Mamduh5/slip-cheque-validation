@@ -229,9 +229,16 @@ Before comparing extracted field values in the duplicate assessment, values are 
 **Reference normalization** (`normalizeReferenceForCompare`):
 - Detects the Thai bank reference format: a long digit prefix (`{9-20}` chars), a `{3-5}` uppercase-letter transaction code, and a digit suffix (`{4+}` chars).
 - In the digit prefix and suffix, normalizes three common OCR character confusions: `O` (letter O) → `0` (zero), `I` (uppercase I) → `1`, `l` (lowercase L) → `1`.
+- Strips leading zeros from the digit prefix. OCR sometimes places the leading `0` of a reference on its own line, causing the captured prefix to be truncated (e.g. `16126175244BTF00250` instead of `016126175244BTF00250`). Stripping leading zeros from both sides makes them compare equal.
 - The letter-code group is left unchanged so that genuinely different transaction codes remain distinct.
 - Non-matching strings fall back to plain lowercase-and-trim comparison.
-- Consequence: `01612I214623BTF04629` and `016121214623BTF04629` compare as equal (same transaction, OCR confusion); `016126175244BTF00250` and `016121214623BTF04629` remain distinct (genuinely different transactions).
+- Consequence: `01612I214623BTF04629`, `016121214623BTF04629`, and `16121214623BTF04629` (leading-zero-truncated) all compare as equal (same transaction, OCR variants); `016126175244BTF00250` and `016121214623BTF04629` remain distinct (genuinely different transactions).
+
+**Reference extraction** (`extractTransactionReference` in `lib/slip-image-read.ts`):
+- Priority 2 (label + generic alphanumeric): all-numeric captured values must be ≥ 15 characters. Rejects short garbage like `046123` (6 chars) or `0161212158448` (13-char truncated OCR artifact) that can appear when OCR degrades the label context.
+- Priority 3 (robust contextual alphanumeric): tolerates noise after the label colon (e.g. ` : .` from OCR garbage). Looks up to 3 lines ahead for a bank-format reference.
+- Priority 3b (contextual pure-numeric, runs after Priority 5): captures 15–20 digit PromptPay-style references that appear on the line(s) after a reference label, only when no alphanumeric bank-code reference was found by higher priorities.
+- Variant scoring bonus: OCR variants that extract an alphanumeric (letter-code-bearing) reference score 1.5 points higher than variants with only a pure-numeric reference. This ensures the variant that correctly reads `BTF`/`BPP`/`ATF` beats a garbled variant where those letters were OCR-read as digits.
 
 **Thai date/time normalization** (`normalizeThaiDateTimeForCompare`):
 - Tesseract frequently fragments Thai month abbreviations by inserting spaces around Thai characters and dots (e.g., `6 พ . ค . 69 17:52` instead of `6 พ.ค.69 17:52`).

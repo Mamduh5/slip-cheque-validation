@@ -22,6 +22,12 @@
  *   - I  (uppercase letter I) → 1  (one)
  *   - l  (lowercase letter L) → 1  (one)
  *
+ * Also strips leading zeros from the digit prefix. Thai bank references always
+ * start with a date-derived digit run (e.g. "016126…"), and OCR sometimes splits
+ * the leading "0" onto its own line, causing the captured value to miss it.
+ * Stripping leading zeros on both sides makes "016126175244BTF00250" and
+ * "16126175244BTF00250" compare equal.
+ *
  * Normalization is applied only when the value matches the Thai bank reference
  * format: `{9-20 digit-like chars}{3-5 uppercase letters}{4+ digit-like chars}`.
  * This keeps the correction conservative — random alphanumeric strings are not
@@ -31,9 +37,10 @@
  * version for general string comparison.
  *
  * Examples:
- *   normalizeReferenceForCompare("01612I214623BTF04629") → "016121214623BTF04629"
- *   normalizeReferenceForCompare("O16126175244BTF00250") → "016126175244BTF00250"
- *   normalizeReferenceForCompare("016126175244BTF00250") → "016126175244BTF00250"
+ *   normalizeReferenceForCompare("01612I214623BTF04629") → "16121214623BTF04629"
+ *   normalizeReferenceForCompare("O16126175244BTF00250") → "16126175244BTF00250"
+ *   normalizeReferenceForCompare("016126175244BTF00250") → "16126175244BTF00250"
+ *   normalizeReferenceForCompare("16126175244BTF00250")  → "16126175244BTF00250" (same as above)
  *   normalizeReferenceForCompare("REF-ABC123")           → "ref-abc123" (no pattern match)
  */
 export function normalizeReferenceForCompare(value: string | null): string {
@@ -54,7 +61,12 @@ export function normalizeReferenceForCompare(value: string | null): string {
         .toUpperCase()
         .replace(/O/g, "0")   // O → 0
         .replace(/[IL]/g, "1"); // I/uppercase-L (was lowercase-l) → 1
-    return normDigitPart(m[1]) + m[2].toUpperCase() + normDigitPart(m[3]);
+    // Strip leading zeros from the prefix: OCR sometimes splits the leading digit
+    // onto its own line, causing the captured prefix to lose its leading zero
+    // (e.g. "16126175244BTF00250" vs "016126175244BTF00250"). Stripping leading
+    // zeros from both sides makes them compare equal without changing the code or suffix.
+    const prefix = normDigitPart(m[1]).replace(/^0+(?=\d{8,})/, "");
+    return prefix + m[2].toUpperCase() + normDigitPart(m[3]);
   }
 
   // Not a recognized bank reference pattern — plain comparison normalization.

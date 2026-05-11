@@ -186,6 +186,42 @@ describe("extractFieldsFromOcrText", () => {
     const result = extractFieldsFromOcrText(text);
     expect(result.transactionReference.value).toBe("REF-123");
   });
+
+  it("rejects all-numeric short reference from label (< 15 chars) to prevent garbage like '046123'", () => {
+    const text = "เลขที่รายการ: 046123 someNoise\nAmount: 100.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.transactionReference.value).toBeNull();
+  });
+
+  it("rejects all-numeric 13-char reference from label (< 15 chars) to prevent garbled bank refs", () => {
+    const text = "เลขที่รายการ: 0161212158448\nAmount: 100.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.transactionReference.value).toBeNull();
+  });
+
+  it("accepts all-numeric 18-char PromptPay reference from label (>= 15 chars)", () => {
+    const text = "เลขที่รายการ: 016125082931729327\nAmount: 200.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.transactionReference.value).toBe("016125082931729327");
+  });
+
+  it("extracts pure-numeric PromptPay reference from label line with dot-noise (contextual path)", () => {
+    const text = "เลขที่รายการ : .\n016128121551405021\nAmount: 200.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.transactionReference.value).toBe("016128121551405021");
+  });
+
+  it("returns null receiver name for 2-char value (cleanThaiName min length 3)", () => {
+    const text = "To: Se\nAmount: 100.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.receiverName.value).toBeNull();
+  });
+
+  it("extracts receiver name for 3-char minimum value", () => {
+    const text = "To: Amy\nAmount: 100.00";
+    const result = extractFieldsFromOcrText(text);
+    expect(result.receiverName.value).toBe("Amy");
+  });
 });
 
 describe("normalizeReferenceForCompare", () => {
@@ -193,25 +229,28 @@ describe("normalizeReferenceForCompare", () => {
     expect(normalizeReferenceForCompare(null)).toBe("");
   });
 
-  it("leaves a clean bank reference unchanged", () => {
-    expect(normalizeReferenceForCompare("016126175244BTF00250")).toBe("016126175244BTF00250");
-    expect(normalizeReferenceForCompare("016121214623BTF04629")).toBe("016121214623BTF04629");
+  it("normalizes clean references to leading-zero-stripped form", () => {
+    // Leading zeros are stripped from the prefix so that OCR line-split variants
+    // (e.g. "16126175244BTF00250" from OCR that put the leading 0 on its own line)
+    // compare equal to the full form.
+    expect(normalizeReferenceForCompare("016126175244BTF00250")).toBe("16126175244BTF00250");
+    expect(normalizeReferenceForCompare("016121214623BTF04629")).toBe("16121214623BTF04629");
   });
 
-  it("normalizes uppercase O to 0 in digit prefix", () => {
-    expect(normalizeReferenceForCompare("O16126175244BTF00250")).toBe("016126175244BTF00250");
+  it("normalizes uppercase O to 0 in digit prefix (and strips leading zeros)", () => {
+    expect(normalizeReferenceForCompare("O16126175244BTF00250")).toBe("16126175244BTF00250");
   });
 
-  it("normalizes uppercase I to 1 in digit prefix", () => {
-    expect(normalizeReferenceForCompare("01612I214623BTF04629")).toBe("016121214623BTF04629");
+  it("normalizes uppercase I to 1 in digit prefix (and strips leading zeros)", () => {
+    expect(normalizeReferenceForCompare("01612I214623BTF04629")).toBe("16121214623BTF04629");
   });
 
-  it("normalizes lowercase l to 1 in digit prefix", () => {
-    expect(normalizeReferenceForCompare("0l6126175244BTF00250")).toBe("016126175244BTF00250");
+  it("normalizes lowercase l to 1 in digit prefix (and strips leading zeros)", () => {
+    expect(normalizeReferenceForCompare("0l6126175244BTF00250")).toBe("16126175244BTF00250");
   });
 
   it("normalizes O to 0 in digit suffix", () => {
-    expect(normalizeReferenceForCompare("016126175244BTFO0250")).toBe("016126175244BTF00250");
+    expect(normalizeReferenceForCompare("016126175244BTFO0250")).toBe("16126175244BTF00250");
   });
 
   it("does not alter the letter code portion", () => {
@@ -237,7 +276,15 @@ describe("normalizeReferenceForCompare", () => {
   });
 
   it("handles multiple confusions in the same reference", () => {
-    expect(normalizeReferenceForCompare("Ol612l175244BTF0O250")).toBe("016121175244BTF00250");
+    expect(normalizeReferenceForCompare("Ol612l175244BTF0O250")).toBe("16121175244BTF00250");
+  });
+
+  it("makes OCR line-split leading-zero-truncated reference equal to full reference", () => {
+    // OCR sometimes splits the leading digit onto its own line; the captured value
+    // then lacks the leading 0. Both forms should normalize to the same value.
+    const truncated = normalizeReferenceForCompare("16126175244BTF00250");
+    const full = normalizeReferenceForCompare("016126175244BTF00250");
+    expect(truncated).toBe(full);
   });
 });
 

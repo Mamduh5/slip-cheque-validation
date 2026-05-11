@@ -155,6 +155,13 @@ function scoreExtraction(fields: ImageReadTransferFields, rawText: string): numb
     if (field.value !== null && field.confidence !== "NONE") {
       score += weights[key];
       if (field.confidence === "HIGH") score += 0.5;
+      // Extra bonus for a transaction reference that has the proper alphanumeric bank-ref format
+      // (digit prefix + letter code + digit suffix). This ensures variants where OCR correctly reads
+      // the letter code (e.g. "BTF") are preferred over variants where those letters are garbled
+      // to digits, which would produce a lower-quality all-numeric ref.
+      if (key === "transactionReference" && /^[0-9OIl]+[A-Za-z]{3}[A-Za-z0-9]+$/i.test(field.value)) {
+        score += 1.5;
+      }
     }
   }
 
@@ -481,11 +488,13 @@ function extractTransactionReference(lines: string[], flat: string): ImageReadFi
     return makeField(fullRefMatch[1], "HIGH", "regex-reference-full");
   }
 
-  // Priority 2: standard labels followed by any alphanumeric code (shorter/less specific)
+  // Priority 2: standard labels followed by any alphanumeric code (shorter/less specific).
+  // Guard: all-numeric captures must be ≥15 chars to avoid short garbage like "046123" (6 chars)
+  // or truncated partial values like "0161212158448" (13 chars) that arose from OCR degradation.
   const patterns = [
-    /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[\s:]*([A-Za-z0-9\-]{4,40})/i,
+    /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[\s:.,\-]*([A-Za-z0-9\-]{4,40})/i,
     /(?:Ref[:\s]+)([A-Za-z0-9\-]{4,40})/i,
-    /(?:เลขที่รายการ)[\s:]*([A-Za-z0-9\-]{4,40})/
+    /(?:เลขที่รายการ)[\s:.,\-]*([A-Za-z0-9\-]{4,40})/
   ];
 
   for (const pattern of patterns) {
@@ -493,25 +502,33 @@ function extractTransactionReference(lines: string[], flat: string): ImageReadFi
     if (match) {
       const cleaned = match[1].trim();
       if (cleaned) {
-        return makeField(cleaned, "HIGH", "regex-reference-line");
+        const isAllNumeric = /^\d+$/.test(cleaned);
+        if (!isAllNumeric || cleaned.length >= 15) {
+          return makeField(cleaned, "HIGH", "regex-reference-line");
+        }
       }
     }
   }
 
-  // Contextual: label on one line, value on next (tolerate extra text on value line)
+  // Priority 3: robust contextual for alphanumeric bank refs — line CONTAINS a reference label
+  // (tolerates noise after colon), then look at the next 1–3 lines for the reference.
+  // Handles label lines with trailing " : ." noise and line-split where the value follows on the
+  // next line. Only matches alphanumeric format (digit prefix + letter code + digits) here;
+  // the pure-numeric PromptPay case is handled at Priority 3b AFTER the line-start scan.
+  const refLabelRe = /(?:เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|Reference|Ref\.?)/i;
   for (let i = 0; i < lines.length - 1; i++) {
-    const line = lines[i];
-    if (/^(Ref\.?|Reference|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[:\s]*$/i.test(line)) {
-      const next = lines[i + 1].trim();
-      // Allow the full bank reference pattern even with trailing noise
-      const m = next.match(/^([A-Za-z0-9\-]{4,40})/);
-      if (m) {
-        return makeField(m[1], "MEDIUM", "regex-reference-contextual");
+    if (!refLabelRe.test(lines[i])) continue;
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      const candidate = lines[j].trim();
+      // Full bank-ref format: long digit prefix + 3-letter code + digits (letters in suffix OK)
+      const mFull = candidate.match(/^([0-9]{9,20}[A-Za-z]{3}[A-Za-z0-9]{4,})/);
+      if (mFull) {
+        return makeField(mFull[1], "MEDIUM", "regex-reference-contextual");
       }
     }
   }
 
-  // Fallback: look for lines that start with a bank transaction reference
+  // Priority 4: look for lines that start with a bank transaction reference
   // e.g. "016126175244BTF00250 [=]: = [=]"
   for (const line of lines) {
     const m = line.match(/^(\d{9,20}[A-Z]{3}\d{4,})/);
@@ -520,12 +537,27 @@ function extractTransactionReference(lines: string[], flat: string): ImageReadFi
     }
   }
 
-  // Last resort: search anywhere in the text for the distinctive bank reference pattern.
-  // The pattern is specific enough (long digit run + 3-letter code + digits) to warrant MEDIUM
-  // confidence even without a label, since accidental matches are rare.
+  // Priority 5: search anywhere in the text for the distinctive bank reference pattern.
+  // Runs BEFORE the pure-numeric fallback so that alphanumeric refs found elsewhere in the flat
+  // text (even when OCR garbles them on the reference line) take precedence over a nearby
+  // pure-numeric value that may be a garbled version of the same ref.
   const anywhereMatch = flat.match(/(\d{9,20}[A-Z]{3}\d{4,})/);
   if (anywhereMatch) {
     return makeField(anywhereMatch[1], "MEDIUM", "regex-reference-anywhere");
+  }
+
+  // Priority 3b: contextual pure-numeric PromptPay ref (15–20 digits on the line after a label).
+  // Last resort for slips whose reference is purely numeric (no letter code), e.g. PromptPay top-up
+  // slips. Only fires if no alphanumeric bank ref was findable at all (Priorities 1–5 all failed).
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (!refLabelRe.test(lines[i])) continue;
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      const candidate = lines[j].trim();
+      const mNumeric = candidate.match(/^(\d{15,20})(?!\d)/);
+      if (mNumeric) {
+        return makeField(mNumeric[1], "MEDIUM", "regex-reference-contextual-numeric");
+      }
+    }
   }
 
   return makeField(null, "NONE", "no-match");
@@ -686,7 +718,7 @@ function cleanThaiName(raw: string): string | null {
     .replace(/\s+/g, " ")
     .replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s\-.]/g, "")
     .trim();
-  if (cleaned.length < 2) return null;
+  if (cleaned.length < 3) return null;
   // Avoid capturing labels as names
   const lower = cleaned.toLowerCase();
   if (
