@@ -296,7 +296,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.reasonCodes).toEqual(["IMAGE_READ_BANK_MISMATCH"]);
   });
 
-  it("ignores image-read fields when confidence is not HIGH", () => {
+  it("uses MEDIUM confidence amount to suppress (amount is a strong field)", () => {
     const result = assessTransferSlipDuplicateCandidate(
       {
         qrDecode: makeQrDecode(null),
@@ -310,8 +310,146 @@ describe("assessTransferSlipDuplicateCandidate", () => {
       }
     );
 
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different amount");
+    expect(result.reasonCodes).toContain("IMAGE_READ_AMOUNT_MISMATCH");
+  });
+
+  it("uses MEDIUM confidence reference to suppress (reference is a strong field)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ transactionReference: { value: "016126175244BTF00250", confidence: "MEDIUM" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ transactionReference: { value: "016127083448102590", confidence: "MEDIUM" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different transaction reference");
+    expect(result.reasonCodes).toContain("IMAGE_READ_REFERENCE_MISMATCH");
+  });
+
+  it("ignores LOW confidence image-read fields", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "1,250.00", confidence: "LOW" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "999.00", confidence: "LOW" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
     expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
     expect(result.reasonCodes).toEqual(["IMAGE_SIMILARITY_ONLY"]);
+  });
+
+  it("suppresses when two MEDIUM supporting fields conflict (multi-signal)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            receiverName: { value: "Alice Smith", confidence: "MEDIUM" },
+            senderName: { value: "Bob Jones", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            receiverName: { value: "Charlie Brown", confidence: "MEDIUM" },
+            senderName: { value: "Dave Wilson", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different recipient");
+    expect(result.conflicts).toContain("image-read different sender");
+    expect(result.reasonCodes).toContain("IMAGE_READ_RECIPIENT_MISMATCH");
+    expect(result.reasonCodes).toContain("IMAGE_READ_SENDER_MISMATCH");
+  });
+
+  it("does not suppress on a single MEDIUM supporting field alone (insufficient for suppression)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            receiverName: { value: "Alice Smith", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            receiverName: { value: "Bob Jones", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.reasonCodes).toEqual(["IMAGE_SIMILARITY_ONLY"]);
+  });
+
+  it("includes single MEDIUM supporting field in reason codes when another conflict already exists", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            amount: { value: "500.00", confidence: "MEDIUM" },
+            dateTime: { value: "11/05/2026 10:00:00", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            amount: { value: "999.00", confidence: "MEDIUM" },
+            dateTime: { value: "12/05/2026 14:30:00", confidence: "MEDIUM" }
+          }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different amount");
+    expect(result.conflicts).toContain("image-read different date/time");
+    expect(result.reasonCodes).toContain("IMAGE_READ_AMOUNT_MISMATCH");
+    expect(result.reasonCodes).toContain("IMAGE_READ_DATETIME_MISMATCH");
   });
 
   it("uses image-read conflicts to suppress even when QR metadata is missing", () => {
@@ -362,8 +500,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.conflicts).toContain("image-read different transaction reference");
     expect(result.reasonCodes).toEqual([
       "IMAGE_READ_AMOUNT_MISMATCH",
-      "IMAGE_READ_RECIPIENT_MISMATCH",
-      "IMAGE_READ_REFERENCE_MISMATCH"
+      "IMAGE_READ_REFERENCE_MISMATCH",
+      "IMAGE_READ_RECIPIENT_MISMATCH"
     ]);
   });
 
@@ -432,9 +570,9 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.conflicts).toContain("image-read different receiver bank");
     expect(result.reasonCodes).toEqual([
       "IMAGE_READ_AMOUNT_MISMATCH",
+      "IMAGE_READ_REFERENCE_MISMATCH",
       "IMAGE_READ_RECIPIENT_MISMATCH",
       "IMAGE_READ_SENDER_MISMATCH",
-      "IMAGE_READ_REFERENCE_MISMATCH",
       "IMAGE_READ_DATETIME_MISMATCH",
       "IMAGE_READ_BANK_MISMATCH"
     ]);

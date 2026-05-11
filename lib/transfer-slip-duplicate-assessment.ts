@@ -117,72 +117,100 @@ export function assessTransferSlipDuplicateCandidate(
     }
   }
 
-  // Image-read field conflicts (conservative: only HIGH confidence fields)
+  // Image-read field conflicts — field-specific trust tiers with multi-signal combining.
+  //
+  // Tier 1 — strong fields: suppress alone at MEDIUM or higher.
+  //   • amount
+  //   • transactionReference
+  //
+  // Tier 2 — supporting fields: suppress alone at HIGH; contribute to multi-signal at MEDIUM.
+  //   • receiverName, senderName, dateTime, receiverBank
+  //
+  // Multi-signal rule: 2+ MEDIUM contributing signals suppress together, or a single
+  // contributing signal is included when another conflict already exists.
   const newImg = newDoc.slipImageRead?.extractedFields;
   const candImg = candidate.slipImageRead?.extractedFields;
 
   if (newImg && candImg) {
-    // Amount
-    if (
-      isHighConfidence(newImg.amount) &&
-      isHighConfidence(candImg.amount)
-    ) {
-      if (normalizeCompare(newImg.amount.value) !== normalizeCompare(candImg.amount.value)) {
-        conflicts.push("image-read different amount");
+    const imgStrongConflicts: string[] = [];
+    const imgDirectConflicts: string[] = [];
+    const imgContributing: string[] = [];
+
+    // --- Tier 1: strong fields ---
+
+    // Amount (MEDIUM+ trusted)
+    if (isMediumOrHigherConfidence(newImg.amount) && isMediumOrHigherConfidence(candImg.amount)) {
+      if (normalizeAmountForCompare(newImg.amount.value) !== normalizeAmountForCompare(candImg.amount.value)) {
+        imgStrongConflicts.push("image-read different amount");
       }
     }
 
-    // Receiver name
+    // Transaction reference (MEDIUM+ trusted)
     if (
-      isHighConfidence(newImg.receiverName) &&
-      isHighConfidence(candImg.receiverName)
-    ) {
-      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
-        conflicts.push("image-read different recipient");
-      }
-    }
-
-    // Sender name
-    if (
-      isHighConfidence(newImg.senderName) &&
-      isHighConfidence(candImg.senderName)
-    ) {
-      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
-        conflicts.push("image-read different sender");
-      }
-    }
-
-    // Transaction reference
-    if (
-      isHighConfidence(newImg.transactionReference) &&
-      isHighConfidence(candImg.transactionReference)
+      isMediumOrHigherConfidence(newImg.transactionReference) &&
+      isMediumOrHigherConfidence(candImg.transactionReference)
     ) {
       if (
         normalizeCompare(newImg.transactionReference.value) !==
         normalizeCompare(candImg.transactionReference.value)
       ) {
-        conflicts.push("image-read different transaction reference");
+        imgStrongConflicts.push("image-read different transaction reference");
+      }
+    }
+
+    // --- Tier 2: supporting fields ---
+
+    // Receiver name
+    if (isHighConfidence(newImg.receiverName) && isHighConfidence(candImg.receiverName)) {
+      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
+        imgDirectConflicts.push("image-read different recipient");
+      }
+    } else if (isMediumConfidence(newImg.receiverName) && isMediumConfidence(candImg.receiverName)) {
+      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
+        imgContributing.push("image-read different recipient");
+      }
+    }
+
+    // Sender name
+    if (isHighConfidence(newImg.senderName) && isHighConfidence(candImg.senderName)) {
+      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
+        imgDirectConflicts.push("image-read different sender");
+      }
+    } else if (isMediumConfidence(newImg.senderName) && isMediumConfidence(candImg.senderName)) {
+      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
+        imgContributing.push("image-read different sender");
       }
     }
 
     // Date/time
-    if (
-      isHighConfidence(newImg.dateTime) &&
-      isHighConfidence(candImg.dateTime)
-    ) {
+    if (isHighConfidence(newImg.dateTime) && isHighConfidence(candImg.dateTime)) {
       if (normalizeCompare(newImg.dateTime.value) !== normalizeCompare(candImg.dateTime.value)) {
-        conflicts.push("image-read different date/time");
+        imgDirectConflicts.push("image-read different date/time");
+      }
+    } else if (isMediumConfidence(newImg.dateTime) && isMediumConfidence(candImg.dateTime)) {
+      if (normalizeCompare(newImg.dateTime.value) !== normalizeCompare(candImg.dateTime.value)) {
+        imgContributing.push("image-read different date/time");
       }
     }
 
     // Receiver bank
-    if (
-      isHighConfidence(newImg.receiverBank) &&
-      isHighConfidence(candImg.receiverBank)
-    ) {
+    if (isHighConfidence(newImg.receiverBank) && isHighConfidence(candImg.receiverBank)) {
       if (normalizeCompare(newImg.receiverBank.value) !== normalizeCompare(candImg.receiverBank.value)) {
-        conflicts.push("image-read different receiver bank");
+        imgDirectConflicts.push("image-read different receiver bank");
       }
+    } else if (isMediumConfidence(newImg.receiverBank) && isMediumConfidence(candImg.receiverBank)) {
+      if (normalizeCompare(newImg.receiverBank.value) !== normalizeCompare(candImg.receiverBank.value)) {
+        imgContributing.push("image-read different receiver bank");
+      }
+    }
+
+    // Accumulate strong and direct conflicts immediately
+    conflicts.push(...imgStrongConflicts, ...imgDirectConflicts);
+
+    // Multi-signal: include contributing signals when 2+ exist, or when reinforcing existing conflicts
+    const hasOtherImgConflicts = imgStrongConflicts.length > 0 || imgDirectConflicts.length > 0;
+    if (imgContributing.length >= 2 || (imgContributing.length >= 1 && hasOtherImgConflicts)) {
+      conflicts.push(...imgContributing);
     }
   }
 
@@ -221,10 +249,25 @@ function isHighConfidence(field: { value: string | null; confidence: string }): 
   return field.value !== null && field.confidence === "HIGH";
 }
 
+function isMediumOrHigherConfidence(field: { value: string | null; confidence: string }): boolean {
+  return field.value !== null && (field.confidence === "HIGH" || field.confidence === "MEDIUM");
+}
+
+function isMediumConfidence(field: { value: string | null; confidence: string }): boolean {
+  return field.value !== null && field.confidence === "MEDIUM";
+}
+
 function normalizeCompare(value: string | null): string {
   if (!value) return "";
   return value
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeAmountForCompare(value: string | null): string {
+  if (!value) return "";
+  const num = parseFloat(value.replace(/[^\d.]/g, ""));
+  if (isNaN(num)) return normalizeCompare(value);
+  return String(num);
 }

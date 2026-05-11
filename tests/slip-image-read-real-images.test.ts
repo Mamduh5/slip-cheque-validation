@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { attemptSlipImageRead, extractFieldsFromOcrText } from "@/lib/slip-image-read";
+import { assessTransferSlipDuplicateCandidate } from "@/lib/transfer-slip-duplicate-assessment";
 import type { ImageReadTransferFields } from "@/lib/models";
 
 const IMAGE_DIR = path.resolve(__dirname, "image", "transfer-slip");
@@ -172,4 +173,75 @@ describe("slip-image-read real-image regression", () => {
       expect(analysis.extractedFields?.dateTime.value).not.toBeNull();
     }, 120000);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Real-image pair suppression regression
+// ---------------------------------------------------------------------------
+// Two fixture slips with clearly different transaction references, amounts, and
+// dates must not be treated as near-duplicates. They should be assessed as
+// CONFLICT when extracted fields differ, preventing a false LIKELY_DUPLICATE
+// review queue entry.
+
+describe("slip-image-read real-image pair suppression regression", () => {
+  const slipA = "016126175244BTF00250.jpg";
+  const slipB = "016121214623BTF04629.jpg";
+  const pathA = path.join(IMAGE_DIR, slipA);
+  const pathB = path.join(IMAGE_DIR, slipB);
+
+  it("has both fixture images available", () => {
+    expect(fs.existsSync(pathA)).toBe(true);
+    expect(fs.existsSync(pathB)).toBe(true);
+  });
+
+  it(
+    "clearly different slips are suppressed as CONFLICT (not treated as near-duplicates)",
+    async () => {
+      async function readSlip(filepath: string) {
+        const buffer = fs.readFileSync(filepath);
+        const normalized = await sharp(buffer)
+          .rotate()
+          .resize({ width: 1024, height: 1024, fit: "inside" })
+          .toBuffer();
+        const ocrBuffer = await sharp(buffer)
+          .rotate()
+          .resize({ width: 4096, height: 4096, fit: "inside", withoutEnlargement: true })
+          .toBuffer();
+        return attemptSlipImageRead({ normalizedBuffer: normalized, ocrBuffer });
+      }
+
+      const [readA, readB] = await Promise.all([readSlip(pathA), readSlip(pathB)]);
+
+      console.log(`\n[Pair suppression] ${slipA}: result=${readA.result}`);
+      console.log(`  amount=${readA.extractedFields?.amount.value ?? "—"} (${readA.extractedFields?.amount.confidence ?? "—"})`);
+      console.log(`  reference=${readA.extractedFields?.transactionReference.value ?? "—"} (${readA.extractedFields?.transactionReference.confidence ?? "—"})`);
+      console.log(`  dateTime=${readA.extractedFields?.dateTime.value ?? "—"}`);
+
+      console.log(`[Pair suppression] ${slipB}: result=${readB.result}`);
+      console.log(`  amount=${readB.extractedFields?.amount.value ?? "—"} (${readB.extractedFields?.amount.confidence ?? "—"})`);
+      console.log(`  reference=${readB.extractedFields?.transactionReference.value ?? "—"} (${readB.extractedFields?.transactionReference.confidence ?? "—"})`);
+      console.log(`  dateTime=${readB.extractedFields?.dateTime.value ?? "—"}`);
+
+      // Both slips must produce at least partial OCR extraction
+      expect(["EXTRACTED", "PARTIAL"]).toContain(readA.result);
+      expect(["EXTRACTED", "PARTIAL"]).toContain(readB.result);
+
+      const docA = { qrDecode: null, transferMetadata: null, slipImageRead: readA };
+      const docB = { qrDecode: null, transferMetadata: null, slipImageRead: readB };
+      const assessment = assessTransferSlipDuplicateCandidate(docA, docB);
+
+      console.log(`[Pair suppression] assessment result: ${assessment.result}`);
+      console.log(`  conflicts: ${assessment.conflicts.join(", ") || "(none)"}`);
+      console.log(`  reasonCodes: ${assessment.reasonCodes.join(", ")}`);
+
+      // These are clearly different transactions. With field-specific trust and
+      // multi-signal combining, the assessment must be CONFLICT, not INSUFFICIENT_EVIDENCE.
+      // INSUFFICIENT_EVIDENCE would mean no extracted field was trustworthy enough to compare,
+      // which would leave the slips relying on perceptual similarity alone and risk a false
+      // LIKELY_DUPLICATE classification.
+      expect(assessment.result).toBe("CONFLICT");
+      expect(assessment.conflicts.length).toBeGreaterThan(0);
+    },
+    240000
+  );
 });

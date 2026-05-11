@@ -358,8 +358,9 @@ function extractReceiverName(lines: string[], flat: string): ImageReadField {
 }
 
 function extractThaiPersonOrCompanyName(line: string): string | null {
-  // Thai titles: น.ส. (Miss), นาย (Mr), บริษัท (Company), ร้าน (Shop)
-  const titlePattern = /^(.*?)((?:น\.ส\.|นาย|บริษัท|ร้าน|ร\.ร\.)[^\n]{1,60})/;
+  // Thai titles: น.ส./นางสาว (Miss), นาย (Mr), นาง (Mrs), บริษัท (Company), ร้าน (Shop)
+  // นางสาว listed before นาง to avoid a partial prefix match consuming only "นาง".
+  const titlePattern = /^(.*?)((?:น\.ส\.|นางสาว|นาย|นาง|บริษัท|ร้าน|ร\.ร\.)[^\n]{1,60})/;
   const m = line.match(titlePattern);
   if (m) {
     const candidate = cleanThaiName(m[2]);
@@ -519,10 +520,12 @@ function extractTransactionReference(lines: string[], flat: string): ImageReadFi
     }
   }
 
-  // Last resort: search anywhere in the text for the distinctive bank reference pattern
+  // Last resort: search anywhere in the text for the distinctive bank reference pattern.
+  // The pattern is specific enough (long digit run + 3-letter code + digits) to warrant MEDIUM
+  // confidence even without a label, since accidental matches are rare.
   const anywhereMatch = flat.match(/(\d{9,20}[A-Z]{3}\d{4,})/);
   if (anywhereMatch) {
-    return makeField(anywhereMatch[1], "LOW", "regex-reference-anywhere");
+    return makeField(anywhereMatch[1], "MEDIUM", "regex-reference-anywhere");
   }
 
   return makeField(null, "NONE", "no-match");

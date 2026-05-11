@@ -203,15 +203,20 @@ For `BANK_TRANSFER_SLIP`, the duplicate decision layer is now structure-aware. A
 Evidence classes:
 
 - **Definitive positive signals** (override everything): identical `qrDecode.rawDecodedText`, identical `transferMetadata.rawPayload`.
-- **Strong conflict signals** (suppress `LIKELY_DUPLICATE` when no definitive positive exists): different `qrDecode.rawDecodedText`, different `transferMetadata.rawPayload`, different `amount`, different `merchantAccountInfo.targetIdentifier` (recipient), different `merchantAccountInfo.references.reference1` (transaction reference).
-- **Image-read conflict signals** (conservative, only `HIGH` confidence fields): different image-read `amount`, different image-read `receiverName`, different image-read `senderName`, different image-read `transactionReference`, different image-read `dateTime`, different image-read `receiverBank`.
+- **Strong conflict signals from QR/metadata** (suppress `LIKELY_DUPLICATE` when no definitive positive exists): different `qrDecode.rawDecodedText`, different `transferMetadata.rawPayload`, different `amount`, different `merchantAccountInfo.targetIdentifier` (recipient), different `merchantAccountInfo.references.reference1` (transaction reference).
+- **Image-read conflict signals — field-specific trust tiers**:
+  - *Tier 1 — strong fields*: `amount` and `transactionReference` are trusted at `MEDIUM` or higher. Either alone can suppress a near-duplicate without a definitive positive signal.
+  - *Tier 2 — supporting fields*: `receiverName`, `senderName`, `dateTime`, and `receiverBank` suppress alone at `HIGH` confidence. At `MEDIUM` confidence they contribute to multi-signal suppression.
+  - *Multi-signal combining rule*: two or more `MEDIUM`-confidence Tier-2 conflicts suppress together. A single `MEDIUM` Tier-2 conflict is also included in the suppression record when a Tier-1 conflict already exists, for maximum explainability.
 - **Weak/tie-breaker signals** (used when structured evidence is insufficient or absent): perceptual image similarity, same bank template/layout.
 
 Decision behavior:
 
 - If a definitive positive signal exists, the candidate is accepted as a duplicate regardless of other differences.
-- If any strong conflict signal (QR/metadata or image-read) exists and there is no definitive positive, the `LIKELY_DUPLICATE` classification is suppressed. The document receives `duplicateStatus: NEW` and a `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: different amount, different recipient").
-- Image-read conflicts are used only when both sides have the same field at `HIGH` confidence and the values differ. This keeps image-read evidence conservative and avoids false suppression from weak OCR.
+- If any conflict signal exists and there is no definitive positive, the `LIKELY_DUPLICATE` classification is suppressed. The document receives `duplicateStatus: NEW` and a `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: image-read different amount, image-read different transaction reference").
+- Tier-1 image-read conflicts (`amount`, `transactionReference`) fire at `MEDIUM` or `HIGH` confidence, so the system does not depend on QR metadata to suppress clearly different slips.
+- Tier-2 supporting fields require `HIGH` confidence to suppress alone, but two or more `MEDIUM` Tier-2 conflicts together are sufficient for suppression (multi-signal).
+- Structured duplicate-decision reason codes carry all conflicting fields, so the suppression is fully explainable from `duplicateDecisionReasons` without parsing freeform notes.
 - If structured evidence is insufficient (e.g., one side lacks parsed metadata and image-read fields, or neither side has the relevant fields), the system falls back to the generic perceptual-image path.
 - Non-slip document types and transfer slips without parsed metadata or useful image-read results continue to use the original image-only near-duplicate path.
 

@@ -37,6 +37,11 @@
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 - Lightweight dev regression runner (`scripts/inspect-transfer-slip.ts`) for local OCR extraction and duplicate-assessment inspection on real image fixtures without touching the database.
+- Field-specific trust tiers for image-read duplicate suppression: `amount` and `transactionReference` suppress at `MEDIUM` confidence or higher; `receiverName`, `senderName`, `dateTime`, and `receiverBank` suppress alone at `HIGH` or combine as multi-signal at `MEDIUM`. The system no longer depends on QR metadata or on a single field to suppress clearly different transfer-slip near-duplicates.
+- Promoted strong bank transaction reference pattern (`\d{9,20}[A-Z]{3}\d{4,}`) from `LOW` to `MEDIUM` extraction confidence when found anywhere in OCR text, since the pattern is specific enough to drive suppression.
+- Added Thai title `นาง` (Mrs.) and `นางสาว` (Miss, full form) to the OCR name extraction pattern so more real-slip person names are extracted with title context.
+- Numeric amount normalization in duplicate comparison so `500` and `500.00` from different OCR variants are not treated as conflicting amounts.
+- Real-image pair suppression regression test verifying two clearly different fixture slips are assessed as CONFLICT and not sent to review.
 
 ## Next Phase
 
