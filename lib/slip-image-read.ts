@@ -16,6 +16,7 @@ async function getTesseract() {
 
 export interface AttemptSlipImageReadInput {
   normalizedBuffer: Buffer;
+  ocrBuffer?: Buffer;
   readAt?: Date;
 }
 
@@ -25,7 +26,7 @@ export async function attemptSlipImageRead(
   const readAt = input.readAt ?? new Date();
 
   try {
-    const ocrText = await runMultiVariantOcr(input.normalizedBuffer);
+    const ocrText = await runMultiVariantOcr(input.ocrBuffer ?? input.normalizedBuffer);
 
     if (!ocrText || ocrText.trim().length === 0) {
       return {
@@ -99,13 +100,13 @@ async function runMultiVariantOcr(buffer: Buffer): Promise<string> {
     sharp(buffer).grayscale().resize({ width: 2048, height: 2048, fit: "inside" }).toBuffer()
   ]);
 
-  const texts: string[] = [];
+  const candidateTexts: string[] = [];
   for (const variant of variants) {
     try {
       const ret = await worker.recognize(variant);
       const text = ret.data.text?.trim() ?? "";
       if (text.length > 10) {
-        texts.push(text);
+        candidateTexts.push(text);
       }
     } catch {
       // Ignore single-variant failures
@@ -114,34 +115,94 @@ async function runMultiVariantOcr(buffer: Buffer): Promise<string> {
 
   await worker.terminate();
 
-  if (texts.length === 0) {
+  if (candidateTexts.length === 0) {
     return "";
   }
 
-  // Deduplicate lines across variants while preserving order from the longest text
-  const merged = mergeOcrTexts(texts);
-  return merged;
-}
+  // Instead of blindly merging all texts, extract fields from each variant
+  // and pick the variant with the best extraction score (most populated fields).
+  let bestText = candidateTexts[0];
+  let bestScore = scoreExtraction(extractFieldsFromOcrText(bestText), bestText);
 
-function mergeOcrTexts(texts: string[]): string {
-  // Prefer the longest text as the backbone, then append unique lines from others
-  const sorted = [...texts].sort((a, b) => b.length - a.length);
-  const backbone = sorted[0];
-  const backboneLines = new Set(backbone.split(/\r?\n/));
-  const additional: string[] = [];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const lines = sorted[i].split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.length > 0 && !backboneLines.has(trimmed)) {
-        additional.push(trimmed);
-        backboneLines.add(trimmed);
-      }
+  for (let i = 1; i < candidateTexts.length; i++) {
+    const text = candidateTexts[i];
+    const fields = extractFieldsFromOcrText(text);
+    const score = scoreExtraction(fields, text);
+    if (score > bestScore) {
+      bestScore = score;
+      bestText = text;
     }
   }
 
-  return [backbone, ...additional].join("\n");
+  return bestText;
+}
+
+function scoreExtraction(fields: ImageReadTransferFields, rawText: string): number {
+  let score = 0;
+  const weights: Record<keyof ImageReadTransferFields, number> = {
+    amount: 4,
+    transactionReference: 3,
+    dateTime: 3,
+    receiverName: 2,
+    senderName: 2,
+    receiverBank: 1,
+    senderBank: 1,
+    receiverAccountTail: 1,
+    senderAccountTail: 1
+  };
+  for (const key of Object.keys(fields) as Array<keyof ImageReadTransferFields>) {
+    const field = fields[key];
+    if (field.value !== null && field.confidence !== "NONE") {
+      score += weights[key];
+      if (field.confidence === "HIGH") score += 0.5;
+    }
+  }
+
+  // Bonus for Thai date-like patterns in raw text (encourages selecting variants with readable dates)
+  const hasThaiDate = /\d{1,2}\s*[\u0E00-\u0E7F]\s*\.?\s*[\u0E00-\u0E7F]\s*\.?\s*\d{2,4}/.test(rawText);
+  if (hasThaiDate) score += 3;
+
+  // Penalty for excessive garbage characters (non-alphanumeric, non-Thai, non-space, non-punctuation)
+  const garbageChars = (rawText.match(/[^\w\s\u0E00-\u0E7F.,:;!?@%&*()\-\/฿]/g) || []).length;
+  score -= garbageChars * 0.2;
+
+  return score;
+}
+
+function hasOcrFragmentation(text: string): boolean {
+  // Detect OCR-fragmented Thai text: three or more Thai characters
+  // separated by single spaces, which indicates tesseract inserted
+  // spaces between individual characters.
+  return /[\u0E00-\u0E7F]\s[\u0E00-\u0E7F]\s[\u0E00-\u0E7F]/.test(text);
+}
+
+function densifyThaiText(text: string): string {
+  // Tesseract often inserts spaces between Thai characters.
+  // Remove spaces that sit between two Thai characters while preserving
+  // spaces around non-Thai text and line breaks.
+  // Only apply when we detect OCR-fragmentation patterns, so clean
+  // text (e.g. unit tests with proper word spacing) is left untouched.
+  if (!hasOcrFragmentation(text)) {
+    return text;
+  }
+  let result = text;
+  let prev = "";
+  do {
+    prev = result;
+    result = result.replace(
+      /([\u0E00-\u0E7F])\s+([\u0E00-\u0E7F])/g,
+      (_, a: string, b: string) => a + b
+    );
+  } while (result !== prev);
+  return result;
+}
+
+function normalizeThaiOcr(text: string): string {
+  // Fix common tesseract Thai misreadings:
+  // - ํา (nikhahit + sara a) is often OCR'd instead of ำ (sara am)
+  return text
+    .replace(/\u0E4D\u0E32/g, "\u0E33")
+    .replace(/\u0E4D \u0E32/g, "\u0E33");
 }
 
 export function extractFieldsFromOcrText(text: string): ImageReadTransferFields {
@@ -150,8 +211,11 @@ export function extractFieldsFromOcrText(text: string): ImageReadTransferFields 
     .replace(/[\u200B\u200C\u200D\uFEFF]/g, "")
     .replace(/\n{3,}/g, "\n\n");
 
-  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
-  const flat = clean;
+  const densified = densifyThaiText(clean);
+  const normalized = normalizeThaiOcr(densified);
+
+  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+  const flat = normalized;
 
   return {
     amount: extractAmount(lines, flat),
@@ -172,12 +236,18 @@ function makeField(value: string | null, confidence: ImageReadField["confidence"
 
 function extractAmount(lines: string[], flat: string): ImageReadField {
   // Thai amount patterns: ฿1,250.00, 1,250.00, THB 1,250.00, จำนวนเงิน 1,250.00, Amount: 1,250.00, 1,250.00 Baht
+  // After densification, spaced Thai text like "บ า ท" becomes "บาท".
   const patterns = [
+    // Label on same line: "Amount: 1,250.00", "จำนวนเงิน 1,250.00", "ยอดโอน 1,250.00"
     /(?:Amount|จำนวนเงิน|ยอด|ยอดโอน|Amount\s*\(?THB\)?)[\s:]*([\d,]+(?:\.\d{1,2})?)/i,
+    // Currency-first: "THB 1,250.00", "Baht 1,250.00", "บาท 1,250.00"
     /(?:THB|Baht|บาท)[\s:]*([\d,]+(?:\.\d{1,2})?)/i,
+    // Baht symbol
     /฿\s*([\d,]+(?:\.\d{1,2})?)/,
-    /(^|\s)([\d,]+(?:\.\d{2})\s*Baht)/i,
-    /(^|\s)([\d,]+(?:\.\d{2})\s*บาท)/
+    // Number then currency: "1,250.00 Baht", "1,250.00 บาท"
+    /(^|\s)([\d,]+(?:\.\d{2})\s*(?:Baht|บาท))/i,
+    // Number then currency (Thai script): "1,250.00บาท" without space
+    /(^|\s)([\d,]+(?:\.\d{2})บาท)/i
   ];
 
   for (const pattern of patterns) {
@@ -185,24 +255,50 @@ function extractAmount(lines: string[], flat: string): ImageReadField {
     if (match) {
       const raw = match[1] || match[2] || match[0];
       const normalized = normalizeAmount(raw);
-      if (normalized) {
+      if (normalized && !isFeeAmount(normalized)) {
         return makeField(normalized, "HIGH", "regex-amount-line");
       }
     }
   }
 
-  // Fallback: look for large standalone numbers that look like amounts on their own line
-  for (const line of lines) {
-    const m = line.match(/^[\s:]*([\d,]+\.\d{2})[\s]*$/);
-    if (m) {
-      const normalized = normalizeAmount(m[1]);
-      if (normalized) {
-        return makeField(normalized, "MEDIUM", "regex-amount-standalone");
+  // Contextual: label "จำนวน" or "Amount" on one line, number on next line(s)
+  for (let i = 0; i < lines.length; i++) {
+    if (/^(จำนวน|จำนวนเงิน|Amount|ยอด|ยอดโอน)/i.test(lines[i])) {
+      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        const m = lines[j].match(/([\d,]+\.\d{2})/);
+        if (m) {
+          const normalized = normalizeAmount(m[1]);
+          if (normalized && !isFeeAmount(normalized)) {
+            return makeField(normalized, "MEDIUM", "regex-amount-contextual");
+          }
+        }
       }
     }
   }
 
+  // Fallback: look for the largest standalone number with 2 decimals on its own line
+  let bestAmount: string | null = null;
+  for (const line of lines) {
+    const m = line.match(/^[\s:]*([\d,]+\.\d{2})[\s]*$/);
+    if (m) {
+      const normalized = normalizeAmount(m[1]);
+      if (normalized && !isFeeAmount(normalized)) {
+        if (!bestAmount || parseFloat(normalized.replace(/,/g, "")) > parseFloat(bestAmount.replace(/,/g, ""))) {
+          bestAmount = normalized;
+        }
+      }
+    }
+  }
+  if (bestAmount) {
+    return makeField(bestAmount, "MEDIUM", "regex-amount-standalone");
+  }
+
   return makeField(null, "NONE", "no-match");
+}
+
+function isFeeAmount(value: string): boolean {
+  const num = parseFloat(value.replace(/,/g, ""));
+  return num === 0;
 }
 
 function normalizeAmount(raw: string): string | null {
@@ -222,7 +318,7 @@ function normalizeAmount(raw: string): string | null {
 
 function extractReceiverName(lines: string[], flat: string): ImageReadField {
   const labelPatterns = [
-    /(?:To|Receiver|Recipient|Pay\s*(?:to|ee)?|ผู้รับ|โอนเข้า)[\s:]*(.{2,80})/i,
+    /(?:To|Receiver|Recipient|Pay\s*(?:to|ee)?|ผู้รับ|โอนเข้า|ไปที่)[\s:]*(.{2,80})/i,
     /(?:To[:\s]+)([^\n]{2,80})/i,
     /(?:ผู้รับเงิน|ชื่อผู้รับ)[\s:]*(.{2,80})/
   ];
@@ -237,10 +333,10 @@ function extractReceiverName(lines: string[], flat: string): ImageReadField {
     }
   }
 
-  // Contextual: look for "To" or "ผู้รับ" on one line and the next line is a name
+  // Contextual: look for "To", "ผู้รับ", or "ไปที่" on one line and the next line is a name
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i];
-    if (/^(To|ผู้รับ|Receiver|โอนเข้า)[:\s]*$/i.test(line)) {
+    if (/^(To|ผู้รับ|Receiver|โอนเข้า|ไปที่)[:\s]*$/i.test(line)) {
       const next = cleanThaiName(lines[i + 1]);
       if (next) {
         return makeField(next, "MEDIUM", "regex-receiver-contextual");
@@ -248,12 +344,35 @@ function extractReceiverName(lines: string[], flat: string): ImageReadField {
     }
   }
 
+  // Fallback: look for Thai titles or company names that suggest a receiver
+  for (const line of lines) {
+    const name = extractThaiPersonOrCompanyName(line);
+    if (name) {
+      // Skip if this line already matched as sender via "จาก" context
+      // (handled by trying sender first in the caller pipeline)
+      return makeField(name, "LOW", "regex-receiver-title");
+    }
+  }
+
   return makeField(null, "NONE", "no-match");
+}
+
+function extractThaiPersonOrCompanyName(line: string): string | null {
+  // Thai titles: น.ส. (Miss), นาย (Mr), บริษัท (Company), ร้าน (Shop)
+  const titlePattern = /^(.*?)((?:น\.ส\.|นาย|บริษัท|ร้าน|ร\.ร\.)[^\n]{1,60})/;
+  const m = line.match(titlePattern);
+  if (m) {
+    const candidate = cleanThaiName(m[2]);
+    if (candidate && candidate.length >= 3) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function extractSenderName(lines: string[], flat: string): ImageReadField {
   const labelPatterns = [
-    /(?:From|Sender|Remitter|ผู้โอน|โอนจาก)[\s:]*(.{2,80})/i,
+    /(?:From|Sender|Remitter|ผู้โอน|โอนจาก|จ่ายจาก)[\s:]*(.{2,80})/i,
     /(?:From[:\s]+)([^\n]{2,80})/i,
     /(?:ผู้โอนเงิน|ชื่อผู้โอน)[\s:]*(.{2,80})/
   ];
@@ -270,10 +389,22 @@ function extractSenderName(lines: string[], flat: string): ImageReadField {
 
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i];
-    if (/^(From|ผู้โอน|Sender|โอนจาก)[:\s]*$/i.test(line)) {
+    if (/^(From|ผู้โอน|Sender|โอนจาก|จ่ายจาก)[:\s]*$/i.test(line)) {
       const next = cleanThaiName(lines[i + 1]);
       if (next) {
         return makeField(next, "MEDIUM", "regex-sender-contextual");
+      }
+    }
+  }
+
+  // Fallback: look for Thai titles near "จาก" (from) context
+  for (let i = 0; i < lines.length; i++) {
+    if (/จาก/i.test(lines[i])) {
+      for (let j = i; j < Math.min(i + 3, lines.length); j++) {
+        const name = extractThaiPersonOrCompanyName(lines[j]);
+        if (name) {
+          return makeField(name, "MEDIUM", "regex-sender-title-near-label");
+        }
       }
     }
   }
@@ -289,7 +420,18 @@ function extractDateTime(lines: string[], flat: string): ImageReadField {
     return makeField(matchIso[1].replace("T", " "), "HIGH", "regex-datetime-iso");
   }
 
-  // Thai/common: 11/05/2026 or 11-05-2026 with optional time
+  // Thai Buddhist calendar: 6 พ.ค. 2569 17:52 น.  or  30 เม.ย. 69, 09:32
+  // Handles both dense and spaced OCR output (e.g. "พ . ค ." → matched as-is)
+  const thaiBuddhistPattern = /(\d{1,2}(?:\s*[\u0E00-\u0E7F]\s*\.?\s*){1,5}\d{2,4})(?:[,\s]+(\d{2}:\d{2}(?::\d{2})?))?(?:\s*น\.)?/;
+  const matchThaiBuddhist = flat.match(thaiBuddhistPattern);
+  if (matchThaiBuddhist) {
+    const value = matchThaiBuddhist[2]
+      ? `${matchThaiBuddhist[1]} ${matchThaiBuddhist[2]}`.trim()
+      : matchThaiBuddhist[1];
+    return makeField(value, "HIGH", "regex-datetime-thai-buddhist");
+  }
+
+  // Thai/common slash-dash: 11/05/2026 or 11-05-2026 with optional time
   const thaiDatePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})(?:[\s,]+(\d{2}:\d{2}:\d{2}|\d{2}:\d{2}))?/;
   const matchThai = flat.match(thaiDatePattern);
   if (matchThai) {
@@ -300,12 +442,21 @@ function extractDateTime(lines: string[], flat: string): ImageReadField {
   // Date + time on adjacent lines
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i];
-    const dateMatch = line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
-    if (dateMatch) {
+    const slashDate = line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
+    if (slashDate) {
       const next = lines[i + 1];
       const timeMatch = next.match(/(\d{2}:\d{2}(:\d{2})?)/);
       if (timeMatch) {
-        return makeField(`${dateMatch[1]} ${timeMatch[1]}`, "MEDIUM", "regex-datetime-adjacent");
+        return makeField(`${slashDate[1]} ${timeMatch[1]}`, "MEDIUM", "regex-datetime-adjacent");
+      }
+    }
+    // Thai Buddhist date on one line, time on next
+    const thaiDate = line.match(/(\d{1,2}\s*[\u0E01-\u0E30\u0E32\u0E33\u0E40-\u0E46]+\.\s*\d{2,4})/);
+    if (thaiDate) {
+      const next = lines[i + 1];
+      const timeMatch = next.match(/(\d{2}:\d{2}(:\d{2})?)/);
+      if (timeMatch) {
+        return makeField(`${thaiDate[1]} ${timeMatch[1]}`, "MEDIUM", "regex-datetime-adjacent");
       }
     }
   }
@@ -321,8 +472,17 @@ function extractDateTime(lines: string[], flat: string): ImageReadField {
 }
 
 function extractTransactionReference(lines: string[], flat: string): ImageReadField {
+  // Priority 1: full bank reference code after a label (handles line breaks via flat text)
+  // e.g. "เลขที่รายการ: 016126175244BTF00250"
+  const fullRefPattern = /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[\s:]*([0-9]{9,20}[A-Z]{3}\d{4,})/i;
+  const fullRefMatch = flat.match(fullRefPattern);
+  if (fullRefMatch) {
+    return makeField(fullRefMatch[1], "HIGH", "regex-reference-full");
+  }
+
+  // Priority 2: standard labels followed by any alphanumeric code (shorter/less specific)
   const patterns = [
-    /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง)[\s:]*([A-Za-z0-9\-]{4,40})/i,
+    /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[\s:]*([A-Za-z0-9\-]{4,40})/i,
     /(?:Ref[:\s]+)([A-Za-z0-9\-]{4,40})/i,
     /(?:เลขที่รายการ)[\s:]*([A-Za-z0-9\-]{4,40})/
   ];
@@ -337,15 +497,32 @@ function extractTransactionReference(lines: string[], flat: string): ImageReadFi
     }
   }
 
-  // Contextual: label on one line, value on next
+  // Contextual: label on one line, value on next (tolerate extra text on value line)
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i];
-    if (/^(Ref\.?|Reference|เลขที่รายการ|เลขอ้างอิง)[:\s]*$/i.test(line)) {
+    if (/^(Ref\.?|Reference|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง|รายการ)[:\s]*$/i.test(line)) {
       const next = lines[i + 1].trim();
-      if (/^[A-Za-z0-9\-]{4,40}$/.test(next)) {
-        return makeField(next, "MEDIUM", "regex-reference-contextual");
+      // Allow the full bank reference pattern even with trailing noise
+      const m = next.match(/^([A-Za-z0-9\-]{4,40})/);
+      if (m) {
+        return makeField(m[1], "MEDIUM", "regex-reference-contextual");
       }
     }
+  }
+
+  // Fallback: look for lines that start with a bank transaction reference
+  // e.g. "016126175244BTF00250 [=]: = [=]"
+  for (const line of lines) {
+    const m = line.match(/^(\d{9,20}[A-Z]{3}\d{4,})/);
+    if (m) {
+      return makeField(m[1], "MEDIUM", "regex-reference-line-start");
+    }
+  }
+
+  // Last resort: search anywhere in the text for the distinctive bank reference pattern
+  const anywhereMatch = flat.match(/(\d{9,20}[A-Z]{3}\d{4,})/);
+  if (anywhereMatch) {
+    return makeField(anywhereMatch[1], "LOW", "regex-reference-anywhere");
   }
 
   return makeField(null, "NONE", "no-match");
@@ -371,6 +548,7 @@ const knownThaiBanks = [
   "Bank of Ayudhya",
   "TThanachart",
   "Government Savings Bank",
+  // Full Thai names
   "ธนาคารกสิกรไทย",
   "ธนาคารไทยพาณิชย์",
   "ธนาคารกรุงเทพ",
@@ -379,7 +557,18 @@ const knownThaiBanks = [
   "ธนาคารทหารไทย",
   "ธนาคารออมสิน",
   "ธนาคารซีไอเอ็มบี",
-  "ธนาคารยูโอบี"
+  "ธนาคารยูโอบี",
+  // Short forms used on slips (after densification)
+  "กสิกร",
+  "กรุงเทพ",
+  "กรุงไทย",
+  "กรุงศรี",
+  "ทหารไทย",
+  "ออมสิน",
+  "ไทยพาณิชย์",
+  "ธ.กสิกร",
+  "ธ.กรุงเทพ",
+  "ธ.กรุงไทย"
 ];
 
 function extractSenderBank(lines: string[], flat: string): ImageReadField {

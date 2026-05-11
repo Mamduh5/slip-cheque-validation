@@ -9,6 +9,7 @@ import { attemptSlipImageRead } from "@/lib/slip-image-read";
 import { attemptSlipVerification } from "@/lib/slip-verification";
 import { attemptTransferMetadataParse } from "@/lib/transfer-metadata-parse";
 import type { DocumentRecord, DocumentType } from "@/lib/models";
+import sharp from "sharp";
 
 export class DocumentImageProcessingError extends Error {
   constructor() {
@@ -89,7 +90,8 @@ export async function processUploadedDocumentImage(input: {
     const slipImageRead =
       processingPlan.specializedBranch === "slip"
         ? await attemptSlipImageRead({
-            normalizedBuffer: normalized.buffer
+            normalizedBuffer: normalized.buffer,
+            ocrBuffer: await sharp(input.buffer).rotate().resize({ width: 4096, height: 4096, fit: "inside", withoutEnlargement: true }).toBuffer()
           })
         : null;
 
