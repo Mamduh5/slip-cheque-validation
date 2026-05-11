@@ -35,7 +35,13 @@ export const duplicateDecisionReasons = [
   "TRANSFER_METADATA_PAYLOAD_MISMATCH",
   "IMAGE_SIMILARITY_ONLY",
   "IDENTICAL_QR_PAYLOAD",
-  "IDENTICAL_TRANSFER_METADATA_PAYLOAD"
+  "IDENTICAL_TRANSFER_METADATA_PAYLOAD",
+  "IMAGE_READ_AMOUNT_MISMATCH",
+  "IMAGE_READ_RECIPIENT_MISMATCH",
+  "IMAGE_READ_SENDER_MISMATCH",
+  "IMAGE_READ_REFERENCE_MISMATCH",
+  "IMAGE_READ_DATETIME_MISMATCH",
+  "IMAGE_READ_BANK_MISMATCH"
 ] as const;
 
 export const reviewStatuses = [
@@ -87,6 +93,9 @@ export const slipVerificationResults = [
   "STRUCTURALLY_INCONSISTENT"
 ] as const;
 export const slipVerificationEvidenceCategories = ["NO_EVIDENCE", "LOCAL_STRUCTURAL_CHECK"] as const;
+export const slipImageReadStageStatuses = ["NOT_APPLICABLE", "SKIPPED", "COMPLETED", "FAILED"] as const;
+export const slipImageReadResults = ["EXTRACTED", "PARTIAL", "NONE"] as const;
+export const imageReadFieldConfidences = ["HIGH", "MEDIUM", "LOW", "NONE"] as const;
 
 export type DocumentType = (typeof documentTypes)[number];
 export type SourceType = (typeof sourceTypes)[number];
@@ -110,6 +119,9 @@ export type TransferMetadataPayloadFormat = (typeof transferMetadataPayloadForma
 export type SlipVerificationStageStatus = (typeof slipVerificationStageStatuses)[number];
 export type SlipVerificationResult = (typeof slipVerificationResults)[number];
 export type SlipVerificationEvidenceCategory = (typeof slipVerificationEvidenceCategories)[number];
+export type SlipImageReadStageStatus = (typeof slipImageReadStageStatuses)[number];
+export type SlipImageReadResult = (typeof slipImageReadResults)[number];
+export type ImageReadFieldConfidence = (typeof imageReadFieldConfidences)[number];
 
 export interface AppUser {
   _id?: ObjectId;
@@ -246,6 +258,36 @@ export interface SlipVerificationAnalysisResult {
   notes: string[];
 }
 
+export interface ImageReadField {
+  value: string | null;
+  confidence: ImageReadFieldConfidence;
+  source: string;
+}
+
+export interface ImageReadTransferFields {
+  amount: ImageReadField;
+  senderName: ImageReadField;
+  receiverName: ImageReadField;
+  dateTime: ImageReadField;
+  transactionReference: ImageReadField;
+  senderBank: ImageReadField;
+  receiverBank: ImageReadField;
+  senderAccountTail: ImageReadField;
+  receiverAccountTail: ImageReadField;
+}
+
+export interface SlipImageReadAnalysisResult {
+  stage: "SLIP_IMAGE_READ";
+  algorithm: "slip-image-read-v1";
+  status: SlipImageReadStageStatus;
+  result: SlipImageReadResult;
+  readAt: Date;
+  extractedFields: ImageReadTransferFields | null;
+  rawOcrText: string | null;
+  notes: string[];
+  warnings: string[];
+}
+
 export interface DocumentRecord {
   _id?: ObjectId;
   userId: string;
@@ -262,6 +304,7 @@ export interface DocumentRecord {
   qrDecode?: QrDecodeAnalysisResult | null;
   transferMetadata?: TransferMetadataParseAnalysisResult | null;
   slipVerification?: SlipVerificationAnalysisResult | null;
+  slipImageRead?: SlipImageReadAnalysisResult | null;
   status: DocumentStatus;
   duplicateStatus: DuplicateStatus;
   duplicateDecisionType: DuplicateDecisionType | null;

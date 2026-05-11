@@ -24,6 +24,18 @@ function conflictToReasonCode(conflict: string): DuplicateDecisionReason {
       return "QR_PAYLOAD_MISMATCH";
     case "different transfer metadata payload":
       return "TRANSFER_METADATA_PAYLOAD_MISMATCH";
+    case "image-read different amount":
+      return "IMAGE_READ_AMOUNT_MISMATCH";
+    case "image-read different recipient":
+      return "IMAGE_READ_RECIPIENT_MISMATCH";
+    case "image-read different sender":
+      return "IMAGE_READ_SENDER_MISMATCH";
+    case "image-read different transaction reference":
+      return "IMAGE_READ_REFERENCE_MISMATCH";
+    case "image-read different date/time":
+      return "IMAGE_READ_DATETIME_MISMATCH";
+    case "image-read different receiver bank":
+      return "IMAGE_READ_BANK_MISMATCH";
     default:
       return "IMAGE_SIMILARITY_ONLY";
   }
@@ -44,10 +56,12 @@ export function assessTransferSlipDuplicateCandidate(
   newDoc: {
     qrDecode: DocumentRecord["qrDecode"];
     transferMetadata: DocumentRecord["transferMetadata"];
+    slipImageRead: DocumentRecord["slipImageRead"];
   },
   candidate: {
     qrDecode: DocumentRecord["qrDecode"];
     transferMetadata: DocumentRecord["transferMetadata"];
+    slipImageRead: DocumentRecord["slipImageRead"];
   }
 ): TransferSlipDuplicateAssessment {
   const conflicts: string[] = [];
@@ -103,6 +117,75 @@ export function assessTransferSlipDuplicateCandidate(
     }
   }
 
+  // Image-read field conflicts (conservative: only HIGH confidence fields)
+  const newImg = newDoc.slipImageRead?.extractedFields;
+  const candImg = candidate.slipImageRead?.extractedFields;
+
+  if (newImg && candImg) {
+    // Amount
+    if (
+      isHighConfidence(newImg.amount) &&
+      isHighConfidence(candImg.amount)
+    ) {
+      if (normalizeCompare(newImg.amount.value) !== normalizeCompare(candImg.amount.value)) {
+        conflicts.push("image-read different amount");
+      }
+    }
+
+    // Receiver name
+    if (
+      isHighConfidence(newImg.receiverName) &&
+      isHighConfidence(candImg.receiverName)
+    ) {
+      if (normalizeCompare(newImg.receiverName.value) !== normalizeCompare(candImg.receiverName.value)) {
+        conflicts.push("image-read different recipient");
+      }
+    }
+
+    // Sender name
+    if (
+      isHighConfidence(newImg.senderName) &&
+      isHighConfidence(candImg.senderName)
+    ) {
+      if (normalizeCompare(newImg.senderName.value) !== normalizeCompare(candImg.senderName.value)) {
+        conflicts.push("image-read different sender");
+      }
+    }
+
+    // Transaction reference
+    if (
+      isHighConfidence(newImg.transactionReference) &&
+      isHighConfidence(candImg.transactionReference)
+    ) {
+      if (
+        normalizeCompare(newImg.transactionReference.value) !==
+        normalizeCompare(candImg.transactionReference.value)
+      ) {
+        conflicts.push("image-read different transaction reference");
+      }
+    }
+
+    // Date/time
+    if (
+      isHighConfidence(newImg.dateTime) &&
+      isHighConfidence(candImg.dateTime)
+    ) {
+      if (normalizeCompare(newImg.dateTime.value) !== normalizeCompare(candImg.dateTime.value)) {
+        conflicts.push("image-read different date/time");
+      }
+    }
+
+    // Receiver bank
+    if (
+      isHighConfidence(newImg.receiverBank) &&
+      isHighConfidence(candImg.receiverBank)
+    ) {
+      if (normalizeCompare(newImg.receiverBank.value) !== normalizeCompare(candImg.receiverBank.value)) {
+        conflicts.push("image-read different receiver bank");
+      }
+    }
+  }
+
   // Definitive match wins over everything
   if (definitiveMatches.length > 0) {
     return {
@@ -132,4 +215,16 @@ export function assessTransferSlipDuplicateCandidate(
     notes: "Insufficient structured evidence; rely on perceptual similarity",
     reasonCodes: ["IMAGE_SIMILARITY_ONLY"]
   };
+}
+
+function isHighConfidence(field: { value: string | null; confidence: string }): boolean {
+  return field.value !== null && field.confidence === "HIGH";
+}
+
+function normalizeCompare(value: string | null): string {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }

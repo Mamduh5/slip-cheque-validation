@@ -91,6 +91,7 @@ export function buildUploadedDocumentRecord(input: {
   qrDecode: DocumentRecord["qrDecode"];
   transferMetadata: DocumentRecord["transferMetadata"];
   slipVerification: DocumentRecord["slipVerification"];
+  slipImageRead: DocumentRecord["slipImageRead"];
   exactHash: string;
   perceptualHash: string | null;
   qualityStatus: DocumentRecord["qualityStatus"];
@@ -116,6 +117,7 @@ export function buildUploadedDocumentRecord(input: {
     qrDecode: input.qrDecode,
     transferMetadata: input.transferMetadata,
     slipVerification: input.slipVerification,
+    slipImageRead: input.slipImageRead,
     status: input.perceptualHash ? "READY" : "UPLOADED",
     duplicateStatus: input.duplicateDecision.duplicateStatus,
     duplicateDecisionType: input.duplicateDecision.duplicateDecisionType,
@@ -216,6 +218,7 @@ export async function findDuplicateMatchForUser(input: {
   documentType: DocumentType;
   qrDecode: DocumentRecord["qrDecode"];
   transferMetadata: DocumentRecord["transferMetadata"];
+  slipImageRead: DocumentRecord["slipImageRead"];
   excludeDocumentId?: ObjectId;
 }): Promise<DuplicateMatchResult | null> {
   const db = await getDb();
@@ -240,7 +243,8 @@ export async function findDuplicateMatchForUser(input: {
         perceptualHash: 1,
         createdAt: 1,
         qrDecode: 1,
-        transferMetadata: 1
+        transferMetadata: 1,
+        slipImageRead: 1
       }
     })
     .sort({ createdAt: 1, _id: 1 })
@@ -283,14 +287,19 @@ export async function findDuplicateMatchForUser(input: {
     return null;
   }
 
-  // For transfer slips with parsed metadata, run structured assessment on all candidates
-  if (input.documentType === "BANK_TRANSFER_SLIP" && input.transferMetadata?.result === "PARSED") {
+  // For transfer slips, run structured assessment when we have parsed metadata or useful image-read fields
+  const hasStructuredEvidence =
+    input.transferMetadata?.result === "PARSED" ||
+    (input.slipImageRead?.result === "EXTRACTED" || input.slipImageRead?.result === "PARTIAL");
+
+  if (input.documentType === "BANK_TRANSFER_SLIP" && hasStructuredEvidence) {
     for (const match of matches) {
       const assessment = assessTransferSlipDuplicateCandidate(
-        { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata },
+        { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata, slipImageRead: input.slipImageRead },
         {
           qrDecode: match.document.qrDecode,
-          transferMetadata: match.document.transferMetadata
+          transferMetadata: match.document.transferMetadata,
+          slipImageRead: match.document.slipImageRead
         }
       );
       if (assessment.result !== "CONFLICT") {
@@ -303,10 +312,11 @@ export async function findDuplicateMatchForUser(input: {
 
     // All top candidates had strong conflicts
     const firstConflict = assessTransferSlipDuplicateCandidate(
-      { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata },
+      { qrDecode: input.qrDecode, transferMetadata: input.transferMetadata, slipImageRead: input.slipImageRead },
       {
         qrDecode: matches[0].document.qrDecode,
-        transferMetadata: matches[0].document.transferMetadata
+        transferMetadata: matches[0].document.transferMetadata,
+        slipImageRead: matches[0].document.slipImageRead
       }
     );
 
@@ -369,6 +379,7 @@ export async function createUploadedDocument(input: {
           documentType: input.documentType,
           qrDecode: processedImage.qrDecode,
           transferMetadata: processedImage.transferMetadata,
+          slipImageRead: processedImage.slipImageRead,
           excludeDocumentId: documentId
         })
       : null;
@@ -412,6 +423,7 @@ export async function createUploadedDocument(input: {
     qrDecode: processedImage.qrDecode,
     transferMetadata: processedImage.transferMetadata,
     slipVerification: processedImage.slipVerification,
+    slipImageRead: processedImage.slipImageRead,
     exactHash,
     perceptualHash: processedImage.perceptualHash,
     qualityStatus: processedImage.qualityStatus,

@@ -21,6 +21,7 @@ function makeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
     qrDecode: null,
     transferMetadata: null,
     slipVerification: null,
+    slipImageRead: null,
     status: "READY",
     duplicateStatus: "NEW",
     duplicateDecisionType: null,

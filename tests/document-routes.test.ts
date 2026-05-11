@@ -375,6 +375,7 @@ describe("document API integration boundaries", () => {
         qrDecode: buildMockQrDecode(input.documentType, input.buffer),
         transferMetadata,
         slipVerification: buildMockSlipVerification(input.documentType, transferMetadata),
+        slipImageRead: null,
         perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
         qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
         qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],

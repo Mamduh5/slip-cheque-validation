@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     qrDecode: record.qrDecode ?? null,
     transferMetadata: record.transferMetadata ?? null,
     slipVerification: record.slipVerification ?? null,
+    slipImageRead: record.slipImageRead ?? null,
     duplicateStatus: record.duplicateStatus,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,

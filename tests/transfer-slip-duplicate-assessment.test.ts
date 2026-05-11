@@ -62,8 +62,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
   it("returns MATCH for identical raw QR payloads", () => {
     const payload = "00020101021129370016A00000067701011101130066812345678...";
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata(null, null, null, null) },
-      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata(null, null, null, null) }
+      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) },
+      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) }
     );
 
     expect(result.result).toBe("MATCH");
@@ -74,8 +74,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different raw QR payloads", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("payload-a-123"), transferMetadata: makeTransferMetadata(null, null, null, null) },
-      { qrDecode: makeQrDecode("payload-b-456"), transferMetadata: makeTransferMetadata(null, null, null, null) }
+      { qrDecode: makeQrDecode("payload-a-123"), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) },
+      { qrDecode: makeQrDecode("payload-b-456"), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -87,8 +87,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different amounts", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("73.00", "0812345678", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("40.00", "0812345678", "REF001", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("73.00", "0812345678", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("40.00", "0812345678", "REF001", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -98,8 +98,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different recipients", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0822222222", "REF001", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0822222222", "REF001", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -109,8 +109,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different transaction references", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF002", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF001", null) },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF002", null) }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -120,8 +120,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different raw metadata payloads", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata(null, null, null, "payload-abc") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata(null, null, null, "payload-def") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, "payload-abc") },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, "payload-def") }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -131,8 +131,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns MATCH when definitive signals align (identical QR and raw payload)", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "same-payload") },
-      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "same-payload") }
+      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "same-payload") },
+      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "same-payload") }
     );
 
     expect(result.result).toBe("MATCH");
@@ -143,7 +143,7 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns INSUFFICIENT_EVIDENCE when only one side has structured data", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("some-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "payload") },
+      { qrDecode: makeQrDecode("some-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "payload") },
       { qrDecode: makeQrDecode(null), transferMetadata: null }
     );
 
@@ -165,8 +165,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT when strong conflicts exist even if other fields match", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "payload-a") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF002", "payload-b") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "payload-a") },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF002", "payload-b") }
     );
 
     expect(result.result).toBe("CONFLICT");

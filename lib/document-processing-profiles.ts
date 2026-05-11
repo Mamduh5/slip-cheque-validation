@@ -62,12 +62,13 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     branch: "TRANSFER_SLIP",
     family: "transfer-slip",
     description:
-      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, conservative QR-candidate analysis, QR decoding, transfer metadata parsing, and local-only structural slip validation for supported Thai QR payment metadata.",
+      "Slip-first branch. Current runtime uses shared image quality, duplicate checks, conservative QR-candidate analysis, QR decoding, transfer metadata parsing, slip image reading with OCR field extraction, and local-only structural slip validation for supported Thai QR payment metadata.",
     currentStages: [
       ...sharedCurrentStages,
       "qr-candidate-analysis",
       "qr-decode",
       "transfer-metadata-parse",
+      "slip-image-read",
       "slip-verification-local-structural"
     ],
     futureStages: ["external-truth-verification"],
@@ -75,7 +76,7 @@ const profiles: Record<DocumentType, DocumentProcessingProfileSnapshot> = {
     capabilities: {
       qrOrientedFuturePath: true,
       qrCandidateAnalysisImplemented: true,
-      extractionImplemented: false,
+      extractionImplemented: true,
       verificationImplemented: true
     }
   },
