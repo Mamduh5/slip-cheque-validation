@@ -48,6 +48,16 @@
 - Normalization is applied in the duplicate assessment comparison path; raw OCR values stored in document records are unchanged.
 - Inspector script (`inspect-transfer-slip.ts`) shows a "Norm. ref" or "Norm. datetime" line when the normalized comparison value differs visibly from the stored raw value.
 
+- Dedicated review queue at `/review` surfacing all `LIKELY_DUPLICATE` + `PENDING` documents with compact cards showing key OCR-derived fields (amount, receiver, reference, date/time), visual similarity, matched document filename, and quick triage actions.
+- Side-by-side compare page at `/review/[id]` showing both slip images, a structured field comparison table with difference highlighting, and prominent review action buttons. Low-confidence fields excluded from the comparison table to reduce noise. Links to full detail for both documents.
+- Dashboard pending-review banner: when items are waiting, a count badge with a direct link to the review queue appears above the filter bar.
+- Review link added to the authenticated navigation header.
+- Two-level information density on the document detail page: primary review decision, images, and quality warnings are always visible; "Document metadata", "Image-read fields", "Transfer slip analysis", and "Technical identifiers" are collapsed behind expandable sections, reducing cognitive load for triage work.
+- `lib/review-helpers.ts`: extracted and unit-tested field comparison helpers (`reviewValuesMatch`, `getImageReadField`, `getImageReadConfidence`, `isLowConfidence`, `REVIEW_FIELD_LABELS`) that power the compare page without mixing display logic into lib code.
+- `getReviewQueueForUser(userId)` data function in `lib/documents.ts` that batches matched-document lookups in one query rather than N+1 fetches.
+- No new duplicate logic, statuses, or verification claims introduced. Compact mode summarises existing stored truth only.
+- OCR comparison normalisation improvements (leading-zero prefix strip on `normalizeReferenceForCompare`, robust contextual reference extraction with Priority 3b for pure-numeric PromptPay refs, all-numeric reference garbage filter in Priority 2, cleanThaiName min-length guard).
+
 ## Next Phase
 
 - Add a provider-specific CI workflow only when the target provider is known.

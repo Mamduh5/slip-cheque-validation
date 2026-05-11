@@ -32,6 +32,9 @@ export function AuthNav({
       <Link className="rounded-md px-3 py-2 hover:bg-white" href="/dashboard">
         Dashboard
       </Link>
+      <Link className="rounded-md px-3 py-2 hover:bg-white" href="/review">
+        Review
+      </Link>
       <button
         className="rounded-md border border-line bg-white px-3 py-2 hover:border-slate-400"
         type="button"

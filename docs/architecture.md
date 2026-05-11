@@ -8,6 +8,28 @@
 - `types/`: NextAuth session type extensions.
 - `docs/`: project memory for future work.
 
+## Review Queue Workflow
+
+The review workflow surfaces documents with `duplicateStatus: LIKELY_DUPLICATE` and `reviewStatus: PENDING` through a dedicated first-class queue.
+
+**Routes:**
+- `/review` — Review queue page. Lists all pending items for the authenticated user. Shows compact cards with key OCR-derived fields (amount, receiver, reference, date/time), similarity score, and the matched document name. Two quick actions per card: **Compare & review** (goes to the compare page) and **Full detail** (goes to the document detail page).
+- `/review/[id]` — Side-by-side compare page. Shows both images, a structured field comparison table with OCR-derived fields side by side, difference highlighting, and review action buttons (Confirm duplicate / Mark not duplicate). Low-confidence fields are excluded from the comparison table. Links to full detail for both documents. Also handles already-reviewed items gracefully (shows the recorded decision, no action buttons).
+- `/dashboard` — Shows a pending-review count banner that links to `/review` when items are waiting.
+
+**Data layer:**
+- `getReviewQueueForUser(userId)` in `lib/documents.ts` — fetches LIKELY_DUPLICATE + PENDING documents for a user, batches the matched-document lookup in a single query, and returns pairs.
+
+**Information density:**
+- **Compact (default):** review queue cards and compare page show only decision-relevant fields. OCR fields, QR details, structural analysis, and technical identifiers are hidden.
+- **Full detail:** the existing `/documents/[id]` page exposes everything, reorganised into collapsible sections so primary content is visible on first load.
+
+**Collapsible sections** (`components/collapsible-section.tsx`): a thin client component wrapping any children behind a toggle button. Used on the document detail page to collapse "Document metadata", "Image-read fields", "Transfer slip analysis", and "Technical identifiers" behind on-demand expansion. The primary review decision and images remain always visible.
+
+**Field comparison helpers** (`lib/review-helpers.ts`): pure helpers for the compare page, exported and unit-tested independently of the page component. Includes `reviewValuesMatch` (display-only string comparison — does not apply OCR normalisation; that responsibility stays in `normalizeReferenceForCompare`), `getImageReadField`, `getImageReadConfidence`, and `isLowConfidence`.
+
+**Semantics preserved:** compact mode summarises existing stored truth. No new verification claims, no new duplicate logic, and no new statuses are introduced. The review decision API (`POST /api/documents/[id]/review`) is unchanged.
+
 Imports use a TypeScript `paths` mapping for `@/*` without `baseUrl`. This keeps existing imports concise while avoiding deprecated `baseUrl` behavior in newer TypeScript versions.
 
 ## Auth

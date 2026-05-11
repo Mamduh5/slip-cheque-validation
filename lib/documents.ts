@@ -484,6 +484,39 @@ export async function createUploadedDocument(input: {
 }
 
 
+export async function getReviewQueueForUser(userId: string): Promise<
+  Array<{ document: DocumentRecord; matchedDocument: DocumentRecord | null }>
+> {
+  await ensureDocumentIndexes();
+  const db = await getDb();
+
+  const pending = await db
+    .collection<DocumentRecord>("documents")
+    .find({ userId, duplicateStatus: "LIKELY_DUPLICATE", reviewStatus: "PENDING" })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .toArray();
+
+  const validMatchedIds = pending
+    .filter((d) => d.matchedDocumentId && ObjectId.isValid(d.matchedDocumentId))
+    .map((d) => new ObjectId(d.matchedDocumentId as string));
+
+  const matchedDocs =
+    validMatchedIds.length > 0
+      ? await db
+          .collection<DocumentRecord>("documents")
+          .find({ _id: { $in: validMatchedIds }, userId })
+          .toArray()
+      : [];
+
+  const matchedById = new Map(matchedDocs.map((d) => [String(d._id), d]));
+
+  return pending.map((doc) => ({
+    document: doc,
+    matchedDocument: doc.matchedDocumentId ? (matchedById.get(doc.matchedDocumentId) ?? null) : null
+  }));
+}
+
 export async function getRecentDocumentsForUser(
   userId: string,
   input: {

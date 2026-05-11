@@ -4,7 +4,7 @@ import { ReviewStatusPill } from "@/components/review-status-pill";
 import { DashboardFilters } from "@/components/dashboard-filters";
 import { formatDocumentType } from "@/lib/document-types";
 import { duplicateStatuses, documentTypes } from "@/lib/models";
-import { getRecentDocumentsForUser } from "@/lib/documents";
+import { getRecentDocumentsForUser, getReviewQueueForUser } from "@/lib/documents";
 import { type DocumentReviewFilter } from "@/lib/formatters";
 import { parseSuppressionReasons } from "@/lib/document-result-summary";
 import { requireUser } from "@/lib/session";
@@ -103,11 +103,15 @@ export default async function DashboardPage({
   const reviewFilter = parseReviewFilter(resolvedSearchParams?.review);
   const documentTypeFilter = parseDocumentTypeFilter(resolvedSearchParams?.documentType);
   const duplicateStatusFilter = parseDuplicateStatusFilter(resolvedSearchParams?.duplicateStatus);
-  const documents = await getRecentDocumentsForUser(user.id, {
-    reviewFilter,
-    documentType: documentTypeFilter,
-    duplicateStatus: duplicateStatusFilter
-  });
+  const [documents, reviewQueue] = await Promise.all([
+    getRecentDocumentsForUser(user.id, {
+      reviewFilter,
+      documentType: documentTypeFilter,
+      duplicateStatus: duplicateStatusFilter
+    }),
+    getReviewQueueForUser(user.id)
+  ]);
+  const pendingCount = reviewQueue.length;
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
@@ -125,6 +129,18 @@ export default async function DashboardPage({
           Upload document
         </Link>
       </div>
+
+      {pendingCount > 0 && (
+        <Link
+          href="/review"
+          className="mb-5 flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm hover:bg-orange-100"
+        >
+          <span className="text-orange-900">
+            <strong>{pendingCount}</strong> item{pendingCount === 1 ? "" : "s"} pending review
+          </span>
+          <span className="font-medium text-accent hover:text-accent-dark">Open review queue →</span>
+        </Link>
+      )}
 
       <DashboardFilters
         reviewFilter={reviewFilter}
