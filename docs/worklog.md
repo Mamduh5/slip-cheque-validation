@@ -2,6 +2,49 @@
 
 ## 2026-05-11
 
+### Dev Regression Runner for OCR and Duplicate Assessment
+
+#### Changed
+
+- Added `scripts/inspect-transfer-slip.ts`, a lightweight CLI dev runner for inspecting OCR extraction and duplicate-assessment behavior on real transfer-slip images.
+  - Reads one or two image paths from CLI arguments.
+  - Bare filenames resolve under `tests/image/transfer-slip/`; absolute and relative paths also work.
+  - Runs the real `attemptSlipImageRead` pipeline using the same preprocessing (1024px normalized + 4096px OCR buffers) as production.
+  - Prints a human-readable report per image: status, all extracted fields with confidence levels, warnings, and notes.
+  - When two images are provided, constructs minimal document-like objects and runs `assessTransferSlipDuplicateCandidate` plus `resolveDuplicateDecision`.
+  - Duplicate-assessment output includes: assessment result, decision type, conflicts, reason codes, and an honest outcome description.
+  - Supports `--json` for machine-readable output and `--list-fixtures` to enumerate available test images.
+  - Labels all extracted values as OCR-derived and unverified. Does not claim bank/provider truth.
+- Added `lib/dev/inspect-formatters.ts` with pure formatting helpers (`resolveImagePath`, `formatField`, `formatFieldsLines`, `formatFields`).
+- Added `tests/inspect-formatters.test.ts` with 8 focused tests covering path resolution, field formatting, and fields-line generation.
+- Installed `tsx` as a dev dependency to enable running `.ts` scripts directly.
+- Updated documentation:
+  - `README.md`: Added dev/regression runner commands and examples.
+  - `docs/architecture.md`: Added "Dev / Regression Runner" section.
+  - `docs/operations.md`: Added "Inspect Transfer-Slip OCR and Duplicate Assessment (Dev Only)" runbook section.
+  - `docs/roadmap.md`: Listed the regression runner under V1 scaffold.
+
+#### Key Decisions
+
+- The runner is strictly a dev/debug tool. It is not a web endpoint and not part of production runtime.
+- It does not touch MongoDB, MinIO, or any external service. It reads images from the local filesystem only.
+- It reuses the real `attemptSlipImageRead`, `assessTransferSlipDuplicateCandidate`, and `resolveDuplicateDecision` functions rather than duplicating logic.
+- For pair assessment, QR decode and transfer metadata are passed as `null` so the assessment focuses on image-read conflicts, which is the primary use case for debugging real-image behavior.
+- Output is honest and non-overclaiming: "OCR-derived", "unverified", "simulated decision", "would be treated as".
+
+#### Verification
+
+- `npm run test` - all 185 tests pass (8 new formatter tests, existing suite unchanged)
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- Sample runner invocations verified against real fixture images:
+  - `npx tsx scripts/inspect-transfer-slip.ts --list-fixtures`
+  - `npx tsx scripts/inspect-transfer-slip.ts 016126175244BTF00250.jpg`
+  - `npx tsx scripts/inspect-transfer-slip.ts 016126175244BTF00250.jpg 016120093227BTF03543.jpg`
+  - `npx tsx scripts/inspect-transfer-slip.ts --json 016126175244BTF00250.jpg 016120093227BTF03543.jpg`
+
+## 2026-05-11
+
 ### Image-Read Visibility, Debug Transparency, and Real-Image Regression
 
 #### Changed

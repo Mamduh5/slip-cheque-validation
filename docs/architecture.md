@@ -389,6 +389,20 @@ Skipping reviewed pairs is pair-specific, not document-wide. If a pair was marke
 
 OCR, cheque field extraction, slip verification, and bank verification remain later pipeline stages, not the core v1 intake path.
 
+## Dev / Regression Runner
+
+A local CLI script (`scripts/inspect-transfer-slip.ts`) lets developers inspect OCR extraction and duplicate-assessment behavior on real image files without touching the database or running the full web app.
+
+- Reads one or two image paths from CLI arguments.
+- Bare filenames resolve under `tests/image/transfer-slip/`; absolute and relative paths also work.
+- Runs the real `attemptSlipImageRead` pipeline on each image, using the same preprocessing (normalized + high-res OCR buffers) as production.
+- Prints a human-readable report of extracted fields, confidence levels, warnings, and OCR stage status.
+- When two images are provided, constructs minimal document-like objects and runs `assessTransferSlipDuplicateCandidate` plus `resolveDuplicateDecision`, printing the simulated duplicate outcome, conflicts, reason codes, and suppression behavior.
+- Supports `--json` for machine-readable output and `--list-fixtures` to enumerate available test images.
+- Labels all extracted values as OCR-derived and unverified. Does not claim bank/provider truth.
+
+This is a development and debugging tool only. It is not a web endpoint, not part of production runtime, and does not perform financial verification.
+
 ## Known Limitations
 
 Concurrent uploads of identical bytes by the same user can still race: two requests that both perform the duplicate lookup before either insert commits may both be marked `NEW`. A later pass can address this with a per-user hash claim, transaction strategy, or post-insert reconciliation if the product needs strong concurrent duplicate guarantees.

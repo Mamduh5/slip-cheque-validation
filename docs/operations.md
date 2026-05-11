@@ -103,6 +103,58 @@ Expected output after a completed backfill:
 - It does not parse cheques.
 - It does not reprocess images.
 - It does not infer or change document types.
-- It does not touch duplicate, review, quality, hash, object, QR-candidate, QR-decode, or transfer-metadata fields.
+- It does not touch duplicate, review, quality, hashes, object references, original assets, normalized assets, QR-candidate, QR-decode, or transfer-metadata fields.
 - It does not create per-record audit logs.
 - It does not run automatically at application startup.
+
+## Inspect Transfer-Slip OCR and Duplicate Assessment (Dev Only)
+
+This is a read-only developer script that runs the current OCR/image-read pipeline and duplicate assessment on one or two local image files. It does not connect to MongoDB, MinIO, or the web app. It is useful for inspecting extraction behavior on real fixture images and for debugging why two images are treated as distinct or similar.
+
+### Prerequisites
+
+`tsx` is installed as a dev dependency (`npm install --save-dev tsx`).
+
+### List available fixture images
+
+```bash
+npx tsx scripts/inspect-transfer-slip.ts --list-fixtures
+```
+
+### Inspect a single image
+
+```bash
+npx tsx scripts/inspect-transfer-slip.ts 016126175244BTF00250.jpg
+```
+
+Bare filenames resolve under `tests/image/transfer-slip/`. Absolute or relative paths also work.
+
+### Compare two images
+
+```bash
+npx tsx scripts/inspect-transfer-slip.ts image1.jpg image2.jpg
+```
+
+This prints the simulated duplicate assessment: conflicts, reason codes, and whether the pair would be suppressed.
+
+### JSON output
+
+```bash
+npx tsx scripts/inspect-transfer-slip.ts --json image1.jpg image2.jpg
+```
+
+### What it does
+
+- Reads the image(s) from disk.
+- Runs the same preprocessing (normalized 1024px buffer + high-res 4096px OCR buffer) as the production pipeline.
+- Runs `attemptSlipImageRead` to extract fields and confidence levels.
+- For two images, constructs minimal document-like objects and runs `assessTransferSlipDuplicateCandidate` plus `resolveDuplicateDecision`.
+- Prints a human-readable report to stdout.
+
+### What it does NOT do
+
+- It does not verify payments, confirm bank truth, or contact any provider.
+- It does not write to the database or object storage.
+- It does not run the web app or start a server.
+- It does not perform exact-hash or perceptual-hash comparison.
+- Extracted values are OCR-derived interpretations of visible text, not financial facts.

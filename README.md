@@ -70,6 +70,26 @@ npm run backfill:slip-verification
 npm run build
 ```
 
+### Dev / Regression Runner
+
+A lightweight CLI script inspects OCR extraction and duplicate-assessment behavior on real image files without touching the database:
+
+```bash
+# List available fixture images
+npx tsx scripts/inspect-transfer-slip.ts --list-fixtures
+
+# Inspect a single image
+npx tsx scripts/inspect-transfer-slip.ts 016126175244BTF00250.jpg
+
+# Compare two images (duplicate assessment)
+npx tsx scripts/inspect-transfer-slip.ts image1.jpg image2.jpg
+
+# Machine-readable JSON output
+npx tsx scripts/inspect-transfer-slip.ts --json image1.jpg image2.jpg
+```
+
+Bare filenames are resolved under `tests/image/transfer-slip/`. Absolute and relative paths also work. This is for local debugging only; it does not perform financial verification.
+
 For non-Docker local development, set `MONGODB_URI` and MinIO values to reachable local services.
 
 `npm run test:e2e` uses Playwright. The Playwright web-server command starts the existing Docker Compose `mongo` and `minio` services, waits for real MongoDB and MinIO client readiness, runs the Next.js app locally on `127.0.0.1:3100`, and waits for `/api/health`.

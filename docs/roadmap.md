@@ -36,6 +36,7 @@
 - Dashboard suppression badges so users can visually distinguish suppressed near-duplicates from plain new uploads.
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
+- Lightweight dev regression runner (`scripts/inspect-transfer-slip.ts`) for local OCR extraction and duplicate-assessment inspection on real image fixtures without touching the database.
 
 ## Next Phase
 
