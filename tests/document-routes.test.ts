@@ -375,7 +375,30 @@ describe("document API integration boundaries", () => {
         qrDecode: buildMockQrDecode(input.documentType, input.buffer),
         transferMetadata,
         slipVerification: buildMockSlipVerification(input.documentType, transferMetadata),
-        slipImageRead: null,
+        slipImageRead:
+          input.documentType === "BANK_TRANSFER_SLIP"
+            ? {
+                stage: "SLIP_IMAGE_READ",
+                algorithm: "slip-image-read-v1",
+                status: "COMPLETED",
+                result: "EXTRACTED",
+                readAt: new Date("2026-05-08T10:00:00.000Z"),
+                extractedFields: {
+                  amount: { value: "100.00", confidence: "HIGH", source: "regex-amount-line" },
+                  senderName: { value: "Alice Smith", confidence: "HIGH", source: "regex-sender-line" },
+                  receiverName: { value: "Bob Jones", confidence: "HIGH", source: "regex-receiver-line" },
+                  dateTime: { value: "11/05/2026 10:21:00", confidence: "HIGH", source: "regex-datetime-iso" },
+                  transactionReference: { value: "REF-12345", confidence: "HIGH", source: "regex-reference-line" },
+                  senderBank: { value: "KBANK", confidence: "HIGH", source: "regex-bank-contextual" },
+                  receiverBank: { value: "SCB", confidence: "HIGH", source: "regex-bank-contextual" },
+                  senderAccountTail: { value: "1234", confidence: "MEDIUM", source: "regex-tail-contextual" },
+                  receiverAccountTail: { value: "5678", confidence: "MEDIUM", source: "regex-tail-contextual" }
+                },
+                rawOcrText: "Amount: 100.00\nFrom: Alice Smith\nTo: Bob Jones\nRef: REF-12345",
+                notes: ["Multi-variant OCR completed."],
+                warnings: []
+              }
+            : null,
         perceptualHash: input.buffer.toString("utf8").includes("near") ? "ffff0000ffff0000" : "0000000000000000",
         qualityStatus: input.buffer.toString("utf8").includes("warn") ? "WARN" : "PASS",
         qualityWarnings: input.buffer.toString("utf8").includes("warn") ? ["BLURRY_IMAGE"] : [],
@@ -507,6 +530,7 @@ describe("document API integration boundaries", () => {
       qrCandidateAnalysis: DocumentRecord["qrCandidateAnalysis"];
       qrDecode: DocumentRecord["qrDecode"];
       transferMetadata: DocumentRecord["transferMetadata"];
+      slipImageRead: DocumentRecord["slipImageRead"];
       slipVerification: DocumentRecord["slipVerification"];
     };
 
@@ -539,6 +563,17 @@ describe("document API integration boundaries", () => {
       stage: "TRANSFER_METADATA_PARSE",
       status: "SKIPPED",
       result: "NO_STRUCTURED_METADATA"
+    });
+    expect(detail.slipImageRead).toMatchObject({
+      stage: "SLIP_IMAGE_READ",
+      algorithm: "slip-image-read-v1",
+      status: "COMPLETED",
+      result: "EXTRACTED",
+      extractedFields: {
+        amount: { value: "100.00", confidence: "HIGH" },
+        senderName: { value: "Alice Smith", confidence: "HIGH" },
+        receiverName: { value: "Bob Jones", confidence: "HIGH" }
+      }
     });
     expect(detail.slipVerification).toMatchObject({
       stage: "SLIP_VERIFICATION",

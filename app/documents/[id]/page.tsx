@@ -468,6 +468,52 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             </div>
 
             <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Image-read fields</dt>
+              <dd className="mt-1 text-sm text-slate-700">
+                {document.slipImageRead?.status === "COMPLETED" && document.slipImageRead.extractedFields
+                  ? "Extracted from slip image via OCR. These are interpretations of visible text, not verified payment data."
+                  : document.slipImageRead?.status === "FAILED"
+                    ? "Image reading failed for this upload."
+                    : "This record does not have image-read results."}
+              </dd>
+              {document.slipImageRead?.extractedFields ? (
+                <dd className="mt-2 rounded border border-slate-200 bg-white p-2 text-xs text-slate-700">
+                  <dl className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      { label: "Amount", field: document.slipImageRead.extractedFields.amount },
+                      { label: "Sender", field: document.slipImageRead.extractedFields.senderName },
+                      { label: "Receiver", field: document.slipImageRead.extractedFields.receiverName },
+                      { label: "Date / time", field: document.slipImageRead.extractedFields.dateTime },
+                      { label: "Transaction reference", field: document.slipImageRead.extractedFields.transactionReference },
+                      { label: "Sender bank", field: document.slipImageRead.extractedFields.senderBank },
+                      { label: "Receiver bank", field: document.slipImageRead.extractedFields.receiverBank },
+                      { label: "Sender account tail", field: document.slipImageRead.extractedFields.senderAccountTail },
+                      { label: "Receiver account tail", field: document.slipImageRead.extractedFields.receiverAccountTail }
+                    ]
+                      .filter((item) => item.field.value !== null && item.field.value !== "")
+                      .map((item) => (
+                        <div key={item.label}>
+                          <dt className="font-medium text-slate-500">{item.label}</dt>
+                          <dd className="break-words">{item.field.value}</dd>
+                          <dd className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-400">
+                            Confidence: {item.field.confidence.toLowerCase()}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
+                  {document.slipImageRead.warnings && document.slipImageRead.warnings.length > 0 ? (
+                    <div className="mt-2 text-[10px] text-orange-700">
+                      Warnings: {document.slipImageRead.warnings.join("; ")}
+                    </div>
+                  ) : null}
+                </dd>
+              ) : null}
+              <dd className="mt-1 text-[10px] text-slate-400">
+                Not bank/provider verified.
+              </dd>
+            </div>
+
+            <div className="mt-3 rounded-md border border-line bg-slate-50 p-3">
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Slip verification</dt>
               <dd className="mt-1 text-sm font-medium text-slate-800">
                 {formatSlipVerificationResult(document.slipVerification?.result)}

@@ -2,6 +2,46 @@
 
 ## 2026-05-11
 
+### Image-Read Visibility, Debug Transparency, and Real-Image Regression
+
+#### Changed
+
+- Added `slipImageRead` to the document detail API (`GET /api/documents/{id}`) and type-correction response (`PATCH /api/documents/{id}`) so image-read fields are exposed to authenticated owners.
+- Added an **"Image-read fields"** section to the document detail page (`app/documents/[id]/page.tsx`):
+  - Shows key extracted fields when present: amount, sender, receiver, date/time, transaction reference, sender/receiver bank, sender/receiver account tail.
+  - Shows per-field confidence (`Confidence: high / medium / low`) in a small, readable format.
+  - Filters out empty/null fields so the UI stays clean.
+  - Shows warnings when OCR extraction uncertainty is recorded.
+  - Clearly labeled with honest wording: "Extracted from slip image via OCR. These are interpretations of visible text, not verified payment data." and "Not bank/provider verified."
+- Updated duplicate-decision rendering to surface image-read conflict reasons:
+  - Added all 6 image-read reason codes to `reasonCodeToLabel` in `lib/document-result-summary.ts`.
+  - Added image-read conflict parsing to `parseSuppressionReasons` so legacy suppression notes like "image-read different amount" render correctly.
+  - Result summary now shows human-readable reasons such as "image-read amount differed" and "image-read recipient differed" alongside QR/metadata reasons.
+- Added deterministic regression tests simulating real-slip behavior:
+  - "BTF00250 vs COR07936 scenario" — two clearly different slips with no QR metadata. Image-read fields alone drive suppression with 6 distinct conflicts (amount, sender, recipient, date/time, reference, receiver bank).
+  - "Common real-slip scenario" — same receiver but different amount, date/time, and reference. Verifies that matching fields (receiver) do NOT produce false conflicts.
+- Added API test asserting `slipImageRead` is present in transfer-slip detail responses with realistic extracted fields.
+- Added 3 new `parseSuppressionReasons` tests for image-read conflicts (single, mixed, and all types).
+- Added 2 new `buildResultSummary` tests for suppressed near-duplicates with image-read reason codes.
+- Updated README to reflect that OCR-assisted field extraction is now implemented, and removed "OCR or image-based field extraction" from the "Not implemented yet" list.
+
+#### Key Decisions
+
+- Kept image-read fields strictly separate from QR-derived metadata in the UI layout and wording.
+- Used `filter()` on the field list in the detail page so only non-empty fields render, avoiding noise.
+- Confidence rendered as small uppercase text (`text-[10px] uppercase tracking-wide`) so it's visible but not visually dominant.
+- No raw OCR text dump on the detail page by default; `rawOcrText` is available in the API for debugging but not surfaced to the primary user view.
+- Regression tests use mocked OCR outputs rather than binary image fixtures to stay repo-light and deterministic.
+
+#### Verification
+
+- `npm run test` - all 154 tests pass (5 new regression/visibility tests, 2 new summary tests, 3 new parse tests)
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run build` - clean
+
+## 2026-05-11
+
 ### Transfer-Slip Image Reading and Smarter Duplicate Suppression
 
 #### Changed

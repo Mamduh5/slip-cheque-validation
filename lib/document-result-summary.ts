@@ -24,6 +24,18 @@ export function reasonCodeToLabel(reason: DuplicateDecisionReason): string {
       return "identical QR payload";
     case "IDENTICAL_TRANSFER_METADATA_PAYLOAD":
       return "identical transfer metadata payload";
+    case "IMAGE_READ_AMOUNT_MISMATCH":
+      return "image-read amount differed";
+    case "IMAGE_READ_RECIPIENT_MISMATCH":
+      return "image-read recipient differed";
+    case "IMAGE_READ_SENDER_MISMATCH":
+      return "image-read sender differed";
+    case "IMAGE_READ_REFERENCE_MISMATCH":
+      return "image-read transaction reference differed";
+    case "IMAGE_READ_DATETIME_MISMATCH":
+      return "image-read date/time differed";
+    case "IMAGE_READ_BANK_MISMATCH":
+      return "image-read receiver bank differed";
     default:
       return reason;
   }
@@ -56,6 +68,18 @@ export function parseSuppressionReasons(note: string | null): string[] {
         return "QR payload differed";
       case "different transfer metadata payload":
         return "transfer metadata payload differed";
+      case "image-read different amount":
+        return "image-read amount differed";
+      case "image-read different recipient":
+        return "image-read recipient differed";
+      case "image-read different sender":
+        return "image-read sender differed";
+      case "image-read different transaction reference":
+        return "image-read transaction reference differed";
+      case "image-read different date/time":
+        return "image-read date/time differed";
+      case "image-read different receiver bank":
+        return "image-read receiver bank differed";
       default:
         return reason;
     }

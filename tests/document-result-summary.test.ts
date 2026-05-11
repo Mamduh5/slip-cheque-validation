@@ -394,6 +394,35 @@ describe("parseSuppressionReasons", () => {
   it("returns empty for empty suppression prefix", () => {
     expect(parseSuppressionReasons("Suppressed near-duplicate:")).toEqual([]);
   });
+
+  it("parses image-read amount conflict", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: image-read different amount")).toEqual([
+      "image-read amount differed"
+    ]);
+  });
+
+  it("parses mixed QR and image-read conflicts", () => {
+    expect(
+      parseSuppressionReasons(
+        "Suppressed near-duplicate: different amount, image-read different recipient, image-read different transaction reference"
+      )
+    ).toEqual(["amount differed", "image-read recipient differed", "image-read transaction reference differed"]);
+  });
+
+  it("parses all image-read conflict types", () => {
+    expect(
+      parseSuppressionReasons(
+        "Suppressed near-duplicate: image-read different amount, image-read different recipient, image-read different sender, image-read different transaction reference, image-read different date/time, image-read different receiver bank"
+      )
+    ).toEqual([
+      "image-read amount differed",
+      "image-read recipient differed",
+      "image-read sender differed",
+      "image-read transaction reference differed",
+      "image-read date/time differed",
+      "image-read receiver bank differed"
+    ]);
+  });
 });
 
 describe("toneClasses", () => {
