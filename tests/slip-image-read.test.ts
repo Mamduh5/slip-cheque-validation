@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractFieldsFromOcrText } from "../lib/slip-image-read";
+import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare } from "../lib/slip-ocr-normalization";
 
 describe("extractFieldsFromOcrText", () => {
   it("extracts amount from Amount line", () => {
@@ -184,5 +185,107 @@ describe("extractFieldsFromOcrText", () => {
     const text = "เลขที่รายการ: REF-123\nAmount: 100.00";
     const result = extractFieldsFromOcrText(text);
     expect(result.transactionReference.value).toBe("REF-123");
+  });
+});
+
+describe("normalizeReferenceForCompare", () => {
+  it("returns empty string for null", () => {
+    expect(normalizeReferenceForCompare(null)).toBe("");
+  });
+
+  it("leaves a clean bank reference unchanged", () => {
+    expect(normalizeReferenceForCompare("016126175244BTF00250")).toBe("016126175244BTF00250");
+    expect(normalizeReferenceForCompare("016121214623BTF04629")).toBe("016121214623BTF04629");
+  });
+
+  it("normalizes uppercase O to 0 in digit prefix", () => {
+    expect(normalizeReferenceForCompare("O16126175244BTF00250")).toBe("016126175244BTF00250");
+  });
+
+  it("normalizes uppercase I to 1 in digit prefix", () => {
+    expect(normalizeReferenceForCompare("01612I214623BTF04629")).toBe("016121214623BTF04629");
+  });
+
+  it("normalizes lowercase l to 1 in digit prefix", () => {
+    expect(normalizeReferenceForCompare("0l6126175244BTF00250")).toBe("016126175244BTF00250");
+  });
+
+  it("normalizes O to 0 in digit suffix", () => {
+    expect(normalizeReferenceForCompare("016126175244BTFO0250")).toBe("016126175244BTF00250");
+  });
+
+  it("does not alter the letter code portion", () => {
+    const result = normalizeReferenceForCompare("016126175244BTF00250");
+    expect(result).toContain("BTF");
+  });
+
+  it("makes OCR-confused reference equal to correct reference", () => {
+    const confused = normalizeReferenceForCompare("01612I214623BTF04629");
+    const correct = normalizeReferenceForCompare("016121214623BTF04629");
+    expect(confused).toBe(correct);
+  });
+
+  it("keeps different bank references different after normalization", () => {
+    const a = normalizeReferenceForCompare("016126175244BTF00250");
+    const b = normalizeReferenceForCompare("016121214623BTF04629");
+    expect(a).not.toBe(b);
+  });
+
+  it("falls back to lowercase-and-trim for non-bank-ref strings", () => {
+    expect(normalizeReferenceForCompare("REF-ABC123")).toBe("ref-abc123");
+    expect(normalizeReferenceForCompare("XYZ-99999")).toBe("xyz-99999");
+  });
+
+  it("handles multiple confusions in the same reference", () => {
+    expect(normalizeReferenceForCompare("Ol612l175244BTF0O250")).toBe("016121175244BTF00250");
+  });
+});
+
+describe("normalizeThaiDateTimeForCompare", () => {
+  it("returns empty string for null", () => {
+    expect(normalizeThaiDateTimeForCompare(null)).toBe("");
+  });
+
+  it("normalizes fully fragmented Thai date-time", () => {
+    expect(normalizeThaiDateTimeForCompare("6 พ . ค . 69 17:52")).toBe("6พ.ค.69 17:52");
+  });
+
+  it("normalizes semi-compact Thai date-time", () => {
+    expect(normalizeThaiDateTimeForCompare("6 พ.ค. 69 17:52")).toBe("6พ.ค.69 17:52");
+  });
+
+  it("normalizes compact Thai date-time already without spaces", () => {
+    expect(normalizeThaiDateTimeForCompare("6พ.ค.69 17:52")).toBe("6พ.ค.69 17:52");
+  });
+
+  it("fragmented and compact forms normalize to the same value", () => {
+    const fragmented = normalizeThaiDateTimeForCompare("6 พ . ค . 69 17:52");
+    const compact = normalizeThaiDateTimeForCompare("6 พ.ค. 69 17:52");
+    expect(fragmented).toBe(compact);
+  });
+
+  it("handles April abbreviation (เม.ย.)", () => {
+    expect(normalizeThaiDateTimeForCompare("30 เม . ย . 69 09:32")).toBe("30เม.ย.69 09:32");
+    expect(normalizeThaiDateTimeForCompare("30 เม.ย. 69 09:32")).toBe("30เม.ย.69 09:32");
+  });
+
+  it("two equivalent dates normalize to the same value", () => {
+    const a = normalizeThaiDateTimeForCompare("1 พ . ค . 69 21:46");
+    const b = normalizeThaiDateTimeForCompare("1 พ.ค. 69 21:46");
+    expect(a).toBe(b);
+  });
+
+  it("genuinely different dates remain different after normalization", () => {
+    const a = normalizeThaiDateTimeForCompare("6 พ.ค. 69 17:52");
+    const b = normalizeThaiDateTimeForCompare("1 พ.ค. 69 21:46");
+    expect(a).not.toBe(b);
+  });
+
+  it("does not alter ISO date format", () => {
+    expect(normalizeThaiDateTimeForCompare("2026-05-11 10:21:00")).toBe("2026-05-11 10:21:00");
+  });
+
+  it("does not alter slash date format", () => {
+    expect(normalizeThaiDateTimeForCompare("11/05/2026 10:21:00")).toBe("11/05/2026 10:21:00");
   });
 });

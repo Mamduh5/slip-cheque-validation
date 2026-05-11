@@ -222,6 +222,25 @@ Decision behavior:
 
 The assessment logic lives in `lib/transfer-slip-duplicate-assessment.ts` and is consumed by `lib/documents.ts` during the upload duplicate-decision flow. It is deterministic, does not call external services, and does not modify the stored candidate documents.
 
+### OCR Comparison Normalization
+
+Before comparing extracted field values in the duplicate assessment, values are normalized by `lib/slip-ocr-normalization.ts`. Normalization is applied at comparison time only — stored field values remain the raw OCR-derived strings.
+
+**Reference normalization** (`normalizeReferenceForCompare`):
+- Detects the Thai bank reference format: a long digit prefix (`{9-20}` chars), a `{3-5}` uppercase-letter transaction code, and a digit suffix (`{4+}` chars).
+- In the digit prefix and suffix, normalizes three common OCR character confusions: `O` (letter O) → `0` (zero), `I` (uppercase I) → `1`, `l` (lowercase L) → `1`.
+- The letter-code group is left unchanged so that genuinely different transaction codes remain distinct.
+- Non-matching strings fall back to plain lowercase-and-trim comparison.
+- Consequence: `01612I214623BTF04629` and `016121214623BTF04629` compare as equal (same transaction, OCR confusion); `016126175244BTF00250` and `016121214623BTF04629` remain distinct (genuinely different transactions).
+
+**Thai date/time normalization** (`normalizeThaiDateTimeForCompare`):
+- Tesseract frequently fragments Thai month abbreviations by inserting spaces around Thai characters and dots (e.g., `6 พ . ค . 69 17:52` instead of `6 พ.ค.69 17:52`).
+- Normalization strips all spaces adjacent to Thai characters and dots, then collapses remaining whitespace.
+- Both fragmented and compact OCR representations of the same date/time map to the same canonical form, preventing false conflicts caused purely by tesseract spacing behaviour.
+- Non-Thai formats (ISO, slash-date, time-only) are not affected.
+
+These normalizations do not affect confidence scores and do not claim that values are verified. They improve comparison reliability without over-claiming extraction quality.
+
 ## Capture Quality
 
 Quality assessment is a separate machine signal from duplicate detection and human review.

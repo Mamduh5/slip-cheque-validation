@@ -1,4 +1,5 @@
 import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
+import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare } from "@/lib/slip-ocr-normalization";
 
 export interface TransferSlipDuplicateAssessment {
   result: "MATCH" | "CONFLICT" | "INSUFFICIENT_EVIDENCE";
@@ -146,13 +147,14 @@ export function assessTransferSlipDuplicateCandidate(
     }
 
     // Transaction reference (MEDIUM+ trusted)
+    // Uses OCR-confusion normalization (O/0, I/1, l/1) for digit positions.
     if (
       isMediumOrHigherConfidence(newImg.transactionReference) &&
       isMediumOrHigherConfidence(candImg.transactionReference)
     ) {
       if (
-        normalizeCompare(newImg.transactionReference.value) !==
-        normalizeCompare(candImg.transactionReference.value)
+        normalizeReferenceForCompare(newImg.transactionReference.value) !==
+        normalizeReferenceForCompare(candImg.transactionReference.value)
       ) {
         imgStrongConflicts.push("image-read different transaction reference");
       }
@@ -183,12 +185,14 @@ export function assessTransferSlipDuplicateCandidate(
     }
 
     // Date/time
+    // Uses Thai month-abbreviation spacing normalization to avoid false conflicts
+    // from OCR whitespace fragmentation around Thai chars and dots.
     if (isHighConfidence(newImg.dateTime) && isHighConfidence(candImg.dateTime)) {
-      if (normalizeCompare(newImg.dateTime.value) !== normalizeCompare(candImg.dateTime.value)) {
+      if (normalizeThaiDateTimeForCompare(newImg.dateTime.value) !== normalizeThaiDateTimeForCompare(candImg.dateTime.value)) {
         imgDirectConflicts.push("image-read different date/time");
       }
     } else if (isMediumConfidence(newImg.dateTime) && isMediumConfidence(candImg.dateTime)) {
-      if (normalizeCompare(newImg.dateTime.value) !== normalizeCompare(candImg.dateTime.value)) {
+      if (normalizeThaiDateTimeForCompare(newImg.dateTime.value) !== normalizeThaiDateTimeForCompare(candImg.dateTime.value)) {
         imgContributing.push("image-read different date/time");
       }
     }

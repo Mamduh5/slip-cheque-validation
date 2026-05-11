@@ -42,6 +42,11 @@
 - Added Thai title `นาง` (Mrs.) and `นางสาว` (Miss, full form) to the OCR name extraction pattern so more real-slip person names are extracted with title context.
 - Numeric amount normalization in duplicate comparison so `500` and `500.00` from different OCR variants are not treated as conflicting amounts.
 - Real-image pair suppression regression test verifying two clearly different fixture slips are assessed as CONFLICT and not sent to review.
+- OCR comparison normalization module (`lib/slip-ocr-normalization.ts`) with two focused helpers:
+  - `normalizeReferenceForCompare`: resolves O/0, I/1, l/1 character confusions in the digit portions of Thai bank transaction references, applied only when the value matches the expected reference format.
+  - `normalizeThaiDateTimeForCompare`: collapses OCR-fragmented Thai month abbreviation spacing so that `6 พ . ค . 69 17:52` and `6 พ.ค. 69 17:52` compare as equal.
+- Normalization is applied in the duplicate assessment comparison path; raw OCR values stored in document records are unchanged.
+- Inspector script (`inspect-transfer-slip.ts`) shows a "Norm. ref" or "Norm. datetime" line when the normalized comparison value differs visibly from the stored raw value.
 
 ## Next Phase
 

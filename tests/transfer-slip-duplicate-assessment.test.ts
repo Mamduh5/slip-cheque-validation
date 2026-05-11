@@ -579,6 +579,136 @@ describe("assessTransferSlipDuplicateCandidate", () => {
     expect(result.notes).toContain("Suppressed near-duplicate");
   });
 
+  it("does not conflict when references differ only by O/0 OCR confusion", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "016126175244BTF00250", confidence: "MEDIUM" } }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "O16126175244BTF00250", confidence: "MEDIUM" } }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.conflicts).not.toContain("image-read different transaction reference");
+  });
+
+  it("does not conflict when references differ only by I/1 OCR confusion", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "016121214623BTF04629", confidence: "HIGH" } }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "01612I214623BTF04629", confidence: "HIGH" } }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.conflicts).not.toContain("image-read different transaction reference");
+  });
+
+  it("still conflicts when references are genuinely different after normalization", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "016126175244BTF00250", confidence: "MEDIUM" } }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ transactionReference: { value: "016121214623BTF04629", confidence: "MEDIUM" } }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different transaction reference");
+  });
+
+  it("does not conflict when Thai date/time strings differ only by OCR spacing", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ dateTime: { value: "6 พ . ค . 69 17:52", confidence: "HIGH" } }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ dateTime: { value: "6 พ.ค. 69 17:52", confidence: "HIGH" } }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.conflicts).not.toContain("image-read different date/time");
+  });
+
+  it("still conflicts when Thai dates are genuinely different after spacing normalization", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ dateTime: { value: "6 พ.ค. 69 17:52", confidence: "HIGH" } }),
+          rawOcrText: "a", notes: [], warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(),
+          extractedFields: makeImageReadFields({ dateTime: { value: "1 พ.ค. 69 21:46", confidence: "HIGH" } }),
+          rawOcrText: "b", notes: [], warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different date/time");
+  });
+
   it("regression: suppresses when only amount and reference differ (common real-slip scenario)", () => {
     const slipA = {
       qrDecode: makeQrDecode(null),

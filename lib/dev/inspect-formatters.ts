@@ -5,6 +5,7 @@
 
 import path from "node:path";
 import type { ImageReadField, ImageReadTransferFields } from "@/lib/models";
+import { normalizeReferenceForCompare, normalizeThaiDateTimeForCompare } from "@/lib/slip-ocr-normalization";
 
 export function resolveImagePath(input: string, fixtureDir: string): string {
   if (path.isAbsolute(input) || input.includes("/") || input.includes("\\")) {
@@ -18,21 +19,37 @@ export function formatField(field: ImageReadField | undefined): string {
   return `${field.value} (${field.confidence.toLowerCase()})`;
 }
 
+function maybeNormLine(label: string, rawValue: string | null, normalize: (v: string | null) => string): string | null {
+  if (!rawValue) return null;
+  const norm = normalize(rawValue);
+  if (norm !== rawValue.toLowerCase().replace(/\s+/g, " ").trim()) {
+    return `${label}${norm}`;
+  }
+  return null;
+}
+
 export function formatFieldsLines(fields: ImageReadTransferFields | null): string[] {
   if (!fields) {
     return ["  (no fields extracted)"];
   }
-  return [
+  const lines: string[] = [
     `  Amount:              ${formatField(fields.amount)}`,
     `  Sender name:         ${formatField(fields.senderName)}`,
     `  Receiver name:       ${formatField(fields.receiverName)}`,
     `  Date/Time:           ${formatField(fields.dateTime)}`,
-    `  Transaction ref:     ${formatField(fields.transactionReference)}`,
+  ];
+  const normDt = maybeNormLine("  Norm. datetime:      ", fields.dateTime.value, normalizeThaiDateTimeForCompare);
+  if (normDt) lines.push(normDt);
+  lines.push(`  Transaction ref:     ${formatField(fields.transactionReference)}`);
+  const normRef = maybeNormLine("  Norm. ref:           ", fields.transactionReference.value, normalizeReferenceForCompare);
+  if (normRef) lines.push(normRef);
+  lines.push(
     `  Sender bank:         ${formatField(fields.senderBank)}`,
     `  Receiver bank:       ${formatField(fields.receiverBank)}`,
     `  Sender acct tail:    ${formatField(fields.senderAccountTail)}`,
     `  Receiver acct tail:  ${formatField(fields.receiverAccountTail)}`,
-  ];
+  );
+  return lines;
 }
 
 export function formatFields(fields: ImageReadTransferFields | null): string {
