@@ -513,7 +513,8 @@ describe("document API integration boundaries", () => {
     expect(detail.processingProfile.capabilities).toMatchObject({
       qrOrientedFuturePath: true,
       qrCandidateAnalysisImplemented: true,
-      extractionImplemented: false
+      extractionImplemented: true,
+      verificationImplemented: true
     });
     expect(detail.processingProfile.plannedStages).toEqual(
       expect.arrayContaining([

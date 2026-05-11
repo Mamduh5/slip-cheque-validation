@@ -87,7 +87,7 @@ The processing boundary includes a document-type processing profile so later sta
 
 Profiles define the current branch and future stage hints:
 
-- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and a minimal `SLIP_VERIFICATION` runtime scaffold that records no verification evidence.
+- `BANK_TRANSFER_SLIP`: `TRANSFER_SLIP` branch. This is the first specialized path. It runs `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, `SLIP_IMAGE_READ` (OCR field extraction from the slip image), and a minimal `SLIP_VERIFICATION` runtime scaffold that records no verification evidence.
 - `DEPOSIT_PAYMENT_SLIP`: `PAYMENT_SLIP` branch. Future work can add printed-field extraction and payment-slip-specific validation.
 - `CHEQUE`: `CHEQUE` branch. Future work can add cheque field extraction and cheque layout review support.
 - `UNKNOWN`: `GENERIC` branch. It stays generic unless the owner corrects the type.
@@ -135,6 +135,19 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 - Unsupported formats produce clean `UNSUPPORTED_FORMAT` or `NO_STRUCTURED_METADATA` results instead of fake business fields.
 - Non-slip types do not run the stage.
 
+## Transfer-Slip Image Reading (SLIP_IMAGE_READ)
+
+`SLIP_IMAGE_READ` is a real executed transfer-slip stage. It runs independently of QR decode and transfer metadata parsing, using OCR on the normalized image to extract printed or displayed transaction fields.
+
+- The stage uses `tesseract.js` with multi-variant preprocessing (original, upscaled, contrast-boosted, edge-sharpened) to improve OCR robustness.
+- Extracted fields are kept separate from QR-derived data. They are labeled as image-read and are not treated as verified.
+- Extracted fields include: amount, sender name, receiver name, date/time, transaction/reference number, sender bank, receiver bank, sender account tail, receiver account tail.
+- Each field carries a confidence level (`HIGH`, `MEDIUM`, `LOW`, `NONE`) and a source tag so callers know whether it came from a labeled line, contextual next line, or fallback regex.
+- When OCR yields no usable text, the stage returns `result: "NONE"` with all fields set to `null` and `confidence: "NONE"`.
+- When extraction yields at least one usable field, the stage returns `result: "EXTRACTED"` or `result: "PARTIAL"`.
+- **Image-read fields are not verified. They are interpretations of visible text, not proof of bank truth, payment completion, or authenticity.**
+- The stage runs even when QR decode fails or produces no structured metadata, providing an independent evidence source for duplicate suppression.
+
 ## Slip Verification Runtime
 
 `SLIP_VERIFICATION` now runs local-only structural validation for supported Thai QR payment metadata and otherwise falls back to safe no-evidence outcomes. The design contract is documented in `docs/slip-verification-spec.md`.
@@ -160,11 +173,11 @@ Owners can correct `documentType` after upload from the document detail page. Th
 
 Correction behavior is intentionally narrow:
 
-- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, `slipVerification`, and `updatedAt` are changed on the document record.
+- Only `documentType`, `processingProfile`, `qrCandidateAnalysis`, `qrDecode`, `transferMetadata`, `slipImageRead`, `slipVerification`, and `updatedAt` are changed on the document record.
 - Non-owned or missing documents return `404`.
 - Invalid type values return `400`.
 - Duplicate status, review status, quality status, hashes, object references, original assets, and normalized assets are not recomputed or overwritten.
-- Existing QR-candidate analysis, QR decode, transfer metadata, and slip-verification scaffold results are cleared on type correction because the document is not reprocessed in this v1 flow.
+- Existing QR-candidate analysis, QR decode, transfer metadata, slip-image-read, and slip-verification scaffold results are cleared on type correction because the document is not reprocessed in this v1 flow.
 - The corrected type becomes the current source of truth for future type-aware stages.
 
 Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.
@@ -185,20 +198,22 @@ The normalized-image stage is intentionally small and in-process. It does not us
 
 ## Structure-Aware Transfer-Slip Duplicate Detection
 
-For `BANK_TRANSFER_SLIP`, the duplicate decision layer is now structure-aware. After exact-hash matching, perceptual-hash candidates are collected and then assessed using structured evidence from QR decode and transfer metadata parsing. This prevents visually similar but structurally different slips from becoming false `LIKELY_DUPLICATE` review candidates.
+For `BANK_TRANSFER_SLIP`, the duplicate decision layer is now structure-aware. After exact-hash matching, perceptual-hash candidates are collected and then assessed using structured evidence from QR decode, transfer metadata parsing, and image-read field extraction. This prevents visually similar but structurally different slips from becoming false `LIKELY_DUPLICATE` review candidates.
 
 Evidence classes:
 
 - **Definitive positive signals** (override everything): identical `qrDecode.rawDecodedText`, identical `transferMetadata.rawPayload`.
 - **Strong conflict signals** (suppress `LIKELY_DUPLICATE` when no definitive positive exists): different `qrDecode.rawDecodedText`, different `transferMetadata.rawPayload`, different `amount`, different `merchantAccountInfo.targetIdentifier` (recipient), different `merchantAccountInfo.references.reference1` (transaction reference).
+- **Image-read conflict signals** (conservative, only `HIGH` confidence fields): different image-read `amount`, different image-read `receiverName`, different image-read `senderName`, different image-read `transactionReference`, different image-read `dateTime`, different image-read `receiverBank`.
 - **Weak/tie-breaker signals** (used when structured evidence is insufficient or absent): perceptual image similarity, same bank template/layout.
 
 Decision behavior:
 
 - If a definitive positive signal exists, the candidate is accepted as a duplicate regardless of other differences.
-- If any strong conflict signal exists and there is no definitive positive, the `LIKELY_DUPLICATE` classification is suppressed. The document receives `duplicateStatus: NEW` and a `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: different amount, different recipient").
-- If structured evidence is insufficient (e.g., one side lacks parsed metadata, or neither side has the relevant fields), the system falls back to the generic perceptual-image path.
-- Non-slip document types and transfer slips without parsed metadata continue to use the original image-only near-duplicate path.
+- If any strong conflict signal (QR/metadata or image-read) exists and there is no definitive positive, the `LIKELY_DUPLICATE` classification is suppressed. The document receives `duplicateStatus: NEW` and a `notes` field records the suppression reason (e.g., "Suppressed near-duplicate: different amount, different recipient").
+- Image-read conflicts are used only when both sides have the same field at `HIGH` confidence and the values differ. This keeps image-read evidence conservative and avoids false suppression from weak OCR.
+- If structured evidence is insufficient (e.g., one side lacks parsed metadata and image-read fields, or neither side has the relevant fields), the system falls back to the generic perceptual-image path.
+- Non-slip document types and transfer slips without parsed metadata or useful image-read results continue to use the original image-only near-duplicate path.
 
 The assessment logic lives in `lib/transfer-slip-duplicate-assessment.ts` and is consumed by `lib/documents.ts` during the upload duplicate-decision flow. It is deterministic, does not call external services, and does not modify the stored candidate documents.
 

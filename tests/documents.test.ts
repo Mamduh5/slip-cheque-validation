@@ -41,7 +41,7 @@ describe("document helpers", () => {
         capabilities: {
           qrOrientedFuturePath: true,
           qrCandidateAnalysisImplemented: true,
-          extractionImplemented: false,
+          extractionImplemented: true,
           verificationImplemented: true
         },
         plannedStages: expect.arrayContaining([
@@ -50,7 +50,7 @@ describe("document helpers", () => {
           expect.objectContaining({ key: "TRANSFER_METADATA_PARSE", status: "ACTIVE" }),
           expect.objectContaining({ key: "SLIP_VERIFICATION", status: "ACTIVE" })
         ]),
-        currentStages: expect.arrayContaining(["qr-candidate-analysis", "qr-decode", "transfer-metadata-parse", "slip-verification-local-structural"]),
+        currentStages: expect.arrayContaining(["qr-candidate-analysis", "qr-decode", "transfer-metadata-parse", "slip-image-read", "slip-verification-local-structural"]),
         futureStages: expect.arrayContaining(["external-truth-verification"])
       }
     });

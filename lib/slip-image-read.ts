@@ -322,7 +322,7 @@ function extractDateTime(lines: string[], flat: string): ImageReadField {
 
 function extractTransactionReference(lines: string[], flat: string): ImageReadField {
   const patterns = [
-    /(?:Ref\.?|Reference|Transaction\s*ID|Trace\s*No\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง)[\s:]*([A-Za-z0-9\-]{4,40})/i,
+    /(?:Reference|Transaction\s*ID|Trace\s*No\.?|Ref\.?|เลขที่รายการ|เลขอ้างอิง|หมายเลขอ้างอิง)[\s:]*([A-Za-z0-9\-]{4,40})/i,
     /(?:Ref[:\s]+)([A-Za-z0-9\-]{4,40})/i,
     /(?:เลขที่รายการ)[\s:]*([A-Za-z0-9\-]{4,40})/
   ];

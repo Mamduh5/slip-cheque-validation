@@ -1,5 +1,61 @@
 # Worklog
 
+## 2026-05-11
+
+### Transfer-Slip Image Reading and Smarter Duplicate Suppression
+
+#### Changed
+
+- Added a new `SLIP_IMAGE_READ` stage for `BANK_TRANSFER_SLIP` documents.
+  - Implemented in `lib/slip-image-read.ts` using `tesseract.js` with multi-variant OCR preprocessing (original, upscaled, contrast-boosted, edge-sharpened).
+  - Extracts structured fields from OCR text: amount, sender name, receiver name, date/time, transaction/reference number, sender bank, receiver bank, sender account tail, receiver account tail.
+  - Each field carries `value`, `confidence` (`HIGH`/`MEDIUM`/`LOW`/`NONE`), and `source` for transparency.
+  - Added `ImageReadTransferFields`, `SlipImageReadAnalysisResult`, and related types to `lib/models.ts`.
+  - Integrated `attemptSlipImageRead` into `lib/document-processing.ts` pipeline after normalization and before duplicate detection.
+  - Added `slip-image-read` to the `BANK_TRANSFER_SLIP` processing profile current stages and set `extractionImplemented: true`.
+- Upgraded duplicate suppression to use image-read conflicts.
+  - Modified `lib/transfer-slip-duplicate-assessment.ts` to compare `slipImageRead.extractedFields` between candidate documents.
+  - Only `HIGH` confidence fields trigger conflicts: amount, receiver name, sender name, transaction reference, date/time, receiver bank.
+  - Added new `duplicateDecisionReasons`: `IMAGE_READ_AMOUNT_MISMATCH`, `IMAGE_READ_RECIPIENT_MISMATCH`, `IMAGE_READ_SENDER_MISMATCH`, `IMAGE_READ_REFERENCE_MISMATCH`, `IMAGE_READ_DATETIME_MISMATCH`, `IMAGE_READ_BANK_MISMATCH`.
+  - Structured assessment now runs when either parsed metadata or useful image-read fields (`EXTRACTED` or `PARTIAL`) are available, so image-read evidence suppresses likely duplicates even when QR metadata is weak or missing.
+- Wired `slipImageRead` through the full document creation flow:
+  - `lib/documents.ts`: `buildUploadedDocumentRecord`, `findDuplicateMatchForUser`, and `createUploadedDocument` now pass `slipImageRead`.
+  - MongoDB candidate query projection includes `slipImageRead`.
+  - `app/api/documents/route.ts` exposes `slipImageRead` in upload response.
+- Added 26 focused tests in `tests/slip-image-read.test.ts` covering:
+  - Amount extraction from labels, currency symbols, standalone lines, and Thai text.
+  - Receiver/sender name extraction from labels and contextual lines, including Thai.
+  - Date/time extraction from ISO, Thai-style, adjacent lines, and standalone time.
+  - Transaction reference extraction from labels and contextual lines, including Thai.
+  - Bank extraction near From/To context and global fallback.
+  - Account tail extraction.
+  - Safe null behavior when no data is present.
+- Added 8 new tests in `tests/transfer-slip-duplicate-assessment.test.ts` covering:
+  - Image-read amount, receiver name, transaction reference, date/time, and receiver bank conflicts at HIGH confidence.
+  - Ignoring MEDIUM/LOW confidence fields.
+  - Multi-field image-read suppression when QR metadata is missing.
+- Updated existing test fixtures across `tests/documents.test.ts`, `tests/document-routes.test.ts`, and `tests/document-result-summary.test.ts` to include `slipImageRead: null`.
+- Fixed a regex ordering bug in `lib/slip-image-read.ts` where `Ref.?` partially matched "Reference" and captured "erence" instead of the actual reference value.
+- Updated documentation:
+  - `docs/architecture.md`: Added `Transfer-Slip Image Reading` section; updated duplicate detection and document-type correction sections.
+  - `docs/data-model.md`: Added `slipImageRead` fields and updated `duplicateDecisionReasons`.
+  - `docs/roadmap.md`: Moved OCR-assisted extraction to V1 scope.
+
+#### Key Decisions
+
+- Image-read fields are kept strictly separate from QR-derived data. They are labeled as unverified and are never mixed with QR metadata.
+- Conflict detection is conservative: only `HIGH` confidence image-read fields are used to suppress likely duplicates. This avoids false suppression from noisy OCR.
+- The stage runs independently of QR decode so it can provide duplicate-suppression evidence even when QR is missing, weak, or unsupported.
+- `normalizeAmount` strips commas and non-numeric characters for consistent comparison.
+- No external/provider verification was added. This is still local-only extraction and structural assessment.
+
+#### Verification
+
+- `npm run test` - all 149 tests pass (26 new slip-image-read tests, 8 new duplicate-assessment tests)
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run build` - clean
+
 ## 2026-05-10
 
 ### Upload Progress and Result Summary

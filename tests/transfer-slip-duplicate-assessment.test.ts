@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assessTransferSlipDuplicateCandidate } from "../lib/transfer-slip-duplicate-assessment";
-import type { DocumentRecord } from "../lib/models";
+import type { DocumentRecord, ImageReadTransferFields } from "../lib/models";
 
 function makeQrDecode(rawDecodedText: string | null): NonNullable<DocumentRecord["qrDecode"]> {
   return {
@@ -58,12 +58,38 @@ function makeTransferMetadata(
   };
 }
 
+function emptyImageReadFields(): ImageReadTransferFields {
+  const empty = { value: null, confidence: "NONE" as const, source: "none" };
+  return {
+    amount: empty,
+    senderName: empty,
+    receiverName: empty,
+    dateTime: empty,
+    transactionReference: empty,
+    senderBank: empty,
+    receiverBank: empty,
+    senderAccountTail: empty,
+    receiverAccountTail: empty
+  };
+}
+
+function makeImageReadFields(overrides: Partial<Record<keyof ImageReadTransferFields, { value: string | null; confidence: "HIGH" | "MEDIUM" | "LOW" | "NONE"; source?: string }>> = {}): ImageReadTransferFields {
+  const base = emptyImageReadFields();
+  for (const key of Object.keys(overrides) as Array<keyof ImageReadTransferFields>) {
+    const override = overrides[key];
+    if (override) {
+      base[key] = { value: override.value, confidence: override.confidence, source: override.source ?? "regex" };
+    }
+  }
+  return base;
+}
+
 describe("assessTransferSlipDuplicateCandidate", () => {
   it("returns MATCH for identical raw QR payloads", () => {
     const payload = "00020101021129370016A00000067701011101130066812345678...";
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) },
-      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) }
+      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata(null, null, null, null), slipImageRead: null },
+      { qrDecode: makeQrDecode(payload), transferMetadata: makeTransferMetadata(null, null, null, null), slipImageRead: null }
     );
 
     expect(result.result).toBe("MATCH");
@@ -74,8 +100,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different raw QR payloads", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("payload-a-123"), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) },
-      { qrDecode: makeQrDecode("payload-b-456"), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, null) }
+      { qrDecode: makeQrDecode("payload-a-123"), transferMetadata: makeTransferMetadata(null, null, null, null), slipImageRead: null },
+      { qrDecode: makeQrDecode("payload-b-456"), transferMetadata: makeTransferMetadata(null, null, null, null), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -87,8 +113,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different amounts", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("73.00", "0812345678", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("40.00", "0812345678", "REF001", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("73.00", "0812345678", "REF001", null), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("40.00", "0812345678", "REF001", null), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -98,8 +124,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different recipients", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0822222222", "REF001", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0822222222", "REF001", null), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -109,8 +135,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different transaction references", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF001", null) },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("100.00", "0811111111", "REF002", null) }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF001", null), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("100.00", "0811111111", "REF002", null), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -120,8 +146,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT for different raw metadata payloads", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, "payload-abc") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null(null, null, null, "payload-def") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata(null, null, null, "payload-abc"), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata(null, null, null, "payload-def"), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
@@ -131,8 +157,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns MATCH when definitive signals align (identical QR and raw payload)", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "same-payload") },
-      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "same-payload") }
+      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "same-payload"), slipImageRead: null },
+      { qrDecode: makeQrDecode("same-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "same-payload"), slipImageRead: null }
     );
 
     expect(result.result).toBe("MATCH");
@@ -143,8 +169,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns INSUFFICIENT_EVIDENCE when only one side has structured data", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode("some-qr"), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "payload") },
-      { qrDecode: makeQrDecode(null), transferMetadata: null }
+      { qrDecode: makeQrDecode("some-qr"), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "payload"), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: null, slipImageRead: null }
     );
 
     expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
@@ -155,8 +181,8 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns INSUFFICIENT_EVIDENCE when both sides lack parsed metadata", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: null },
-      { qrDecode: makeQrDecode(null), transferMetadata: null }
+      { qrDecode: makeQrDecode(null), transferMetadata: null, slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: null, slipImageRead: null }
     );
 
     expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
@@ -165,13 +191,179 @@ describe("assessTransferSlipDuplicateCandidate", () => {
 
   it("returns CONFLICT when strong conflicts exist even if other fields match", () => {
     const result = assessTransferSlipDuplicateCandidate(
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF001", "payload-a") },
-      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata, slipImageRead: null("50.00", "0811111111", "REF002", "payload-b") }
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF001", "payload-a"), slipImageRead: null },
+      { qrDecode: makeQrDecode(null), transferMetadata: makeTransferMetadata("50.00", "0811111111", "REF002", "payload-b"), slipImageRead: null }
     );
 
     expect(result.result).toBe("CONFLICT");
     expect(result.conflicts).toContain("different transaction reference");
     expect(result.conflicts).toContain("different transfer metadata payload");
     expect(result.reasonCodes).toEqual(["TRANSFER_METADATA_PAYLOAD_MISMATCH", "REFERENCE_MISMATCH"]);
+  });
+
+  it("returns CONFLICT from image-read different amount (HIGH confidence)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "1,250.00", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "999.00", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different amount");
+    expect(result.reasonCodes).toEqual(["IMAGE_READ_AMOUNT_MISMATCH"]);
+  });
+
+  it("returns CONFLICT from image-read different receiver name (HIGH confidence)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "Somchai Jaidee", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverName: { value: "Suda Prasert", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different recipient");
+    expect(result.reasonCodes).toEqual(["IMAGE_READ_RECIPIENT_MISMATCH"]);
+  });
+
+  it("returns CONFLICT from image-read different transaction reference (HIGH confidence)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ transactionReference: { value: "TRX-001", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ transactionReference: { value: "TRX-002", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different transaction reference");
+    expect(result.reasonCodes).toEqual(["IMAGE_READ_REFERENCE_MISMATCH"]);
+  });
+
+  it("returns CONFLICT from image-read different date/time (HIGH confidence)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ dateTime: { value: "11/05/2026 10:21:00", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ dateTime: { value: "12/05/2026 14:30:00", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different date/time");
+    expect(result.reasonCodes).toEqual(["IMAGE_READ_DATETIME_MISMATCH"]);
+  });
+
+  it("returns CONFLICT from image-read different receiver bank (HIGH confidence)", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverBank: { value: "KBANK", confidence: "HIGH" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ receiverBank: { value: "SCB", confidence: "HIGH" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different receiver bank");
+    expect(result.reasonCodes).toEqual(["IMAGE_READ_BANK_MISMATCH"]);
+  });
+
+  it("ignores image-read fields when confidence is not HIGH", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "1,250.00", confidence: "MEDIUM" } }), rawOcrText: "a", notes: [], warnings: [] }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: { stage: "SLIP_IMAGE_READ", algorithm: "slip-image-read-v1", status: "COMPLETED", result: "EXTRACTED", readAt: new Date(), extractedFields: makeImageReadFields({ amount: { value: "999.00", confidence: "MEDIUM" } }), rawOcrText: "b", notes: [], warnings: [] }
+      }
+    );
+
+    expect(result.result).toBe("INSUFFICIENT_EVIDENCE");
+    expect(result.reasonCodes).toEqual(["IMAGE_SIMILARITY_ONLY"]);
+  });
+
+  it("uses image-read conflicts to suppress even when QR metadata is missing", () => {
+    const result = assessTransferSlipDuplicateCandidate(
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ",
+          algorithm: "slip-image-read-v1",
+          status: "COMPLETED",
+          result: "EXTRACTED",
+          readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            amount: { value: "500.00", confidence: "HIGH" },
+            receiverName: { value: "Alice Smith", confidence: "HIGH" },
+            transactionReference: { value: "REF-A1", confidence: "HIGH" }
+          }),
+          rawOcrText: "a",
+          notes: [],
+          warnings: []
+        }
+      },
+      {
+        qrDecode: makeQrDecode(null),
+        transferMetadata: null,
+        slipImageRead: {
+          stage: "SLIP_IMAGE_READ",
+          algorithm: "slip-image-read-v1",
+          status: "COMPLETED",
+          result: "EXTRACTED",
+          readAt: new Date(),
+          extractedFields: makeImageReadFields({
+            amount: { value: "750.00", confidence: "HIGH" },
+            receiverName: { value: "Bob Jones", confidence: "HIGH" },
+            transactionReference: { value: "REF-B2", confidence: "HIGH" }
+          }),
+          rawOcrText: "b",
+          notes: [],
+          warnings: []
+        }
+      }
+    );
+
+    expect(result.result).toBe("CONFLICT");
+    expect(result.conflicts).toContain("image-read different amount");
+    expect(result.conflicts).toContain("image-read different recipient");
+    expect(result.conflicts).toContain("image-read different transaction reference");
+    expect(result.reasonCodes).toEqual([
+      "IMAGE_READ_AMOUNT_MISMATCH",
+      "IMAGE_READ_RECIPIENT_MISMATCH",
+      "IMAGE_READ_REFERENCE_MISMATCH"
+    ]);
   });
 });

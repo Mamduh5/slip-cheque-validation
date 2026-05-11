@@ -41,10 +41,10 @@ Stores one registry record per uploaded document image.
 | `normalizedImage.algorithm` | string \| null | Currently `normalized-webp-grayscale-v1`. |
 | `processingProfile.name` | string | Type-aware processing profile name, such as `bank-transfer-slip-v1`. |
 | `processingProfile.branch` | enum | `TRANSFER_SLIP`, `PAYMENT_SLIP`, `CHEQUE`, or `GENERIC`. |
-| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`, `qr-decode`, and `transfer-metadata-parse`. |
+| `processingProfile.currentStages` | string[] | Current enabled stages. All types use shared quality, normalization, and duplicate stages; transfer slips also include `qr-candidate-analysis`, `qr-decode`, `transfer-metadata-parse`, and `slip-image-read`. |
 | `processingProfile.futureStages` | string[] | Documented future stage hints; not executed in v1. |
-| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE`, `QR_DECODE`, and `TRANSFER_METADATA_PARSE` as `ACTIVE`; `SLIP_VERIFICATION` remains planned as real verification even though a no-evidence scaffold field is persisted. Shared stages are marked `ACTIVE`. |
-| `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. Extraction and verification are currently false. |
+| `processingProfile.plannedStages` | object[] | Stage contract metadata. Transfer slips mark `QR_CANDIDATE`, `QR_DECODE`, `TRANSFER_METADATA_PARSE`, and `SLIP_IMAGE_READ` as `ACTIVE`; `SLIP_VERIFICATION` remains planned as real verification even though a no-evidence scaffold field is persisted. Shared stages are marked `ACTIVE`. |
+| `processingProfile.capabilities` | object | Capability flags such as QR-oriented future path, QR-candidate analysis availability, and whether extraction/verification are implemented. `extractionImplemented` is `true` for transfer slips because `SLIP_IMAGE_READ` runs; `verificationImplemented` is `true` for local structural checks. |
 | `qrCandidateAnalysis.stage` | string \| null | Transfer-slip-only stage key, currently `QR_CANDIDATE`. Null or absent for non-slip records and older records. |
 | `qrCandidateAnalysis.algorithm` | string \| null | Currently `qr-candidate-heuristic-v1`. |
 | `qrCandidateAnalysis.status` | enum \| null | `COMPLETED`, `FAILED`, `PENDING`, or `NOT_APPLICABLE`. New transfer-slip uploads normally use `COMPLETED` unless analysis fails. |
@@ -77,6 +77,15 @@ Stores one registry record per uploaded document image.
 | `transferMetadata.rawPayload` | string \| null | The raw decoded QR payload string used for parsing and CRC checksum validation. |
 | `transferMetadata.notes` | string[] \| null | Short non-authoritative notes about parse behavior. |
 | `transferMetadata.warnings` | string[] \| null | Warnings for suspicious but parseable structure, such as unexpected amount formatting. |
+| `slipImageRead.stage` | string \| null | Transfer-slip-only stage key, currently `SLIP_IMAGE_READ`. Null or absent for non-slip records and older records. |
+| `slipImageRead.algorithm` | string \| null | Currently `slip-image-read-v1`. |
+| `slipImageRead.status` | enum \| null | `COMPLETED`, `FAILED`, or `NOT_APPLICABLE`. |
+| `slipImageRead.result` | enum \| null | `EXTRACTED`, `PARTIAL`, `NONE`, or `FAILED`. `EXTRACTED` when multiple fields were found; `PARTIAL` when only a few fields were found; `NONE` when OCR produced no usable text. |
+| `slipImageRead.readAt` | Date \| null | When image reading ran. |
+| `slipImageRead.extractedFields` | object \| null | Structured image-read fields. Each sub-field is an object with `value` (string \| null), `confidence` (`HIGH` \| `MEDIUM` \| `LOW` \| `NONE`), and `source` (string). Fields: `amount`, `senderName`, `receiverName`, `dateTime`, `transactionReference`, `senderBank`, `receiverBank`, `senderAccountTail`, `receiverAccountTail`. |
+| `slipImageRead.rawOcrText` | string \| null | The merged OCR text used for extraction, preserved for debugging. |
+| `slipImageRead.notes` | string[] \| null | Notes about the image-read attempt. |
+| `slipImageRead.warnings` | string[] \| null | Warnings about OCR quality or extraction uncertainty. |
 | `slipVerification.stage` | string \| null | Transfer-slip-only scaffold stage key, currently `SLIP_VERIFICATION`. Null or absent for non-slip records and older records. |
 | `slipVerification.algorithm` | string \| null | `slip-verification-local-structural-v1` for local structural checks; `slip-verification-scaffold-v1` for no-evidence fallback/backfill records. |
 | `slipVerification.status` | enum \| null | `COMPLETED` when a result is recorded; `SKIPPED` when supported metadata is unavailable. |
@@ -87,7 +96,7 @@ Stores one registry record per uploaded document image.
 | `status` | enum | `UPLOADED`, `PROCESSING`, `READY`, `FAILED`. |
 | `duplicateStatus` | enum | `NOT_CHECKED`, `PENDING`, `NEW`, `EXACT_DUPLICATE`, `LIKELY_DUPLICATE`, `DUPLICATE`, `POSSIBLE_DUPLICATE`, `ERROR`. |
 | `duplicateDecisionType` | enum \| null | `EXACT_DUPLICATE`, `LIKELY_DUPLICATE_REVIEW`, `NEW_UPLOAD`, `SUPPRESSED_NEAR_DUPLICATE`. Explanation field that makes duplicate outcome transparent in the UI without relying on brittle note-string parsing. `null` for legacy records. |
-| `duplicateDecisionReasons` | string[] | Machine-readable reason codes such as `AMOUNT_MISMATCH`, `RECIPIENT_MISMATCH`, `REFERENCE_MISMATCH`, `QR_PAYLOAD_MISMATCH`, `TRANSFER_METADATA_PAYLOAD_MISMATCH`, `IMAGE_SIMILARITY_ONLY`, `IDENTICAL_QR_PAYLOAD`, `IDENTICAL_TRANSFER_METADATA_PAYLOAD`. Empty array when no reasons apply. |
+| `duplicateDecisionReasons` | string[] | Machine-readable reason codes such as `AMOUNT_MISMATCH`, `RECIPIENT_MISMATCH`, `REFERENCE_MISMATCH`, `QR_PAYLOAD_MISMATCH`, `TRANSFER_METADATA_PAYLOAD_MISMATCH`, `IMAGE_SIMILARITY_ONLY`, `IDENTICAL_QR_PAYLOAD`, `IDENTICAL_TRANSFER_METADATA_PAYLOAD`, `IMAGE_READ_AMOUNT_MISMATCH`, `IMAGE_READ_RECIPIENT_MISMATCH`, `IMAGE_READ_SENDER_MISMATCH`, `IMAGE_READ_REFERENCE_MISMATCH`, `IMAGE_READ_DATETIME_MISMATCH`, `IMAGE_READ_BANK_MISMATCH`. Empty array when no reasons apply. |
 | `matchedDocumentId` | string \| null | Match reference for exact or likely duplicates; null for new documents. |
 | `similarityScore` | number \| null | `1` for exact duplicates; `1 - hammingDistance / 64` for likely duplicates. |
 | `reviewStatus` | enum | Human review state: `NOT_REQUIRED`, `PENDING`, `CONFIRMED_DUPLICATE`, `CONFIRMED_DISTINCT`. |

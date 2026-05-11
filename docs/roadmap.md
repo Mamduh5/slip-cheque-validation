@@ -28,7 +28,7 @@
 - CI-friendly Playwright bootstrap/readiness wrapper for Docker-backed MongoDB and MinIO.
 - Owner-only document detail and original-image access.
 - Document records with exact and likely duplicate fields.
-- Structure-aware transfer-slip duplicate detection that uses QR decode and parsed transfer metadata to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
+- Structure-aware transfer-slip duplicate detection that uses QR decode, parsed transfer metadata, and image-read OCR fields to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
 - Staged upload progress indicator with disabled submit and clear stage labels.
 - Post-upload result summary on the document detail page derived from stored document fields, redirect-safe and refresh-safe.
 - Duplicate-decision transparency: a dedicated "Duplicate decision" card on the document detail page explaining exact duplicate, likely duplicate, new upload, and suppressed near-duplicate outcomes with structured-conflict reasons.
@@ -56,7 +56,6 @@
 - Cluster-level duplicate review behavior beyond pair memory.
 - Broader transfer payload parsing formats beyond the initial Thai QR payment support.
 - External truth verification for bank transfer slips (requires a real provider, credentials, and claim semantics).
-- OCR-assisted field extraction.
 - Cheque-specific field extraction.
 - Review workflow for possible duplicates.
 - Admin audit views and retention controls.

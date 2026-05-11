@@ -578,6 +578,7 @@ export async function updateDocumentTypeForUser(input: {
         qrCandidateAnalysis: null,
         qrDecode: null,
         transferMetadata: null,
+        slipImageRead: null,
         slipVerification: null,
         updatedAt: now
       }
@@ -597,6 +598,7 @@ export async function updateDocumentTypeForUser(input: {
       oldProcessingProfileName: oldProcessingProfile.name,
       newProcessingProfileName: newProcessingProfile.name,
       qrCandidateAnalysisReset: document.qrCandidateAnalysis ? true : false,
+      slipImageReadReset: document.slipImageRead ? true : false,
       slipVerificationReset: document.slipVerification ? true : false,
       changedByUserId: input.userId,
       unchangedDuplicateStatus: oldDuplicateStatus,
