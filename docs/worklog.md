@@ -2,6 +2,58 @@
 
 ## 2026-05-12
 
+### CSV Export of Current Workflow Results
+
+#### Changed
+
+- Added owner-scoped CSV export routes:
+  - `GET /api/exports/dashboard`
+  - `GET /api/exports/review`
+- Dashboard export reuses current dashboard query state:
+  - `review`
+  - `documentType`
+  - `duplicateStatus`
+  - `decision`
+  - `q`
+- Review queue export reuses current queue query state:
+  - `q`
+  - `sort`
+  - intentionally ignores `page` so export covers the full searched/sorted queue, not just the visible page.
+- Added compact Export CSV actions on:
+  - `/dashboard`
+  - `/review`
+- Added `lib/csv-export.ts` for CSV headers, row formatting, escaping, and compact operational field selection.
+- Added `lib/export-query.ts` for safe route query parsing.
+- Added export-specific data helpers:
+  - `getDashboardExportDocumentsForUser`
+  - `getReviewQueueExportForUser`
+- CSV fields include document id, filename, created time, document type, duplicate/review states, duplicate reasons, extracted amount/reference/receiver/sender/date/banks, similarity score, and matched document id/name.
+- Raw OCR text, raw QR payloads, hashes, object keys, metrics, and debug payloads are not exported.
+
+#### Key Decisions
+
+- CSV is the only export format in this pass.
+- Export covers the full filtered/search result set within the current practical export cap, not only the visible page.
+- Exports remain authenticated and owner-scoped.
+- Exported fields are stored/extracted/system fields only. No bank/provider verification semantics were added.
+
+#### Verification
+
+- Focused run: `npx vitest run tests/csv-export.test.ts tests/export-routes.test.ts tests/documents.test.ts tests/review-queue.test.ts` - 4 files passed, 53 tests passed
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 22 files passed, 312 tests passed
+- `npm run build` - clean
+
+#### Known Limitations
+
+- CSV only; no XLSX/PDF export.
+- Export result set has a practical cap of 5000 records.
+- No asynchronous large export jobs.
+- No custom column selection.
+
+## 2026-05-12
+
 ### Built-in Workflow Presets
 
 #### Changed

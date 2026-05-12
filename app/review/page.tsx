@@ -56,6 +56,14 @@ function buildReviewUrl(params: { q: string; sort: ReviewQueueSort; page: number
   return query ? `/review?${query}` : "/review";
 }
 
+function buildReviewExportUrl(params: { q: string; sort: ReviewQueueSort }) {
+  const searchParams = new URLSearchParams();
+  if (params.q) searchParams.set("q", params.q);
+  if (params.sort !== "newest") searchParams.set("sort", params.sort);
+  const query = searchParams.toString();
+  return query ? `/api/exports/review?${query}` : "/api/exports/review";
+}
+
 function QueueCard({
   document,
   matchedDocument
@@ -158,6 +166,7 @@ export default async function ReviewQueuePage({
   const queue = await getReviewQueueForUser(user.id, { searchQuery, sort, page, pageSize: 10 });
   const hasSearchOrSort = searchQuery || sort !== "newest";
   const activePresetId = resolveActiveReviewPreset(sort);
+  const exportHref = buildReviewExportUrl({ q: searchQuery, sort });
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
@@ -168,12 +177,20 @@ export default async function ReviewQueuePage({
             Documents flagged as likely duplicates waiting for your review.
           </p>
         </div>
-        <Link
-          className="self-start rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 sm:self-auto"
-          href="/dashboard"
-        >
-          Back to dashboard
-        </Link>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Link
+            className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+            href={exportHref}
+          >
+            Export CSV
+          </Link>
+          <Link
+            className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+            href="/dashboard"
+          >
+            Back to dashboard
+          </Link>
+        </div>
       </div>
 
       <WorkflowPresetRow
@@ -217,6 +234,9 @@ export default async function ReviewQueuePage({
           </button>
         </div>
         <p className="mt-2 text-xs text-slate-500">Search uses extracted fields only. Full OCR text is not searched here.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the full searched and sorted queue, not just this page.
+        </p>
       </form>
 
       {queue.items.length === 0 ? (

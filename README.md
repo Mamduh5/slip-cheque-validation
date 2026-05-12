@@ -26,6 +26,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Dashboard and review queue search extracted fields from transfer slips: amount, transaction/reference number, receiver/sender names, date/time, banks, and account tails. Search uses structured fields and comparison-safe normalization where available; it does not search raw OCR text by default.
 - Review queue supports compact search, explicit sorting, and pagination so pending likely duplicates stay manageable as volume grows.
 - Built-in workflow presets provide quick URL-driven views for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Custom saved views are deferred.
+- Dashboard and review queue support CSV export of the current filtered/search/sorted working set. Export includes compact operational fields and covers the full matching set, not just the visible page.
 - Uploads require an explicit document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
 - Owners can correct a document type after upload; type changes are audited and do not alter duplicate, review, or quality status.
 - Bank transfer slips run conservative QR-candidate analysis, QR decode, transfer-metadata parsing, and slip-image-read (OCR field extraction) stages.
@@ -142,6 +143,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Dashboard search is owner-scoped and applies to stored extracted fields after the normal filters. The first version is intentionally simple and capped; it is not a full-text search platform.
 - The review queue supports newest first, oldest first, highest similarity first, and lowest similarity first. It paginates pending likely duplicates and preserves search/sort state across pages.
 - Workflow presets are thin query-string shortcuts over existing filters/search/sort state. They are bookmarkable/shareable and do not add new verification or duplicate semantics.
+- CSV export routes are owner-scoped and reuse the same effective dashboard/review query state. They export current workflow data only: document identity, filename, upload time, type/status fields, extracted amount/reference/name/date/bank fields, similarity, matched document, and compact duplicate reasons. Raw OCR and technical debug payloads are not exported.
 - Reviewed document pairs are remembered owner-by-owner in `duplicate_review_pairs`, so the same exact pair does not keep appearing as unresolved after review.
 - Quality assessment is separate from duplicate and review state. Accepted uploads store `qualityStatus`, `qualityWarnings`, `qualityMetrics`, and `qualityCheckedAt`.
 - Most quality issues warn and continue. Clearly unusable tiny images are rejected with a capture-quality error before the duplicate pipeline runs.
@@ -154,7 +156,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering and extracted-field search, workflow preset URL mappings, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering and extracted-field search, workflow preset URL mappings, CSV export formatting and route mapping, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, local-only structural slip validation, and conservative non-slip profile behavior.
 

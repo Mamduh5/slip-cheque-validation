@@ -114,6 +114,23 @@ function hasActiveFilters(params: {
   );
 }
 
+function buildDashboardExportUrl(input: {
+  review: DocumentReviewFilter;
+  documentType?: typeof documentTypes[number];
+  duplicateStatus?: typeof duplicateStatuses[number];
+  duplicateDecisionType?: typeof duplicateDecisionTypes[number];
+  searchQuery: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (input.review !== "all") searchParams.set("review", input.review);
+  if (input.documentType) searchParams.set("documentType", input.documentType);
+  if (input.duplicateStatus) searchParams.set("duplicateStatus", input.duplicateStatus);
+  if (input.duplicateDecisionType) searchParams.set("decision", input.duplicateDecisionType);
+  if (input.searchQuery) searchParams.set("q", input.searchQuery);
+  const query = searchParams.toString();
+  return query ? `/api/exports/dashboard?${query}` : "/api/exports/dashboard";
+}
+
 export default async function DashboardPage({
   searchParams
 }: {
@@ -148,6 +165,13 @@ export default async function DashboardPage({
     duplicateStatus: duplicateStatusFilter,
     duplicateDecisionType: duplicateDecisionTypeFilter
   });
+  const exportHref = buildDashboardExportUrl({
+    review: reviewFilter,
+    documentType: documentTypeFilter,
+    duplicateStatus: duplicateStatusFilter,
+    duplicateDecisionType: duplicateDecisionTypeFilter,
+    searchQuery
+  });
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
@@ -158,12 +182,20 @@ export default async function DashboardPage({
             Recent uploads, machine duplicate status, and review decisions.
           </p>
         </div>
-        <Link
-          className="rounded-md bg-accent px-4 py-2 text-center font-medium text-white hover:bg-accent-dark"
-          href="/upload"
-        >
-          Upload document
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="rounded-md border border-line bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:border-slate-400"
+            href={exportHref}
+          >
+            Export CSV
+          </Link>
+          <Link
+            className="rounded-md bg-accent px-4 py-2 text-center font-medium text-white hover:bg-accent-dark"
+            href="/upload"
+          >
+            Upload document
+          </Link>
+        </div>
       </div>
 
       {pendingCount > 0 && (
@@ -196,6 +228,9 @@ export default async function DashboardPage({
         duplicateDecisionTypeFilter={duplicateDecisionTypeFilter}
         searchQuery={searchQuery}
       />
+      <p className="-mt-2 mb-4 text-xs text-slate-500">
+        Export CSV downloads the full filtered result set, not just the visible rows.
+      </p>
 
       {documents.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">

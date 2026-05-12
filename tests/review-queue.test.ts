@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getReviewQueueForUser } from "../lib/documents";
+import { getReviewQueueExportForUser, getReviewQueueForUser } from "../lib/documents";
 import {
   reviewValuesMatch,
   getImageReadField,
@@ -301,6 +301,27 @@ describe("getReviewQueueForUser", () => {
       "higher-match.jpg",
       "lower-match.jpg"
     ]);
+  });
+
+  it("exports the full searched and sorted review queue without pagination", async () => {
+    for (let index = 0; index < 12; index += 1) {
+      mockDocuments.push(
+        makeDoc({
+          originalFilename: `match-${index}.jpg`,
+          similarityScore: index / 20,
+          slipImageRead: makeSlipImageRead({ receiverName: "Export Receiver" })
+        })
+      );
+    }
+
+    const rows = await getReviewQueueExportForUser("user-1", {
+      searchQuery: "Export Receiver",
+      sort: "highest-similarity"
+    });
+
+    expect(rows).toHaveLength(12);
+    expect(rows[0].document.originalFilename).toBe("match-11.jpg");
+    expect(rows.at(-1)?.document.originalFilename).toBe("match-0.jpg");
   });
 });
 

@@ -54,6 +54,13 @@ export interface ReviewQueueResult {
   searchQuery: string;
 }
 
+export interface ExportDocumentResult {
+  document: DocumentRecord;
+  matchedDocument: DocumentRecord | null;
+}
+
+const exportResultLimit = 5000;
+
 async function ensureDocumentIndexes() {
   if (indexesReady) {
     return;
@@ -550,6 +557,24 @@ function sortReviewDocuments(documents: DocumentRecord[], sort: ReviewQueueSort)
   });
 }
 
+async function getMatchedDocumentsForUser(documents: DocumentRecord[], userId: string) {
+  const db = await getDb();
+  const validMatchedIds = documents
+    .filter((d) => d.matchedDocumentId && ObjectId.isValid(d.matchedDocumentId))
+    .map((d) => new ObjectId(d.matchedDocumentId as string));
+
+  if (validMatchedIds.length === 0) {
+    return new Map<string, DocumentRecord>();
+  }
+
+  const matchedDocs = await db
+    .collection<DocumentRecord>("documents")
+    .find({ _id: { $in: validMatchedIds }, userId })
+    .toArray();
+
+  return new Map(matchedDocs.map((d) => [String(d._id), d]));
+}
+
 export async function getReviewQueueForUser(userId: string, options: ReviewQueueOptions = {}): Promise<ReviewQueueResult> {
   await ensureDocumentIndexes();
   const db = await getDb();
@@ -585,19 +610,7 @@ export async function getReviewQueueForUser(userId: string, options: ReviewQueue
       .toArray();
   }
 
-  const validMatchedIds = pending
-    .filter((d) => d.matchedDocumentId && ObjectId.isValid(d.matchedDocumentId))
-    .map((d) => new ObjectId(d.matchedDocumentId as string));
-
-  const matchedDocs =
-    validMatchedIds.length > 0
-      ? await db
-          .collection<DocumentRecord>("documents")
-          .find({ _id: { $in: validMatchedIds }, userId })
-          .toArray()
-      : [];
-
-  const matchedById = new Map(matchedDocs.map((d) => [String(d._id), d]));
+  const matchedById = await getMatchedDocumentsForUser(pending, userId);
 
   return {
     items: pending.map((doc) => ({
@@ -613,20 +626,44 @@ export async function getReviewQueueForUser(userId: string, options: ReviewQueue
   };
 }
 
-export async function getRecentDocumentsForUser(
+export async function getReviewQueueExportForUser(
+  userId: string,
+  options: Pick<ReviewQueueOptions, "searchQuery" | "sort"> = {}
+): Promise<ExportDocumentResult[]> {
+  await ensureDocumentIndexes();
+  const db = await getDb();
+  const sort = options.sort ?? "newest";
+  const searchQuery = (options.searchQuery ?? "").trim();
+  const query = { userId, duplicateStatus: "LIKELY_DUPLICATE" as const, reviewStatus: "PENDING" as const };
+  const candidates = await db
+    .collection<DocumentRecord>("documents")
+    .find(query)
+    .sort(reviewQueueSort(sort))
+    .limit(exportResultLimit)
+    .toArray();
+  const documents = searchQuery
+    ? sortReviewDocuments(
+        candidates.filter((document) => documentMatchesExtractedFieldSearch(document, searchQuery)),
+        sort
+      )
+    : candidates;
+  const matchedById = await getMatchedDocumentsForUser(documents, userId);
+
+  return documents.map((document) => ({
+    document,
+    matchedDocument: document.matchedDocumentId ? (matchedById.get(document.matchedDocumentId) ?? null) : null
+  }));
+}
+
+function buildRecentDocumentsQuery(
   userId: string,
   input: {
-    limit?: number;
     reviewFilter?: DocumentReviewFilter;
     documentType?: DocumentType;
     duplicateStatus?: DuplicateStatus;
     duplicateDecisionType?: DuplicateDecisionType;
-    searchQuery?: string;
-  } = {}
+  }
 ) {
-  await ensureDocumentIndexes();
-
-  const db = await getDb();
   const query: {
     userId: string;
     reviewStatus?: ReviewStatus;
@@ -656,6 +693,24 @@ export async function getRecentDocumentsForUser(
     query.duplicateDecisionType = input.duplicateDecisionType;
   }
 
+  return query;
+}
+
+export async function getRecentDocumentsForUser(
+  userId: string,
+  input: {
+    limit?: number;
+    reviewFilter?: DocumentReviewFilter;
+    documentType?: DocumentType;
+    duplicateStatus?: DuplicateStatus;
+    duplicateDecisionType?: DuplicateDecisionType;
+    searchQuery?: string;
+  } = {}
+) {
+  await ensureDocumentIndexes();
+
+  const db = await getDb();
+  const query = buildRecentDocumentsQuery(userId, input);
   const searchQuery = input.searchQuery?.trim();
   const baseCursor = db
     .collection<DocumentRecord>("documents")
@@ -670,6 +725,38 @@ export async function getRecentDocumentsForUser(
   }
 
   return baseCursor.limit(input.limit ?? 12).toArray();
+}
+
+export async function getDashboardExportDocumentsForUser(
+  userId: string,
+  input: {
+    reviewFilter?: DocumentReviewFilter;
+    documentType?: DocumentType;
+    duplicateStatus?: DuplicateStatus;
+    duplicateDecisionType?: DuplicateDecisionType;
+    searchQuery?: string;
+  } = {}
+): Promise<ExportDocumentResult[]> {
+  await ensureDocumentIndexes();
+
+  const db = await getDb();
+  const query = buildRecentDocumentsQuery(userId, input);
+  const searchQuery = input.searchQuery?.trim();
+  const candidates = await db
+    .collection<DocumentRecord>("documents")
+    .find(query)
+    .sort({ createdAt: -1 })
+    .limit(exportResultLimit)
+    .toArray();
+  const documents = searchQuery
+    ? candidates.filter((document) => documentMatchesExtractedFieldSearch(document, searchQuery))
+    : candidates;
+  const matchedById = await getMatchedDocumentsForUser(documents, userId);
+
+  return documents.map((document) => ({
+    document,
+    matchedDocument: document.matchedDocumentId ? (matchedById.get(document.matchedDocumentId) ?? null) : null
+  }));
 }
 
 export async function getDocumentForUser(id: string, userId: string) {

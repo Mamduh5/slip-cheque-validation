@@ -40,6 +40,7 @@
 - Dashboard and review queue extracted-field search for amount, reference, receiver/sender names, date/time, banks, and account tails, using comparison-safe normalization where existing helpers support it.
 - Review queue sorting and pagination for pending likely duplicates, with newest/oldest/highest-similarity/lowest-similarity ordering.
 - Built-in workflow presets for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Presets are URL-driven query shortcuts, not user preference records.
+- CSV export for dashboard and review queue working sets, using current filter/search/sort URL state and compact operational fields only.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 - Lightweight dev regression runner (`scripts/inspect-transfer-slip.ts`) for local OCR extraction and duplicate-assessment inspection on real image fixtures without touching the database.
 - Field-specific trust tiers for image-read duplicate suppression: `amount` and `transactionReference` suppress at `MEDIUM` confidence or higher; `receiverName`, `senderName`, `dateTime`, and `receiverBank` suppress alone at `HIGH` or combine as multi-signal at `MEDIUM`. The system no longer depends on QR metadata or on a single field to suppress clearly different transfer-slip near-duplicates.

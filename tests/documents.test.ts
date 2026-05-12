@@ -11,6 +11,7 @@ import {
   buildDocumentObjectKey,
   buildUploadedDocumentRecord,
   calculateSha256,
+  getDashboardExportDocumentsForUser,
   getRecentDocumentsForUser
 } from "../lib/documents";
 import { getDb } from "../lib/mongodb";
@@ -596,5 +597,22 @@ describe("document list filtering", () => {
     const documents = await getRecentDocumentsForUser(userId, { searchQuery: "does-not-exist" });
 
     expect(documents).toHaveLength(0);
+  });
+
+  it("exports the full filtered dashboard result set with search applied", async () => {
+    const rows = await getDashboardExportDocumentsForUser(userId, {
+      documentType: "BANK_TRANSFER_SLIP",
+      searchQuery: "500"
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(String(rows[0].document._id)).toBe(String(documentIds[0]));
+    expect(rows[0].matchedDocument).toBeNull();
+  });
+
+  it("keeps dashboard export owner scoped", async () => {
+    const rows = await getDashboardExportDocumentsForUser("other-user-id", { searchQuery: "500" });
+
+    expect(rows).toHaveLength(0);
   });
 });

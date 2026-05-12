@@ -247,6 +247,45 @@ Presets preserve manual search text where it is useful and reset pagination when
 
 Custom user-saved views are intentionally deferred. The current implementation stays small: no preferences table, no rename/delete UI, and no hidden client-only state.
 
+## CSV Export
+
+CSV export is available from the dashboard and review queue. It exports the current workflow result set using the same URL query state as the page.
+
+Surfaces:
+
+- `/api/exports/dashboard` exports dashboard results for the active `review`, `documentType`, `duplicateStatus`, `decision`, and `q` params.
+- `/api/exports/review` exports pending review queue results for the active `q` and `sort` params.
+
+Export scope:
+
+- Dashboard export covers the full matching dashboard result set, not just the visible recent rows.
+- Review queue export covers the full searched and sorted queue, not just the current paginated page.
+- Review export intentionally ignores the `page` param.
+- Both exports are authenticated and owner-scoped.
+
+CSV fields:
+
+- Document id
+- Filename
+- Created at
+- Document type
+- Duplicate status
+- Duplicate decision
+- Duplicate decision reasons
+- Review status
+- Amount (extracted)
+- Reference number (extracted)
+- Receiver name (extracted)
+- Sender name (extracted)
+- Date/time (extracted)
+- Receiver bank (extracted)
+- Sender bank (extracted)
+- Similarity score
+- Matched document id
+- Matched filename
+
+The export is operational and compact. It does not include raw OCR text, raw QR payloads, image metrics, hashes, object storage keys, or other technical/debug payloads. Exported extracted values remain extracted/system fields only and do not imply bank/provider verification.
+
 ## Document-Type Correction
 
 Owners can correct `documentType` after upload from the document detail page. The update is handled by `PATCH /api/documents/{id}` and is owner-scoped like the detail and original-image routes.
