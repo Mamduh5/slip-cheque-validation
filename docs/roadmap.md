@@ -39,6 +39,7 @@
 - Dashboard filtering by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Dashboard and review queue extracted-field search for amount, reference, receiver/sender names, date/time, banks, and account tails, using comparison-safe normalization where existing helpers support it.
 - Review queue sorting and pagination for pending likely duplicates, with newest/oldest/highest-similarity/lowest-similarity ordering.
+- Built-in workflow presets for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Presets are URL-driven query shortcuts, not user preference records.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
 - Lightweight dev regression runner (`scripts/inspect-transfer-slip.ts`) for local OCR extraction and duplicate-assessment inspection on real image fixtures without touching the database.
 - Field-specific trust tiers for image-read duplicate suppression: `amount` and `transactionReference` suppress at `MEDIUM` confidence or higher; `receiverName`, `senderName`, `dateTime`, and `receiverBank` suppress alone at `HIGH` or combine as multi-signal at `MEDIUM`. The system no longer depends on QR metadata or on a single field to suppress clearly different transfer-slip near-duplicates.
@@ -74,6 +75,7 @@
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
 - Add richer review history and notes if users need audit comments.
 - Add persisted normalized search keys and indexes if extracted-field search needs to scale beyond the current capped owner-scoped candidate set.
+- Add owner-scoped custom saved views only if built-in workflow presets prove insufficient.
 
 ## Later Phases
 

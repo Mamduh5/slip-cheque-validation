@@ -2,6 +2,47 @@
 
 ## 2026-05-12
 
+### Built-in Workflow Presets
+
+#### Changed
+
+- Added built-in URL-driven workflow presets for common operational views.
+  - Dashboard: Recent uploads, Needs review, Exact duplicates, New uploads, Suppressed near-duplicates.
+  - Review queue: Needs review, Strongest matches, Hardest cases, Oldest first.
+- Added `lib/workflow-presets.ts` with pure preset definitions, URL builders, and active-preset resolution helpers.
+- Added `components/workflow-preset-row.tsx`, a compact reusable preset chip row with active-state rendering.
+- Added preset rows to:
+  - `/dashboard`, above the existing search/filter controls.
+  - `/review`, above the existing queue search/sort controls.
+- Added a real dashboard `decision` query parameter backed by `duplicateDecisionType`.
+  - `decision=NEW_UPLOAD` powers the New uploads preset.
+  - `decision=SUPPRESSED_NEAR_DUPLICATE` powers the Suppressed near-duplicates preset.
+  - This avoids treating suppressed near-duplicates as ordinary new uploads.
+- Threaded `duplicateDecisionType` through `getRecentDocumentsForUser` and dashboard filter URL state so presets remain bookmarkable and compose with search.
+
+#### Key Decisions
+
+- Custom user-saved views were deferred. Built-in presets cover the current repeatable workflows without adding a preferences table or rename/delete UI.
+- Presets are not hidden client state. They are stable query strings over the existing server-rendered filter/search/sort model.
+- Preset names stay semantic and conservative: no bank/provider verification or fraud claims.
+- Switching review presets resets pagination by design; search text is preserved where useful.
+
+#### Verification
+
+- Focused run: `npx vitest run tests/workflow-presets.test.ts tests/workflow-preset-row.test.ts tests/documents.test.ts` - 3 files passed, 28 tests passed
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 20 files passed, 303 tests passed
+- `npm run build` - clean
+
+#### Known Limitations
+
+- No owner-defined custom saved views yet.
+- Presets are built in code, not managed from a database.
+- Presets do not store per-user defaults.
+
+## 2026-05-12
+
 ### Extracted-Field Search and Review Queue Scale Polish
 
 #### Changed

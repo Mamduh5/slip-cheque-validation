@@ -224,6 +224,29 @@ Implementation notes:
 - `getReviewQueueForUser` keeps the owner-scoped pending likely-duplicate query, then applies extracted-field search to a capped queue candidate set when `q` is present.
 - This is not a full-text search subsystem. If volume grows beyond the cap, the next step should be persisted normalized search keys and indexes.
 
+## Workflow Presets
+
+Workflow presets are built-in URL shortcuts over existing filters, search, and sort state. They do not create new data, new statuses, or new verification semantics.
+
+Dashboard presets:
+
+- **Recent uploads**: `/dashboard`
+- **Needs review**: `/dashboard?review=pending`
+- **Exact duplicates**: `/dashboard?duplicateStatus=EXACT_DUPLICATE`
+- **New uploads**: `/dashboard?decision=NEW_UPLOAD`
+- **Suppressed near-duplicates**: `/dashboard?decision=SUPPRESSED_NEAR_DUPLICATE`
+
+Review queue presets:
+
+- **Needs review**: `/review`
+- **Strongest matches**: `/review?sort=highest-similarity`
+- **Hardest cases**: `/review?sort=lowest-similarity`
+- **Oldest first**: `/review?sort=oldest`
+
+Presets preserve manual search text where it is useful and reset pagination when switching modes. Active state is derived from the current URL/query state, so bookmarked or shared preset URLs render the same view after refresh.
+
+Custom user-saved views are intentionally deferred. The current implementation stays small: no preferences table, no rename/delete UI, and no hidden client-only state.
+
 ## Document-Type Correction
 
 Owners can correct `documentType` after upload from the document detail page. The update is handled by `PATCH /api/documents/{id}` and is owner-scoped like the detail and original-image routes.

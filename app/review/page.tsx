@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { WorkflowPresetRow } from "@/components/workflow-preset-row";
 import { getReviewQueueForUser, type ReviewQueueSort } from "@/lib/documents";
 import { reasonCodeToLabel } from "@/lib/document-result-summary";
+import { resolveActiveReviewPreset, reviewPresetHref, reviewPresets } from "@/lib/workflow-presets";
 import { requireUser } from "@/lib/session";
 import type { DocumentRecord } from "@/lib/models";
 
@@ -155,6 +157,7 @@ export default async function ReviewQueuePage({
   const page = parsePage(resolvedSearchParams?.page);
   const queue = await getReviewQueueForUser(user.id, { searchQuery, sort, page, pageSize: 10 });
   const hasSearchOrSort = searchQuery || sort !== "newest";
+  const activePresetId = resolveActiveReviewPreset(sort);
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
@@ -172,6 +175,17 @@ export default async function ReviewQueuePage({
           Back to dashboard
         </Link>
       </div>
+
+      <WorkflowPresetRow
+        label="Quick views"
+        activePresetId={activePresetId}
+        presets={reviewPresets.map((preset) => ({
+          id: preset.id,
+          label: preset.label,
+          description: preset.description,
+          href: reviewPresetHref(preset, { q: searchQuery })
+        }))}
+      />
 
       <form className="mb-4 rounded-lg border border-line bg-white p-3" action="/review">
         <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="review-search">

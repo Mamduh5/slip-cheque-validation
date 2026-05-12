@@ -23,6 +23,7 @@ import type {
   DocumentRecord,
   DocumentType,
   DuplicateDecisionReason,
+  DuplicateDecisionType,
   DuplicateStatus,
   ReviewPairDecision,
   ReviewStatus,
@@ -619,6 +620,7 @@ export async function getRecentDocumentsForUser(
     reviewFilter?: DocumentReviewFilter;
     documentType?: DocumentType;
     duplicateStatus?: DuplicateStatus;
+    duplicateDecisionType?: DuplicateDecisionType;
     searchQuery?: string;
   } = {}
 ) {
@@ -630,6 +632,7 @@ export async function getRecentDocumentsForUser(
     reviewStatus?: ReviewStatus;
     documentType?: DocumentType;
     duplicateStatus?: DuplicateStatus;
+    duplicateDecisionType?: DuplicateDecisionType;
   } = { userId };
   const reviewFilter = input.reviewFilter ?? "all";
 
@@ -647,6 +650,10 @@ export async function getRecentDocumentsForUser(
 
   if (input.duplicateStatus) {
     query.duplicateStatus = input.duplicateStatus;
+  }
+
+  if (input.duplicateDecisionType) {
+    query.duplicateDecisionType = input.duplicateDecisionType;
   }
 
   const searchQuery = input.searchQuery?.trim();

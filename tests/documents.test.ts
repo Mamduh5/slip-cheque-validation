@@ -491,8 +491,8 @@ describe("document list filtering", () => {
         qualityCheckedAt: now,
         duplicateDecision: {
           duplicateStatus: "NEW",
-          duplicateDecisionType: "NEW_UPLOAD",
-          duplicateDecisionReasons: [],
+          duplicateDecisionType: "SUPPRESSED_NEAR_DUPLICATE",
+          duplicateDecisionReasons: ["AMOUNT_MISMATCH"],
           matchedDocumentId: null,
           similarityScore: null
         }
@@ -556,6 +556,18 @@ describe("document list filtering", () => {
     const documents = await getRecentDocumentsForUser(userId, { limit: 2 });
 
     expect(documents).toHaveLength(2);
+  });
+
+  it("filters by duplicateDecisionType for workflow presets", async () => {
+    const newUploads = await getRecentDocumentsForUser(userId, { duplicateDecisionType: "NEW_UPLOAD" });
+    const suppressed = await getRecentDocumentsForUser(userId, {
+      duplicateDecisionType: "SUPPRESSED_NEAR_DUPLICATE"
+    });
+
+    expect(newUploads).toHaveLength(1);
+    expect(String(newUploads[0]._id)).toBe(String(documentIds[0]));
+    expect(suppressed).toHaveLength(1);
+    expect(String(suppressed[0]._id)).toBe(String(documentIds[3]));
   });
 
   it("searches documents by extracted amount", async () => {

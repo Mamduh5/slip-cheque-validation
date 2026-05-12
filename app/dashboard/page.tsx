@@ -2,11 +2,17 @@ import Link from "next/link";
 import { DocumentStatusPill } from "@/components/document-status-pill";
 import { ReviewStatusPill } from "@/components/review-status-pill";
 import { DashboardFilters } from "@/components/dashboard-filters";
+import { WorkflowPresetRow } from "@/components/workflow-preset-row";
 import { formatDocumentType } from "@/lib/document-types";
-import { duplicateStatuses, documentTypes } from "@/lib/models";
+import { duplicateDecisionTypes, duplicateStatuses, documentTypes } from "@/lib/models";
 import { getRecentDocumentsForUser, getReviewQueueForUser } from "@/lib/documents";
 import { type DocumentReviewFilter } from "@/lib/formatters";
 import { parseSuppressionReasons } from "@/lib/document-result-summary";
+import {
+  dashboardPresetHref,
+  dashboardPresets,
+  resolveActiveDashboardPreset
+} from "@/lib/workflow-presets";
 import { requireUser } from "@/lib/session";
 
 function formatDate(date: Date) {
@@ -85,36 +91,63 @@ function parseDuplicateStatusFilter(value: string | undefined): typeof duplicate
   return undefined;
 }
 
+function parseDuplicateDecisionTypeFilter(value: string | undefined): typeof duplicateDecisionTypes[number] | undefined {
+  if (value && duplicateDecisionTypes.includes(value as any)) {
+    return value as typeof duplicateDecisionTypes[number];
+  }
+  return undefined;
+}
+
 function hasActiveFilters(params: {
   review: DocumentReviewFilter;
   documentType?: typeof documentTypes[number];
   duplicateStatus?: typeof duplicateStatuses[number];
+  duplicateDecisionType?: typeof duplicateDecisionTypes[number];
   searchQuery?: string;
 }): boolean {
-  return params.review !== "all" || !!params.documentType || !!params.duplicateStatus || !!params.searchQuery;
+  return (
+    params.review !== "all" ||
+    !!params.documentType ||
+    !!params.duplicateStatus ||
+    !!params.duplicateDecisionType ||
+    !!params.searchQuery
+  );
 }
 
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: Promise<{ review?: string; documentType?: string; duplicateStatus?: string; q?: string }>;
+  searchParams?: Promise<{
+    review?: string;
+    documentType?: string;
+    duplicateStatus?: string;
+    decision?: string;
+    q?: string;
+  }>;
 }) {
   const user = await requireUser();
   const resolvedSearchParams = await searchParams;
   const reviewFilter = parseReviewFilter(resolvedSearchParams?.review);
   const documentTypeFilter = parseDocumentTypeFilter(resolvedSearchParams?.documentType);
   const duplicateStatusFilter = parseDuplicateStatusFilter(resolvedSearchParams?.duplicateStatus);
+  const duplicateDecisionTypeFilter = parseDuplicateDecisionTypeFilter(resolvedSearchParams?.decision);
   const searchQuery = (resolvedSearchParams?.q ?? "").trim();
   const [documents, reviewQueue] = await Promise.all([
     getRecentDocumentsForUser(user.id, {
       reviewFilter,
       documentType: documentTypeFilter,
       duplicateStatus: duplicateStatusFilter,
+      duplicateDecisionType: duplicateDecisionTypeFilter,
       searchQuery
     }),
     getReviewQueueForUser(user.id)
   ]);
   const pendingCount = reviewQueue.total;
+  const activePresetId = resolveActiveDashboardPreset({
+    review: reviewFilter,
+    duplicateStatus: duplicateStatusFilter,
+    duplicateDecisionType: duplicateDecisionTypeFilter
+  });
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
@@ -145,10 +178,22 @@ export default async function DashboardPage({
         </Link>
       )}
 
+      <WorkflowPresetRow
+        label="Quick views"
+        activePresetId={activePresetId}
+        presets={dashboardPresets.map((preset) => ({
+          id: preset.id,
+          label: preset.label,
+          description: preset.description,
+          href: dashboardPresetHref(preset, { q: searchQuery, documentType: documentTypeFilter })
+        }))}
+      />
+
       <DashboardFilters
         reviewFilter={reviewFilter}
         documentTypeFilter={documentTypeFilter}
         duplicateStatusFilter={duplicateStatusFilter}
+        duplicateDecisionTypeFilter={duplicateDecisionTypeFilter}
         searchQuery={searchQuery}
       />
 
@@ -156,7 +201,13 @@ export default async function DashboardPage({
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
           <h2 className="text-xl font-semibold">No documents found</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">
-            {hasActiveFilters({ review: reviewFilter, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter, searchQuery })
+            {hasActiveFilters({
+              review: reviewFilter,
+              documentType: documentTypeFilter,
+              duplicateStatus: duplicateStatusFilter,
+              duplicateDecisionType: duplicateDecisionTypeFilter,
+              searchQuery
+            })
               ? "No documents match the current filters or search."
               : "Upload a paper financial document image to create the first registry record."}
           </p>

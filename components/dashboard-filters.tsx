@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import Link from "next/link";
-import { duplicateStatuses, documentTypes } from "@/lib/models";
+import { duplicateDecisionTypes, duplicateStatuses, documentTypes } from "@/lib/models";
 import { formatDocumentType } from "@/lib/document-types";
 import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/formatters";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,7 @@ interface DashboardFiltersProps {
   reviewFilter: DocumentReviewFilter;
   documentTypeFilter?: typeof documentTypes[number];
   duplicateStatusFilter?: typeof duplicateStatuses[number];
+  duplicateDecisionTypeFilter?: typeof duplicateDecisionTypes[number];
   searchQuery?: string;
 }
 
@@ -25,6 +26,7 @@ export function DashboardFilters({
   reviewFilter,
   documentTypeFilter,
   duplicateStatusFilter,
+  duplicateDecisionTypeFilter,
   searchQuery = ""
 }: DashboardFiltersProps) {
   const router = useRouter();
@@ -34,6 +36,7 @@ export function DashboardFilters({
     review?: DocumentReviewFilter;
     documentType?: typeof documentTypes[number];
     duplicateStatus?: typeof duplicateStatuses[number];
+    duplicateDecisionType?: typeof duplicateDecisionTypes[number];
     q?: string;
   }): string {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -52,6 +55,11 @@ export function DashboardFilters({
     } else {
       newSearchParams.delete("duplicateStatus");
     }
+    if (params.duplicateDecisionType) {
+      newSearchParams.set("decision", params.duplicateDecisionType);
+    } else {
+      newSearchParams.delete("decision");
+    }
     if (params.q?.trim()) {
       newSearchParams.set("q", params.q.trim());
     } else if (params.q !== undefined) {
@@ -62,11 +70,25 @@ export function DashboardFilters({
   }
 
   function hasActiveFilters(): boolean {
-    return reviewFilter !== "all" || !!documentTypeFilter || !!duplicateStatusFilter || !!searchQuery;
+    return (
+      reviewFilter !== "all" ||
+      !!documentTypeFilter ||
+      !!duplicateStatusFilter ||
+      !!duplicateDecisionTypeFilter ||
+      !!searchQuery
+    );
   }
 
   function handleReviewChange(value: DocumentReviewFilter) {
-    router.push(buildSearchUrl({ review: value, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter, q: searchQuery }));
+    router.push(
+      buildSearchUrl({
+        review: value,
+        documentType: documentTypeFilter,
+        duplicateStatus: duplicateStatusFilter,
+        duplicateDecisionType: duplicateDecisionTypeFilter,
+        q: searchQuery
+      })
+    );
   }
 
   function handleDocumentTypeChange(value: string) {
@@ -75,6 +97,7 @@ export function DashboardFilters({
         review: reviewFilter,
         documentType: value ? (value as typeof documentTypes[number]) : undefined,
         duplicateStatus: duplicateStatusFilter,
+        duplicateDecisionType: duplicateDecisionTypeFilter,
         q: searchQuery
       })
     );
@@ -86,6 +109,7 @@ export function DashboardFilters({
         review: reviewFilter,
         documentType: documentTypeFilter,
         duplicateStatus: value ? (value as typeof duplicateStatuses[number]) : undefined,
+        duplicateDecisionType: duplicateDecisionTypeFilter,
         q: searchQuery
       })
     );
@@ -99,6 +123,7 @@ export function DashboardFilters({
         review: reviewFilter,
         documentType: documentTypeFilter,
         duplicateStatus: duplicateStatusFilter,
+        duplicateDecisionType: duplicateDecisionTypeFilter,
         q: String(formData.get("q") ?? "")
       })
     );
