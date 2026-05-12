@@ -1,91 +1,195 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  buildBatchOutcome,
+  formatBatchSummary,
+  summarizeBatch,
+  type BatchUploadLifecycleStatus
+} from "@/lib/batch-upload";
 import {
   documentTypeOptions,
   formatDocumentType,
   getDocumentTypeDescription,
   getDocumentTypeGuidance
 } from "@/lib/document-types";
-import type { DocumentType, QualityStatus, QualityWarningCode, SourceType } from "@/lib/models";
+import type {
+  DocumentType,
+  DuplicateDecisionReason,
+  DuplicateDecisionType,
+  DuplicateStatus,
+  QualityStatus,
+  QualityWarningCode,
+  ReviewStatus,
+  SourceType
+} from "@/lib/models";
 import { qualityWarningLabels } from "@/lib/quality-thresholds";
 import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
-
-type UploadStage = "idle" | "uploading" | "processing" | "redirecting";
 
 interface UploadResponse {
   documentId?: string;
   error?: string;
+  duplicateStatus?: DuplicateStatus;
+  duplicateDecisionType?: DuplicateDecisionType | null;
+  duplicateDecisionReasons?: DuplicateDecisionReason[];
+  matchedDocumentId?: string | null;
+  similarityScore?: number | null;
+  reviewStatus?: ReviewStatus;
   qualityStatus?: QualityStatus;
   qualityWarnings?: QualityWarningCode[];
 }
 
-function stageLabel(stage: UploadStage): string {
-  switch (stage) {
-    case "uploading":
-      return "Uploading image…";
-    case "processing":
-      return "Processing document…";
-    case "redirecting":
-      return "Finalizing result…";
+interface SelectedUploadItem {
+  id: string;
+  file: File;
+  preview: LocalPreviewState;
+  status: BatchUploadLifecycleStatus;
+  error: string | null;
+  result: UploadResponse | null;
+  qualityWarnings: QualityWarningCode[];
+}
+
+function makeUploadItem(file: File): SelectedUploadItem {
+  const previewUrl = URL.createObjectURL(file);
+
+  return {
+    id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+    file,
+    preview: buildLocalPreviewState({ file, previewUrl }),
+    status: "waiting",
+    error: null,
+    result: null,
+    qualityWarnings: []
+  };
+}
+
+function statusToneClasses(tone: ReturnType<typeof buildBatchOutcome>["tone"]) {
+  switch (tone) {
+    case "positive":
+      return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    case "warning":
+      return "border-orange-200 bg-orange-50 text-orange-900";
+    case "danger":
+      return "border-red-200 bg-red-50 text-red-800";
+    case "info":
+      return "border-sky-200 bg-sky-50 text-sky-900";
     default:
-      return "";
+      return "border-slate-200 bg-slate-50 text-slate-700";
   }
+}
+
+function isInFlight(status: BatchUploadLifecycleStatus) {
+  return status === "uploading" || status === "processing";
 }
 
 export function UploadForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectionTokenRef = useRef(0);
+  const selectedItemsRef = useRef<SelectedUploadItem[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>("UNKNOWN");
   const [sourceType, setSourceType] = useState<SourceType>("CAMERA");
   const [error, setError] = useState<string | null>(null);
-  const [qualityWarnings, setQualityWarnings] = useState<QualityWarningCode[]>([]);
-  const [selectedPreview, setSelectedPreview] = useState<LocalPreviewState | null>(null);
+  const [formQualityWarnings, setFormQualityWarnings] = useState<QualityWarningCode[]>([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedUploadItem[]>([]);
   const [isAnalyzingPreview, setIsAnalyzingPreview] = useState(false);
-  const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
-  const isSubmitting = uploadStage !== "idle";
   const selectedTypeGuidance = getDocumentTypeGuidance(documentType);
+  const isSubmitting = selectedItems.some((item) => isInFlight(item.status));
+  const selectedPreview = selectedItems[0]?.preview ?? null;
+  const batchSummary = useMemo(
+    () =>
+      selectedItems.length > 0
+        ? formatBatchSummary(
+            summarizeBatch(
+              selectedItems.map((item) => ({
+                status: item.status,
+                duplicateStatus: item.result?.duplicateStatus,
+                duplicateDecisionType: item.result?.duplicateDecisionType,
+                reviewStatus: item.result?.reviewStatus,
+                qualityStatus: item.result?.qualityStatus,
+                error: item.error
+              }))
+            )
+          )
+        : [],
+    [selectedItems]
+  );
+  const retryableItems = selectedItems.filter((item) => buildBatchOutcome({
+    status: item.status,
+    qualityStatus: item.result?.qualityStatus,
+    error: item.error
+  }).retryable);
+
+  useEffect(() => {
+    selectedItemsRef.current = selectedItems;
+  }, [selectedItems]);
 
   useEffect(() => {
     return () => {
-      if (selectedPreview?.previewUrl) {
-        URL.revokeObjectURL(selectedPreview.previewUrl);
+      for (const item of selectedItemsRef.current) {
+        URL.revokeObjectURL(item.preview.previewUrl);
       }
     };
-  }, [selectedPreview?.previewUrl]);
+  }, []);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0] ?? null;
+    const files = Array.from(event.currentTarget.files ?? []);
+    const token = selectionTokenRef.current + 1;
+    selectionTokenRef.current = token;
     setError(null);
-    setQualityWarnings([]);
+    setFormQualityWarnings([]);
 
-    if (!file) {
-      setSelectedPreview(null);
+    if (files.length === 0) {
+      revokeSelectedPreviews();
+      setSelectedItems([]);
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setSelectedPreview(buildLocalPreviewState({ file, previewUrl }));
+    revokeSelectedPreviews();
+    const nextItems = files.map(makeUploadItem);
+    setSelectedItems(nextItems);
     setIsAnalyzingPreview(true);
 
     try {
-      const advisoryWarnings = await analyzeImagePreview(previewUrl);
-      setSelectedPreview((current) =>
-        current?.previewUrl === previewUrl ? { ...current, advisoryWarnings } : current
+      const analyzedItems = await Promise.all(
+        nextItems.map(async (item) => {
+          try {
+            const advisoryWarnings = await analyzeImagePreview(item.preview.previewUrl);
+            return { id: item.id, advisoryWarnings };
+          } catch {
+            return { id: item.id, advisoryWarnings: [] };
+          }
+        })
       );
-    } catch {
-      setSelectedPreview((current) =>
-        current?.previewUrl === previewUrl ? { ...current, advisoryWarnings: [] } : current
+
+      if (selectionTokenRef.current !== token) {
+        return;
+      }
+
+      setSelectedItems((current) =>
+        current.map((item) => {
+          const analyzed = analyzedItems.find((candidate) => candidate.id === item.id);
+          return analyzed ? { ...item, preview: { ...item.preview, advisoryWarnings: analyzed.advisoryWarnings } } : item;
+        })
       );
     } finally {
-      setIsAnalyzingPreview(false);
+      if (selectionTokenRef.current === token) {
+        setIsAnalyzingPreview(false);
+      }
+    }
+  }
+
+  function revokeSelectedPreviews() {
+    for (const item of selectedItemsRef.current) {
+      URL.revokeObjectURL(item.preview.previewUrl);
     }
   }
 
   function chooseAnotherImage() {
     setError(null);
-    setQualityWarnings([]);
+    setFormQualityWarnings([]);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -93,53 +197,157 @@ export function UploadForm() {
     }
   }
 
+  function removeItem(itemId: string) {
+    setError(null);
+    setFormQualityWarnings([]);
+    setSelectedItems((current) => {
+      const removed = current.find((item) => item.id === itemId);
+      if (removed) {
+        URL.revokeObjectURL(removed.preview.previewUrl);
+      }
+      return current.filter((item) => item.id !== itemId);
+    });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setQualityWarnings([]);
+    setFormQualityWarnings([]);
 
-    if (!selectedPreview) {
-      setError("Take a photo or choose an image before uploading.");
+    if (selectedItems.length === 0) {
+      setError("Take a photo or choose one or more images before uploading.");
       return;
     }
 
-    setUploadStage("uploading");
+    const waitingIds = selectedItems.filter((item) => item.status === "waiting").map((item) => item.id);
 
-    const formData = new FormData(event.currentTarget);
-    let response: Response;
-
-    try {
-      response = await fetch("/api/documents", {
-        method: "POST",
-        body: formData
-      });
-    } catch {
-      setUploadStage("idle");
-      setError("Upload failed. Check your connection and try again.");
+    if (waitingIds.length === 0) {
+      setError("There are no waiting files to upload.");
       return;
     }
 
-    setUploadStage("processing");
+    const uploaded = await uploadItems(waitingIds);
 
-    const payload = (await response.json().catch(() => null)) as UploadResponse | null;
-
-    if (!response.ok || !payload?.documentId) {
-      setUploadStage("idle");
-      setError(payload?.error ?? "Upload failed.");
-      setQualityWarnings(payload?.qualityWarnings ?? []);
-      return;
+    if (selectedItems.length === 1 && uploaded[0]?.documentId) {
+      router.push(`/documents/${uploaded[0].documentId}`);
+      router.refresh();
     }
+  }
 
-    if (payload.qualityStatus === "WARN") {
-      window.sessionStorage.setItem(
-        `document-quality-${payload.documentId}`,
-        JSON.stringify(payload.qualityWarnings ?? [])
+  async function retryItem(itemId: string) {
+    setError(null);
+    setFormQualityWarnings([]);
+    const uploaded = await uploadItems([itemId]);
+
+    if (selectedItems.length === 1 && uploaded[0]?.documentId) {
+      router.push(`/documents/${uploaded[0].documentId}`);
+      router.refresh();
+    }
+  }
+
+  async function retryFailedItems() {
+    setError(null);
+    setFormQualityWarnings([]);
+    await uploadItems(retryableItems.map((item) => item.id));
+  }
+
+  async function uploadItems(itemIds: string[]) {
+    const uploaded: UploadResponse[] = [];
+
+    for (const itemId of itemIds) {
+      const item = selectedItems.find((candidate) => candidate.id === itemId);
+
+      if (!item) {
+        continue;
+      }
+
+      setSelectedItems((current) =>
+        current.map((candidate) =>
+          candidate.id === itemId
+            ? { ...candidate, status: "uploading", error: null, result: null, qualityWarnings: [] }
+            : candidate
+        )
       );
+
+      const formData = new FormData();
+      formData.set("documentType", documentType);
+      formData.set("sourceType", sourceType);
+      formData.set("file", item.file);
+
+      let response: Response;
+
+      try {
+        response = await fetch("/api/documents", {
+          method: "POST",
+          body: formData
+        });
+      } catch {
+        if (selectedItems.length === 1) {
+          setError("Upload failed. Check your connection and try again.");
+          setFormQualityWarnings([]);
+        }
+        setSelectedItems((current) =>
+          current.map((candidate) =>
+            candidate.id === itemId
+              ? { ...candidate, status: "failed", error: "Upload failed. Check your connection and try again." }
+              : candidate
+          )
+        );
+        continue;
+      }
+
+      setSelectedItems((current) =>
+        current.map((candidate) => (candidate.id === itemId ? { ...candidate, status: "processing" } : candidate))
+      );
+
+      const payload = (await response.json().catch(() => null)) as UploadResponse | null;
+
+      if (!response.ok || !payload?.documentId) {
+        const isQualityRejected = response.status === 422 || payload?.qualityStatus === "FAIL";
+        if (selectedItems.length === 1) {
+          setError(payload?.error ?? "Upload failed.");
+          setFormQualityWarnings(payload?.qualityWarnings ?? []);
+        }
+        setSelectedItems((current) =>
+          current.map((candidate) =>
+            candidate.id === itemId
+              ? {
+                  ...candidate,
+                  status: isQualityRejected ? "rejected" : "failed",
+                  error: payload?.error ?? "Upload failed.",
+                  result: payload,
+                  qualityWarnings: payload?.qualityWarnings ?? []
+                }
+              : candidate
+          )
+        );
+        continue;
+      }
+
+      if (payload.qualityStatus === "WARN") {
+        window.sessionStorage.setItem(
+          `document-quality-${payload.documentId}`,
+          JSON.stringify(payload.qualityWarnings ?? [])
+        );
+      }
+
+      setSelectedItems((current) =>
+        current.map((candidate) =>
+          candidate.id === itemId
+            ? {
+                ...candidate,
+                status: "completed",
+                error: null,
+                result: payload,
+                qualityWarnings: payload.qualityWarnings ?? []
+              }
+            : candidate
+        )
+      );
+      uploaded.push(payload);
     }
 
-    setUploadStage("redirecting");
-    router.push(`/documents/${payload.documentId}`);
-    router.refresh();
+    return uploaded;
   }
 
   return (
@@ -203,7 +411,7 @@ export function UploadForm() {
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="file">
-          Take a photo or choose an image
+          Take photos or choose images
         </label>
         <input
           ref={fileInputRef}
@@ -214,13 +422,120 @@ export function UploadForm() {
           data-testid="document-file-input"
           accept="image/jpeg,image/png,image/webp"
           capture={sourceType === "CAMERA" ? "environment" : undefined}
+          multiple
           onChange={handleFileChange}
           required
         />
         <p className="mt-2 text-xs text-slate-500">
-          Use the camera on phones, or select an existing JPEG, PNG, or WebP image.
+          Use the camera on phones, or select one or more JPEG, PNG, or WebP images.
         </p>
       </div>
+
+      {selectedItems.length > 0 ? (
+        <div className="rounded-md border border-line bg-white" data-testid="selected-files-panel">
+          <div className="flex flex-col gap-1 border-b border-line px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Selected files</p>
+              <p className="text-xs text-slate-500">{selectedItems.length} file{selectedItems.length === 1 ? "" : "s"} ready</p>
+            </div>
+            {retryableItems.length > 0 ? (
+              <button
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                data-testid="retry-failed-batch-button"
+                onClick={retryFailedItems}
+                disabled={isSubmitting}
+              >
+                Retry failed/rejected
+              </button>
+            ) : null}
+          </div>
+          <ul className="divide-y divide-line" data-testid="selected-files-list">
+            {selectedItems.map((item) => {
+              const outcome = buildBatchOutcome({
+                status: item.status,
+                duplicateStatus: item.result?.duplicateStatus,
+                duplicateDecisionType: item.result?.duplicateDecisionType,
+                reviewStatus: item.result?.reviewStatus,
+                qualityStatus: item.result?.qualityStatus,
+                error: item.error
+              });
+              const canReview =
+                item.result?.documentId &&
+                (item.result.duplicateDecisionType === "LIKELY_DUPLICATE_REVIEW" ||
+                  item.result.duplicateStatus === "LIKELY_DUPLICATE") &&
+                item.result.reviewStatus === "PENDING";
+
+              return (
+                <li className="p-3" data-testid="selected-file-item" key={item.id}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{item.preview.fileName}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {item.preview.fileSizeLabel} | {item.preview.mimeType}
+                      </p>
+                      <div
+                        className={`mt-2 inline-flex max-w-full rounded-full border px-2 py-1 text-xs font-medium ${statusToneClasses(outcome.tone)}`}
+                        data-testid="batch-item-outcome"
+                      >
+                        <span className="truncate">{outcome.label}</span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{outcome.description}</p>
+                      {item.qualityWarnings.length > 0 ? (
+                        <ul className="mt-2 flex flex-wrap gap-2 text-xs text-orange-900">
+                          {item.qualityWarnings.map((warning) => (
+                            <li key={warning} className="rounded-full border border-orange-200 bg-orange-50 px-2 py-1">
+                              {qualityWarningLabels[warning]}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {item.result?.documentId ? (
+                        <Link
+                          className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400"
+                          href={`/documents/${item.result.documentId}`}
+                        >
+                          Open detail
+                        </Link>
+                      ) : null}
+                      {canReview ? (
+                        <Link
+                          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
+                          href={`/review/${item.result?.documentId}`}
+                        >
+                          Compare/review
+                        </Link>
+                      ) : null}
+                      {outcome.retryable ? (
+                        <button
+                          className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          type="button"
+                          data-testid="retry-file-button"
+                          onClick={() => retryItem(item.id)}
+                          disabled={isSubmitting}
+                        >
+                          Retry
+                        </button>
+                      ) : null}
+                      <button
+                        className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        type="button"
+                        data-testid="remove-file-button"
+                        onClick={() => removeItem(item.id)}
+                        disabled={isInFlight(item.status)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
 
       {selectedPreview ? (
         <div className="overflow-hidden rounded-md border border-line bg-white" data-testid="selected-image-preview">
@@ -284,7 +599,7 @@ export function UploadForm() {
               onClick={chooseAnotherImage}
               disabled={isSubmitting}
             >
-              Retake or choose another image
+              Retake or choose other images
             </button>
           </div>
         </div>
@@ -299,19 +614,36 @@ export function UploadForm() {
           <li>Retake if text or edges look soft.</li>
         </ul>
       </div>
+
+      {batchSummary.length > 0 ? (
+        <div
+          className="rounded-md border border-line bg-slate-50 p-3 text-sm text-slate-700"
+          data-testid="batch-summary"
+        >
+          <p className="font-medium text-slate-900">Batch summary</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {batchSummary.map((part) => (
+              <span key={part} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs">
+                {part}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {error ? (
         <div
           className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
           data-testid="upload-error-message"
         >
           <p className="font-medium">
-            {qualityWarnings.length > 0 ? "Image rejected due to quality issues" : "Upload failed"}
+            {formQualityWarnings.length > 0 ? "Image rejected due to quality issues" : "Upload failed"}
           </p>
           <p className="mt-1">{error}</p>
-          {qualityWarnings.length > 0 ? (
+          {formQualityWarnings.length > 0 ? (
             <>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                {qualityWarnings.map((warning) => (
+                {formQualityWarnings.map((warning) => (
                   <li key={warning}>{qualityWarningLabels[warning]}</li>
                 ))}
               </ul>
@@ -330,23 +662,9 @@ export function UploadForm() {
         >
           <div className="flex items-center gap-3">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
-            <span className="font-medium">{stageLabel(uploadStage)}</span>
+            <span className="font-medium">Uploading selected files</span>
           </div>
-          <div className="mt-2 flex gap-1">
-            {(["uploading", "processing", "redirecting"] as UploadStage[]).map((stage) => (
-              <div
-                key={stage}
-                className={`h-1.5 flex-1 rounded-full ${
-                  uploadStage === stage ||
-                  ((["processing", "redirecting"] as UploadStage[]).includes(uploadStage) &&
-                    (["uploading", "processing"] as UploadStage[]).includes(stage)) ||
-                  (uploadStage === "redirecting" && stage === "uploading")
-                    ? "bg-sky-600"
-                    : "bg-sky-200"
-                }`}
-              />
-            ))}
-          </div>
+          <p className="mt-2 text-xs text-sky-800">Each file is handled separately.</p>
         </div>
       ) : null}
 
@@ -354,9 +672,15 @@ export function UploadForm() {
         className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         data-testid="upload-submit-button"
-        disabled={isSubmitting || !selectedPreview}
+        disabled={isSubmitting || selectedItems.length === 0 || selectedItems.every((item) => item.status !== "waiting")}
       >
-        {isSubmitting ? stageLabel(uploadStage) : selectedPreview ? "Upload selected image" : "Choose an image first"}
+        {isSubmitting
+          ? "Uploading selected files"
+          : selectedItems.length === 0
+            ? "Choose images first"
+            : selectedItems.length === 1
+              ? "Upload selected image"
+              : `Upload ${selectedItems.filter((item) => item.status === "waiting").length} files`}
       </button>
     </form>
   );

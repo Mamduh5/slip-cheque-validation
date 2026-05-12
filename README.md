@@ -16,8 +16,9 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Likely duplicates have a separate human review workflow with side-by-side comparison.
 - Capture quality assessment records warning signals for small, blurry, dark, or bright images.
 - Pre-submit upload preview with advisory client-side capture hints.
+- Bulk upload UI supports selecting multiple images in one session, compact selected-file review, per-file staged status, mixed batch outcomes, grouped counts, and retry of only failed or quality-rejected items.
 - Lightweight framing guidance for paper-document photos.
-- Staged upload progress indicator showing "Uploading image…", "Processing document…", and "Finalizing result…" states with disabled submit to prevent duplicate uploads.
+- Staged upload progress indicator showing upload and processing states with disabled submit to prevent duplicate uploads.
 - Post-upload result summary on the document detail page derived from stored fields: duplicate outcome, review status, quality warnings, and transfer-slip processing stage results. The summary is redirect-safe and refresh-safe because it reads the persisted document record.
 - Duplicate-decision transparency: the document detail page shows a dedicated "Duplicate decision" card that explains exactly why a document was marked as exact duplicate, likely duplicate, new upload, or suppressed near-duplicate. For suppressed transfer-slip near-duplicates, the card shows which structured differences (amount, recipient, transaction reference, QR payload, image-read fields) caused the suppression.
 - Structured duplicate-decision reason fields (`duplicateDecisionType`, `duplicateDecisionReasons`) are stored on each document record so the UI does not rely on brittle note-string parsing. Legacy records with only freeform suppression notes still render correctly via a compatibility fallback.
@@ -123,6 +124,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Older transfer-slip records may have `slipVerification` missing or null, or may have the older no-evidence scaffold. The read path displays them safely, and the optional backfill command only adds the no-evidence scaffold without touching duplicate, review, quality, QR, or transfer-metadata fields.
 - Slip verification terminology is intentionally strict: raw decode, parsed metadata, local structural checks (including CRC-16/CCITT-FALSE checksum correctness), and external truth verification must remain separate.
 - Uploads keep the original file unchanged and store a normalized grayscale WebP derivative for fingerprinting.
+- Bulk upload remains a client-side workflow over the existing single-file `POST /api/documents` route. Files are submitted one at a time so each file keeps existing auth, owner scoping, validation, quality checks, duplicate detection, and result semantics.
 - The normalized derivative is auto-oriented, resized to fit within 1024x1024, converted to grayscale, lightly normalized, and encoded as WebP.
 - The perceptual hash is 64-bit dHash computed from the normalized derivative. dHash was chosen because it is simple, deterministic, fast, and adequate for a conservative first near-duplicate signal.
 - Every upload creates an auditable document record. Exact duplicates are marked `EXACT_DUPLICATE` and linked to the earliest matching document.
@@ -140,16 +142,17 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Client-side preview hints are advisory only. Server-side validation and quality assessment remain the source of truth.
 - Framing aids are static guidance only. They do not detect documents, crop images, or verify document contents.
 - If the server rejects a poor-quality image, the upload form keeps the user in a recovery flow so they can retake or choose another image.
+- In bulk upload, one failed or rejected file does not block the rest of the batch. Batch result cards stay compact by default and link to detail or compare/review for deeper inspection.
 - API upload, document detail, and original-image routes require authentication. Missing or non-owned documents return `404` for owner-scoped lookups, so another user's document existence is not exposed.
 - TypeScript imports use the `@/*` `paths` alias without `baseUrl`, which avoids relying on deprecated `baseUrl` behavior.
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, quality warnings/failures, upload preview helper behavior, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, local-only structural slip validation, and conservative non-slip profile behavior.
 
-Playwright covers the focused browser-critical upload path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, recovery after a controlled server `422` quality failure, and one real successful upload through MongoDB and MinIO. Run it locally with `npm run test:e2e`; use `npm run test:e2e:ci` for a CI-style run with final cleanup.
+Playwright covers the focused browser-critical upload path: authenticated `/upload` access through a dev/test-only auth bypass, image preview rendering, retake/reselect replacement, multiple-file selection and removal, mixed batch outcomes with retry, recovery after a controlled server `422` quality failure, and one real successful upload through MongoDB and MinIO. Run it locally with `npm run test:e2e`; use `npm run test:e2e:ci` for a CI-style run with final cleanup.
 
 ## Intentionally Not Implemented Yet
 

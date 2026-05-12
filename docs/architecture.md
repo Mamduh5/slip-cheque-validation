@@ -73,19 +73,20 @@ documents/{userId}/{documentId}/normalized.webp
 
 1. Authenticated user opens `/upload`.
 2. User selects a document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
-3. Browser sends multipart form data to `POST /api/documents`.
-4. Server validates document type, source type, MIME type, and file size.
-5. Server computes a SHA-256 exact file hash.
-6. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
-7. The in-process document processing service receives the selected document type, decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
-8. For `BANK_TRANSFER_SLIP` only, the transfer-slip branch runs conservative QR-candidate analysis on the normalized derivative, attempts QR decode when a plausible candidate exists, then classifies and parses supported decoded QR payloads into transfer metadata. Raw decode, parsed metadata, and future verification are stored separately.
-9. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
-10. Original image bytes are stored unchanged in MinIO.
-11. A new document record is inserted into MongoDB for auditability.
-12. If no match exists, `duplicateStatus` is `NEW`.
-13. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
-14. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
-15. User is redirected to `/documents/{id}`.
+3. User selects one or more image files. The client lists selected files before upload and allows individual removal before the batch starts.
+4. Browser sends each file as multipart form data to `POST /api/documents`.
+5. Server validates document type, source type, MIME type, and file size.
+6. Server computes a SHA-256 exact file hash.
+7. Server checks MongoDB for the earliest existing document owned by the same user with the same `exactHash`.
+8. The in-process document processing service receives the selected document type, decodes the image, assesses capture quality, creates a normalized grayscale WebP derivative, stores it in MinIO, and computes a 64-bit dHash from that derivative.
+9. For `BANK_TRANSFER_SLIP` only, the transfer-slip branch runs conservative QR-candidate analysis on the normalized derivative, attempts QR decode when a plausible candidate exists, then classifies and parses supported decoded QR payloads into transfer metadata. Raw decode, parsed metadata, and future verification are stored separately.
+10. If no exact match exists, the server checks owner-scoped perceptual-hash candidates for a likely duplicate.
+11. Original image bytes are stored unchanged in MinIO.
+12. A new document record is inserted into MongoDB for auditability.
+13. If no match exists, `duplicateStatus` is `NEW`.
+14. If an exact match exists, `duplicateStatus` is `EXACT_DUPLICATE`, `matchedDocumentId` points to the matched document, and `similarityScore` is `1`.
+15. If no exact match exists but a perceptual match is close enough, `duplicateStatus` is `LIKELY_DUPLICATE`, `matchedDocumentId` points to the best matched document, and `similarityScore` is `1 - hammingDistance / 64`.
+16. Single-file upload keeps the existing redirect to `/documents/{id}`. Multi-file upload stays on `/upload` and shows compact per-file batch results with links to detail or compare/review where applicable.
 
 `documentType` is user-selected and durable. It is not inferred from image content and is separate from machine duplicate status, human review status, and capture quality status.
 
@@ -322,13 +323,35 @@ If the server returns a quality failure such as an unusably small image, the use
 
 ## Upload Progress States
 
-The upload form provides staged progress feedback while the upload request is in flight:
+The upload form provides staged progress feedback while upload requests are in flight:
 
-- **"Uploading image…"** — the network request is being sent.
-- **"Processing document…"** — the server has received the request and is processing.
-- **"Finalizing result…"** — the response has been received and the client is preparing to redirect.
+- `waiting` - file is selected and ready.
+- `uploading` - the request is being sent.
+- `processing` - the server response has arrived and the client is reading the processed result.
+- `completed` - upload finished and result fields are available.
+- `rejected` - server quality checks rejected the image.
+- `failed` - network or non-quality upload failure.
 
-The submit button is disabled during all stages to prevent duplicate uploads. A visual stage bar shows progress through the three stages. Network errors are caught and surfaced with a clear retry message.
+The submit button is disabled while files are in flight. The UI uses staged text rather than byte-level percentages because the current fetch-based path does not expose clean upload progress. Network errors are caught and surfaced with a clear retry message.
+
+## Bulk Upload Workflow
+
+Bulk upload is intentionally a client-side workflow over the existing single-file API route. The app does not introduce a queue, a separate batch endpoint, or a giant multipart request. This keeps existing authentication, owner scoping, validation, quality checks, duplicate detection, storage writes, and audit behavior intact for every file.
+
+Execution model:
+
+- The browser submits selected files one at a time to `POST /api/documents`.
+- Each file has independent lifecycle state: `waiting`, `uploading`, `processing`, `completed`, `rejected`, or `failed`.
+- One file failing or being quality-rejected does not stop the rest of the batch.
+- Failed and quality-rejected items can be retried without re-uploading completed items.
+
+Batch result model:
+
+- Each result row stays compact by default: filename, final status, duplicate outcome, review-needed signal, quality rejection or failure reason, and short explanation.
+- Completed rows can link to `/documents/{id}`.
+- Likely duplicate rows with pending review can link to `/review/{id}`.
+- Technical detail, OCR fields, QR payloads, metadata, and identifiers remain on the detail or compare/review pages rather than being dumped into the batch list.
+- The grouped summary counts exact duplicates, review-needed likely duplicates, new uploads, suppressed near-duplicates, quality-rejected files, and generic failures from actual per-file outcomes.
 
 ## Post-Upload Result Summary
 

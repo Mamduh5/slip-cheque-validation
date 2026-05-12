@@ -1,5 +1,52 @@
 # Worklog
 
+## 2026-05-12
+
+### Bulk Upload and Batch Result Handling
+
+#### Changed
+
+- Upgraded `components/upload-form.tsx` from single selected image state to a compact selected-file list.
+  - File input now supports multiple images.
+  - Selected files are listed before upload with filename, size, MIME type, and remove actions.
+  - The existing preview/checklist remains focused on the first selected file so the form stays low-clutter.
+- Added client-side batch execution over the existing single-file `POST /api/documents` endpoint.
+  - Files upload sequentially for simple per-file isolation.
+  - Existing auth, owner scoping, upload validation, quality checks, duplicate detection, and processing behavior remain unchanged.
+  - Single-file success still redirects to the document detail page.
+  - Multi-file upload stays on the upload page and shows batch results.
+- Added per-file lifecycle states: `waiting`, `uploading`, `processing`, `completed`, `failed`, and `rejected`.
+- Added compact per-file batch result summaries for exact duplicates, likely duplicates needing review, new uploads, suppressed near-duplicates, quality rejection, and generic upload failure.
+- Added grouped batch summary counts for completed files, exact duplicates, review-needed items, new uploads, suppressed near-duplicates, quality-rejected files, and failed files.
+- Added retry behavior for failed or quality-rejected items only; completed files are not re-uploaded during retry.
+- Exposed `duplicateDecisionType` and `duplicateDecisionReasons` in the upload API response so batch results can distinguish suppressed near-duplicates from plain new uploads.
+- Added `lib/batch-upload.ts` with pure batch outcome and grouped-count helpers.
+- Added tests:
+  - `tests/batch-upload.test.ts` for staged status labels, mixed outcomes, grouped summary counts, retryable failure/rejection behavior, compact wording, and overclaiming guard.
+  - `tests/e2e/bulk-upload.spec.ts` for multiple-file selection/removal, mixed browser batch outcomes, grouped counts, and retrying only failed/rejected files.
+
+#### Key Decisions
+
+- Reused the current single-file upload route instead of adding a batch endpoint or queue.
+- Chose sequential submission as the default. It is slower than concurrency but simpler, easier to reason about, and preserves per-file isolation.
+- Kept batch rows compact. Full OCR, QR, metadata, quality metrics, and identifiers remain on detail or compare/review pages.
+- Kept wording honest: upload state, duplicate outcome, review status, quality rejection, and local structural checks remain separate concepts.
+
+#### Verification
+
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 17 files passed, 279 tests passed
+- `npm run build` - clean
+- `npm run test:e2e -- tests/e2e/bulk-upload.spec.ts` - blocked locally because Docker Desktop's Linux engine pipe was unavailable; Playwright could not start the configured MongoDB/MinIO web server.
+
+#### Known Limitations
+
+- Bulk upload does not use byte-level progress because the current fetch path does not expose it cleanly.
+- Bulk upload is sequential; no small-concurrency scheduler is implemented yet.
+- Retrying a quality-rejected file retries the same local file. Users may still need to retake or choose a clearer image.
+- The batch result view is local to the current upload page session; persisted long-term history remains the dashboard and document detail pages.
+
 ## 2026-05-11
 
 ### Dev Regression Runner for OCR and Duplicate Assessment

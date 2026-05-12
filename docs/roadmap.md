@@ -22,6 +22,7 @@
 - Human review workflow for likely duplicates.
 - Capture quality warnings for photographed documents.
 - Pre-submit upload preview with advisory client-side capture hints.
+- Bulk upload workflow for selecting multiple images, removing individual files before upload, seeing per-file staged progress, compact per-file outcomes, grouped batch counts, and retrying only failed or quality-rejected items.
 - Lightweight framing guidance for paper-document photos.
 - Focused Playwright E2E coverage for upload preview and quality-failure recovery.
 - One real-service Playwright happy-path upload test through MongoDB and MinIO.
@@ -30,6 +31,7 @@
 - Document records with exact and likely duplicate fields.
 - Structure-aware transfer-slip duplicate detection that uses QR decode, parsed transfer metadata, and image-read OCR fields to suppress false near-duplicates from similar templates, while keeping image similarity as a fallback for non-slip types and slips without parsed metadata.
 - Staged upload progress indicator with disabled submit and clear stage labels.
+- Per-file bulk upload status model: waiting, uploading, processing, completed, failed, and quality rejected.
 - Post-upload result summary on the document detail page derived from stored document fields, redirect-safe and refresh-safe.
 - Duplicate-decision transparency: a dedicated "Duplicate decision" card on the document detail page explaining exact duplicate, likely duplicate, new upload, and suppressed near-duplicate outcomes with structured-conflict reasons.
 - Structured duplicate-decision reason fields (`duplicateDecisionType`, `duplicateDecisionReasons`) stored on document records so the UI does not depend on brittle note-string parsing. Legacy records with only freeform notes still render via a compatibility fallback.
@@ -63,6 +65,7 @@
 - Add a provider-specific CI workflow only when the target provider is known.
 - Add tests for registration and auth guard behavior.
 - Add optional crop/framing tools only after the current guidance-only flow proves insufficient.
+- Consider small controlled concurrency for bulk uploads only if sequential batches become too slow in real use.
 - Add automated type suggestion only after enough real examples exist; keep manual type selection as the durable source for now.
 - Define external truth-provider requirements only if a real provider, credentials, data-retention policy, and claim semantics are selected.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.

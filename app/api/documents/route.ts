@@ -79,6 +79,8 @@ export async function POST(request: Request) {
     slipVerification: record.slipVerification ?? null,
     slipImageRead: record.slipImageRead ?? null,
     duplicateStatus: record.duplicateStatus,
+    duplicateDecisionType: record.duplicateDecisionType,
+    duplicateDecisionReasons: record.duplicateDecisionReasons,
     matchedDocumentId: record.matchedDocumentId,
     similarityScore: record.similarityScore,
     reviewStatus: record.reviewStatus,
