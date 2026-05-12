@@ -20,6 +20,7 @@ import { documentMatchesExtractedFieldSearch } from "@/lib/extracted-field-searc
 import { filterUnreviewedCandidatePairs, upsertReviewedPair } from "@/lib/review-pairs";
 import { assessTransferSlipDuplicateCandidate } from "@/lib/transfer-slip-duplicate-assessment";
 import type {
+  AuditLogRecord,
   DocumentRecord,
   DocumentType,
   DuplicateDecisionReason,
@@ -76,7 +77,22 @@ export interface BulkReviewResult {
   results: BulkReviewItemResult[];
 }
 
+export interface ReviewHistoryEntry {
+  action: ReviewPairDecision;
+  actionLabel: string;
+  reviewedAt: Date;
+  note: string | null;
+  actorUserId: string | null;
+  matchedDocumentId: string | null;
+  bulkReviewBatchId: string | null;
+}
+
 const exportResultLimit = 5000;
+const maxReviewNoteLength = 500;
+const reviewAuditActions = [
+  "DOCUMENT_REVIEW_CONFIRMED_DUPLICATE",
+  "DOCUMENT_REVIEW_CONFIRMED_DISTINCT"
+] as const;
 
 async function ensureDocumentIndexes() {
   if (indexesReady) {
@@ -106,6 +122,34 @@ async function ensureDocumentIndexes() {
     }
   ]);
   indexesReady = true;
+}
+
+export function normalizeReviewNote(note?: string | null) {
+  const normalized = (note ?? "").trim().replace(/\s+/g, " ");
+
+  return normalized.length > 0 ? normalized.slice(0, maxReviewNoteLength) : null;
+}
+
+function reviewDecisionLabel(decision: ReviewPairDecision) {
+  return decision === "CONFIRMED_DUPLICATE" ? "Confirmed duplicate" : "Confirmed distinct";
+}
+
+function reviewDecisionFromAuditLog(log: AuditLogRecord): ReviewPairDecision | null {
+  const metadataDecision = log.metadata?.reviewDecision;
+
+  if (metadataDecision === "CONFIRMED_DUPLICATE" || metadataDecision === "CONFIRMED_DISTINCT") {
+    return metadataDecision;
+  }
+
+  if (log.action === "DOCUMENT_REVIEW_CONFIRMED_DUPLICATE") {
+    return "CONFIRMED_DUPLICATE";
+  }
+
+  if (log.action === "DOCUMENT_REVIEW_CONFIRMED_DISTINCT") {
+    return "CONFIRMED_DISTINCT";
+  }
+
+  return null;
 }
 
 export function calculateSha256(buffer: Buffer) {
@@ -870,6 +914,8 @@ export async function reviewLikelyDuplicateDocument(input: {
   documentId: string;
   userId: string;
   decision: ReviewPairDecision;
+  reviewNote?: string | null;
+  bulkReviewBatchId?: string | null;
 }) {
   await ensureDocumentIndexes();
 
@@ -895,6 +941,7 @@ export async function reviewLikelyDuplicateDocument(input: {
 
   const now = new Date();
   const db = await getDb();
+  const reviewNote = normalizeReviewNote(input.reviewNote);
 
   await db.collection<DocumentRecord>("documents").updateOne(
     {
@@ -933,7 +980,11 @@ export async function reviewLikelyDuplicateDocument(input: {
     metadata: {
       matchedDocumentId: document.matchedDocumentId,
       machineDuplicateStatus: document.duplicateStatus,
-      similarityScore: document.similarityScore
+      similarityScore: document.similarityScore,
+      reviewDecision: input.decision,
+      reviewNote,
+      reviewedByUserId: input.userId,
+      bulkReviewBatchId: input.bulkReviewBatchId ?? null
     },
     createdAt: now
   });
@@ -945,8 +996,11 @@ export async function bulkReviewLikelyDuplicateDocuments(input: {
   documentIds: string[];
   userId: string;
   decision: ReviewPairDecision;
+  reviewNote?: string | null;
 }): Promise<BulkReviewResult> {
   const documentIds = Array.from(new Set(input.documentIds.map((id) => id.trim()).filter(Boolean)));
+  const reviewNote = normalizeReviewNote(input.reviewNote);
+  const bulkReviewBatchId = documentIds.length > 0 ? crypto.randomUUID() : null;
   const result: BulkReviewResult = {
     requestedCount: documentIds.length,
     updatedCount: 0,
@@ -961,7 +1015,9 @@ export async function bulkReviewLikelyDuplicateDocuments(input: {
       await reviewLikelyDuplicateDocument({
         documentId,
         userId: input.userId,
-        decision: input.decision
+        decision: input.decision,
+        reviewNote,
+        bulkReviewBatchId
       });
 
       result.updatedCount += 1;
@@ -988,6 +1044,60 @@ export async function bulkReviewLikelyDuplicateDocuments(input: {
   }
 
   return result;
+}
+
+export async function getReviewHistoryForDocument(input: {
+  documentId: string;
+  userId: string;
+  limit?: number;
+}): Promise<ReviewHistoryEntry[]> {
+  const document = await getDocumentForUser(input.documentId, input.userId);
+
+  if (!document?._id) {
+    return [];
+  }
+
+  const db = await getDb();
+  const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
+  const logs = await db
+    .collection<AuditLogRecord>("audit_logs")
+    .find({
+      userId: input.userId,
+      targetType: "document",
+      targetId: String(document._id),
+      $or: reviewAuditActions.map((action) => ({ action }))
+    })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit)
+    .toArray();
+
+  return logs.flatMap((log) => {
+    const decision = reviewDecisionFromAuditLog(log);
+
+    if (!decision) {
+      return [];
+    }
+
+    const reviewNote = typeof log.metadata?.reviewNote === "string" ? normalizeReviewNote(log.metadata.reviewNote) : null;
+    const actorUserId = typeof log.metadata?.reviewedByUserId === "string"
+      ? log.metadata.reviewedByUserId
+      : typeof log.userId === "string"
+        ? log.userId
+        : null;
+    const matchedDocumentId = typeof log.metadata?.matchedDocumentId === "string" ? log.metadata.matchedDocumentId : null;
+    const bulkReviewBatchId =
+      typeof log.metadata?.bulkReviewBatchId === "string" ? log.metadata.bulkReviewBatchId : null;
+
+    return [{
+      action: decision,
+      actionLabel: reviewDecisionLabel(decision),
+      reviewedAt: log.createdAt,
+      note: reviewNote,
+      actorUserId,
+      matchedDocumentId,
+      bulkReviewBatchId
+    }];
+  });
 }
 
 export { formatDocumentType } from "@/lib/document-types";

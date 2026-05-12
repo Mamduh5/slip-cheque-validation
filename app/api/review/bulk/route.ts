@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 
 const bulkReviewSchema = z.object({
   decision: z.enum(["CONFIRMED_DUPLICATE", "CONFIRMED_DISTINCT"]),
-  documentIds: z.array(z.string().min(1)).min(1).max(100)
+  documentIds: z.array(z.string().min(1)).min(1).max(100),
+  reviewNote: z.string().max(500).optional().nullable()
 });
 
 export async function POST(request: Request) {
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
   const result = await bulkReviewLikelyDuplicateDocuments({
     documentIds: parsed.data.documentIds,
     userId: user.id,
-    decision: parsed.data.decision
+    decision: parsed.data.decision,
+    reviewNote: parsed.data.reviewNote
   });
 
   return NextResponse.json(result);

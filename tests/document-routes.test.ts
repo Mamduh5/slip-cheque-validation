@@ -7,11 +7,11 @@ import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
 import { POST as bulkReviewDocuments } from "../app/api/review/bulk/route";
 import { getDocumentProcessingProfile } from "../lib/document-processing-profiles";
-import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
+import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser, getReviewHistoryForDocument } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
 import { attemptSlipVerification } from "../lib/slip-verification";
 import { attemptTransferMetadataParse } from "../lib/transfer-metadata-parse";
-import type { DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
+import type { AuditLogRecord, DocumentRecord, DocumentType, DuplicateReviewPairRecord } from "../lib/models";
 
 const thaiPromptPayPayload =
   "00020101021229370016A000000677010111011300668123456785802TH53037645406100.005909TEST SHOP6007BANGKOK63047938";
@@ -20,7 +20,7 @@ const testState = vi.hoisted(() => ({
   session: null as { user?: { id?: string; email?: string } } | null,
   documents: [] as DocumentRecord[],
   reviewPairs: [] as DuplicateReviewPairRecord[],
-  auditLogs: [] as unknown[],
+  auditLogs: [] as AuditLogRecord[],
   processUploadedDocumentImage: vi.fn(),
   getOriginalDocumentObject: vi.fn()
 }));
@@ -120,9 +120,24 @@ vi.mock("@/lib/mongodb", () => ({
 
       if (name === "audit_logs") {
         return {
-          insertOne: vi.fn(async (document: unknown) => {
+          insertOne: vi.fn(async (document: AuditLogRecord) => {
             testState.auditLogs.push(document);
             return { insertedId: new ObjectId() };
+          }),
+          find: vi.fn((query: Record<string, unknown>) => {
+            let matches = testState.auditLogs.filter((log) => matchesQuery(log, query));
+            const cursor = {
+              sort(sort: Record<string, 1 | -1>) {
+                matches = sortAuditLogs(matches, sort);
+                return cursor;
+              },
+              limit(value: number) {
+                matches = matches.slice(0, value);
+                return cursor;
+              },
+              toArray: async () => matches
+            };
+            return cursor;
           })
         };
       }
@@ -171,6 +186,29 @@ function sortDocuments(documents: DocumentRecord[], sort?: Record<string, 1 | -1
         leftValue instanceof Date && rightValue instanceof Date
           ? leftValue.getTime() - rightValue.getTime()
           : String(leftValue).localeCompare(String(rightValue));
+
+      if (comparison !== 0) {
+        return direction === 1 ? comparison : -comparison;
+      }
+    }
+
+    return 0;
+  });
+}
+
+function sortAuditLogs(logs: AuditLogRecord[], sort?: Record<string, 1 | -1>) {
+  if (!sort) {
+    return logs;
+  }
+
+  return [...logs].sort((left, right) => {
+    for (const [field, direction] of Object.entries(sort)) {
+      const leftValue = left[field as keyof AuditLogRecord];
+      const rightValue = right[field as keyof AuditLogRecord];
+      const comparison =
+        leftValue instanceof Date && rightValue instanceof Date
+          ? leftValue.getTime() - rightValue.getTime()
+          : String(leftValue ?? "").localeCompare(String(rightValue ?? ""));
 
       if (comparison !== 0) {
         return direction === 1 ? comparison : -comparison;
@@ -939,6 +977,69 @@ describe("document API integration boundaries", () => {
       userId: "user-1",
       decision: "CONFIRMED_DUPLICATE"
     });
+    const history = await getReviewHistoryForDocument({
+      documentId: second.body.documentId as string,
+      userId: "user-1"
+    });
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      action: "CONFIRMED_DUPLICATE",
+      actionLabel: "Confirmed duplicate",
+      note: null,
+      actorUserId: "user-1",
+      matchedDocumentId: first.body.documentId
+    });
+  });
+
+  it("allows the owner to confirm a pending likely duplicate with a review note", async () => {
+    setSession("user-1");
+
+    const first = await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    const response = await reviewDocument(
+      new Request("http://localhost/api/documents/id/review", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          reviewNote: "  Same amount and reference after visual review.  "
+        })
+      }),
+      { params: Promise.resolve({ id: second.body.documentId as string }) }
+    );
+    const body = (await response.json()) as { reviewStatus: string; reviewNote: string | null };
+
+    expect(response.status).toBe(200);
+    expect(body.reviewStatus).toBe("CONFIRMED_DUPLICATE");
+    expect(body.reviewNote).toBe("Same amount and reference after visual review.");
+    expect(testState.auditLogs).toContainEqual(
+      expect.objectContaining({
+        action: "DOCUMENT_REVIEW_CONFIRMED_DUPLICATE",
+        targetId: second.body.documentId,
+        metadata: expect.objectContaining({
+          matchedDocumentId: first.body.documentId,
+          reviewDecision: "CONFIRMED_DUPLICATE",
+          reviewNote: "Same amount and reference after visual review.",
+          reviewedByUserId: "user-1",
+          bulkReviewBatchId: null
+        })
+      })
+    );
+
+    const history = await getReviewHistoryForDocument({
+      documentId: second.body.documentId as string,
+      userId: "user-1"
+    });
+    expect(history[0]).toMatchObject({
+      action: "CONFIRMED_DUPLICATE",
+      note: "Same amount and reference after visual review.",
+      actorUserId: "user-1"
+    });
+    await expect(
+      getReviewHistoryForDocument({
+        documentId: second.body.documentId as string,
+        userId: "other-user"
+      })
+    ).resolves.toEqual([]);
   });
 
   it("allows the owner to mark a pending likely duplicate as distinct", async () => {
@@ -1008,9 +1109,17 @@ describe("document API integration boundaries", () => {
       reviewStatus: "CONFIRMED_DUPLICATE"
     });
     expect(testState.reviewPairs).toHaveLength(2);
+    const history = await getReviewHistoryForDocument({
+      documentId: second.body.documentId as string,
+      userId: "user-1"
+    });
+    expect(history[0]).toMatchObject({
+      action: "CONFIRMED_DUPLICATE",
+      note: null
+    });
   });
 
-  it("bulk marks selected pending likely duplicates as distinct", async () => {
+  it("bulk marks selected pending likely duplicates as distinct with one shared review note", async () => {
     setSession("user-1");
 
     await upload("near original image bytes");
@@ -1020,7 +1129,8 @@ describe("document API integration boundaries", () => {
         method: "POST",
         body: JSON.stringify({
           decision: "CONFIRMED_DISTINCT",
-          documentIds: [second.body.documentId]
+          documentIds: [second.body.documentId],
+          reviewNote: "Different visible reference."
         })
       })
     );
@@ -1032,6 +1142,17 @@ describe("document API integration boundaries", () => {
     expect(testState.reviewPairs[0]).toMatchObject({
       decision: "CONFIRMED_DISTINCT"
     });
+    const history = await getReviewHistoryForDocument({
+      documentId: second.body.documentId as string,
+      userId: "user-1"
+    });
+    expect(history[0]).toMatchObject({
+      action: "CONFIRMED_DISTINCT",
+      actionLabel: "Confirmed distinct",
+      note: "Different visible reference.",
+      actorUserId: "user-1"
+    });
+    expect(history[0].bulkReviewBatchId).toEqual(expect.any(String));
   });
 
   it("bulk review skips already-reviewed and missing items safely", async () => {
@@ -1048,13 +1169,15 @@ describe("document API integration boundaries", () => {
         })
       })
     );
+    const auditCountAfterFirstReview = testState.auditLogs.length;
 
     const response = await bulkReviewDocuments(
       new Request("http://localhost/api/review/bulk", {
         method: "POST",
         body: JSON.stringify({
           decision: "CONFIRMED_DISTINCT",
-          documentIds: [second.body.documentId, String(new ObjectId())]
+          documentIds: [second.body.documentId, String(new ObjectId())],
+          reviewNote: "Should not be recorded for skipped items."
         })
       })
     );
@@ -1075,6 +1198,13 @@ describe("document API integration boundaries", () => {
     expect(testState.documents.find((document) => String(document._id) === second.body.documentId)).toMatchObject({
       reviewStatus: "CONFIRMED_DUPLICATE"
     });
+    expect(testState.auditLogs).toHaveLength(auditCountAfterFirstReview);
+    const history = await getReviewHistoryForDocument({
+      documentId: second.body.documentId as string,
+      userId: "user-1"
+    });
+    expect(history).toHaveLength(1);
+    expect(history[0].note).toBeNull();
   });
 
   it("bulk review keeps owner scoping intact", async () => {

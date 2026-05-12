@@ -126,7 +126,7 @@ Optional lightweight audit collection.
 | `action` | string | Event name. |
 | `targetType` | string | `document`, `user`, or `system`. |
 | `targetId` | string | Optional target id. |
-| `metadata` | object | Small contextual payload. Document-type corrections store old/new type, display labels, actor user id, and unchanged duplicate/review/quality status values. |
+| `metadata` | object | Small contextual payload. Document-type corrections store old/new type, display labels, actor user id, and unchanged duplicate/review/quality status values. Review actions store the human decision, matched document id, optional `reviewNote`, actor user id, similarity score, machine duplicate status, and optional bulk review batch id. |
 | `createdAt` | Date | Event timestamp. |
 
 ## `duplicate_review_pairs`
@@ -236,6 +236,7 @@ V1 computes `exactHash` during upload and checks for the earliest existing docum
 - Likely duplicate matching is deterministic: lowest Hamming distance, then `createdAt ASC`, then `_id ASC`.
 - The generated current document id is excluded from the lookup so a record cannot match itself.
 - Reviewed pairs in `duplicate_review_pairs` are skipped during likely duplicate candidate selection for that exact pair.
+- Review actions write lightweight history entries to `audit_logs`. Optional `reviewNote` values are human context only and do not change duplicate detection, local structural validation, parsing, or verification semantics.
 - `NOT_CHECKED` remains in the enum for older or future deferred-processing records.
 
 ## Image Storage

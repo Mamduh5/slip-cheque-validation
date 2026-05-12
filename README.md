@@ -13,7 +13,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Protected dashboard, upload flow, and document result/detail page.
 - Exact duplicate detection is implemented using SHA-256 file hashes.
 - Near-duplicate detection is implemented using a normalized image derivative and 64-bit dHash.
-- Likely duplicates have a separate human review workflow with side-by-side comparison.
+- Likely duplicates have a separate human review workflow with side-by-side comparison, optional review notes, and lightweight review history.
 - Capture quality assessment records warning signals for small, blurry, dark, or bright images.
 - Pre-submit upload preview with advisory client-side capture hints.
 - Bulk upload UI supports selecting multiple images in one session, compact selected-file review, per-file staged status, mixed batch outcomes, grouped counts, and retry of only failed or quality-rejected items.
@@ -25,7 +25,8 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Dashboard list shows subtle suppression badges for near-duplicates that were suppressed by structured evidence, so users can distinguish them from plain new uploads at a glance.
 - Dashboard and review queue search extracted fields from transfer slips: amount, transaction/reference number, receiver/sender names, date/time, banks, and account tails. Search uses structured fields and comparison-safe normalization where available; it does not search raw OCR text by default.
 - Review queue supports compact search, explicit sorting, and pagination so pending likely duplicates stay manageable as volume grows.
-- Review queue supports bulk review actions for pending likely duplicates: select one or more queue items, confirm duplicate or confirm distinct after a confirmation step, then see a compact updated/skipped summary.
+- Review queue supports bulk review actions for pending likely duplicates: select one or more queue items, add one optional note for the selected batch, confirm duplicate or confirm distinct after a confirmation step, then see a compact updated/skipped summary.
+- Document detail shows a compact Review history card for reviewed items, with the latest action, time, optional note, actor id when available, and recent earlier review actions behind a lightweight disclosure.
 - Built-in workflow presets provide quick URL-driven views for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Custom saved views are deferred.
 - Dashboard and review queue support CSV export of the current filtered/search/sorted working set. Export includes compact operational fields and covers the full matching set, not just the visible page.
 - Uploads require an explicit document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
@@ -139,8 +140,9 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Duplicate comparison uses OCR-specific normalization for reference and date/time fields (`lib/slip-ocr-normalization.ts`). Reference normalization resolves O/0/I/1/l confusions in digit positions of Thai bank reference codes only when the value matches the expected format. Thai date/time normalization collapses tesseract-induced spacing around month abbreviations. Stored values are not modified; normalization is comparison-path only.
 - Non-slip document types and transfer slips without parsed metadata continue to use the generic image-based near-duplicate path.
 - Machine detection and human review are separate. `duplicateStatus` stores algorithm output; `reviewStatus` stores the user decision.
-- Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or mark not duplicate from the document detail page.
-- Bulk review uses the same owner-scoped review transition as single-item review. It updates only eligible pending likely duplicates, skips already-reviewed or non-owned/missing items safely, and returns updated/skipped counts for operational feedback.
+- Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or confirm distinct from the compare/detail review actions and may add an optional short Review note.
+- Review notes are stored on the review audit event for traceability. They are human context only; they do not change duplicate detection, parsing, local structural validation, or any bank/provider verification status.
+- Bulk review uses the same owner-scoped review transition as single-item review. It updates only eligible pending likely duplicates, applies one optional note to the updated items in that batch, skips already-reviewed or non-owned/missing items safely, and returns updated/skipped counts for operational feedback.
 - The dashboard supports filtering documents by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Dashboard search is owner-scoped and applies to stored extracted fields after the normal filters. The first version is intentionally simple and capped; it is not a full-text search platform.
 - The review queue supports newest first, oldest first, highest similarity first, and lowest similarity first. It paginates pending likely duplicates and preserves search/sort state across pages.
@@ -158,7 +160,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, single and bulk review actions, reviewed pair memory, dashboard review filtering and extracted-field search, workflow preset URL mappings, CSV export formatting and route mapping, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, single and bulk review actions with and without notes, skipped bulk items not receiving review history entries, reviewed pair memory, review history rendering, dashboard review filtering and extracted-field search, workflow preset URL mappings, CSV export formatting and route mapping, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, local-only structural slip validation, and conservative non-slip profile behavior.
 

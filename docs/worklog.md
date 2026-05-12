@@ -2,6 +2,49 @@
 
 ## 2026-05-12
 
+### Review Notes and Lightweight History
+
+#### Changed
+
+- Added optional Review notes to single-item duplicate review actions.
+  - Blank notes are ignored.
+  - Notes are capped and normalized before being stored.
+- Added optional Review notes to bulk review actions.
+  - One note applies to the selected batch.
+  - Only updated eligible pending likely duplicates receive the note/history entry.
+  - Skipped, already-reviewed, missing, or non-owned items do not receive fake review history.
+- Reused review audit entries as the lightweight history store instead of adding a comment/thread system.
+  - Review audit metadata now carries the human decision, matched document id, optional note, actor user id, similarity score, machine duplicate status, and optional bulk batch id.
+- Added `getReviewHistoryForDocument(...)` for owner-scoped compact history reads.
+- Added a compact Review history card on document detail.
+  - Latest action is visible immediately.
+  - Earlier recent actions are behind a lightweight disclosure.
+  - Entries show action, time, optional note, actor id when available, and bulk-batch context.
+- Added compact optional note inputs to:
+  - single review actions on compare/detail review panels;
+  - the review queue bulk action bar.
+
+#### Key Decisions
+
+- Review notes are human workflow context only. They do not change duplicate detection, OCR parsing, local structural validation, cheque behavior, or bank/provider verification semantics.
+- `duplicate_review_pairs` remains pair memory for candidate suppression. `audit_logs` is the lightweight history source.
+- Bulk notes are recorded per updated document so each document history reads cleanly on its own.
+
+#### Verification
+
+- Focused run: `npx vitest run tests/document-routes.test.ts tests/review-history-card.test.ts` - 2 files passed, 36 tests passed
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 23 files passed, 321 tests passed
+- `npm run build` - clean
+
+#### Known Limitations
+
+- No threaded comments, mentions, attachments, rich text, edit history, or broad audit search/export.
+- Review history is compact and document-local.
+
+## 2026-05-12
+
 ### Bulk Review Actions
 
 #### Changed

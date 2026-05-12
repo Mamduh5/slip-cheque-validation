@@ -34,6 +34,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pendingDecision, setPendingDecision] = useState<ReviewPairDecision | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -54,6 +55,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
 
   function clearSelection() {
     setSelectedIds([]);
+    setReviewNote("");
     setError(null);
   }
 
@@ -61,8 +63,9 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
     if (selectedIds.length === 0) return;
 
     const label = decisionLabel(decision).toLowerCase();
+    const hasNote = reviewNote.trim().length > 0;
     const confirmed = window.confirm(
-      `${decisionLabel(decision)} for ${selectedIds.length} selected item${selectedIds.length === 1 ? "" : "s"}? This records the same review decision for each eligible pending item.`
+      `${decisionLabel(decision)} for ${selectedIds.length} selected item${selectedIds.length === 1 ? "" : "s"}? This records the same review decision${hasNote ? " and review note" : ""} for each eligible pending item.`
     );
 
     if (!confirmed) return;
@@ -78,7 +81,8 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
       },
       body: JSON.stringify({
         decision,
-        documentIds: selectedIds
+        documentIds: selectedIds,
+        reviewNote
       })
     });
     const payload = (await response.json().catch(() => null)) as BulkReviewResponse | null;
@@ -92,8 +96,9 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
 
     const updated = payload?.updatedCount ?? 0;
     const skipped = (payload?.skippedCount ?? 0) + (payload?.notFoundCount ?? 0) + (payload?.failedCount ?? 0);
-    setFeedback(`${updated} updated, ${skipped} skipped.`);
+    setFeedback(`${updated} updated, ${skipped} skipped.${hasNote && updated > 0 ? " Review note applied to updated items." : ""}`);
     setSelectedIds([]);
+    setReviewNote("");
     router.refresh();
   }
 
@@ -127,14 +132,26 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
 
       {selectedIds.length > 0 ? (
         <div
-          className="sticky top-2 z-10 flex flex-col gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+          className="sticky top-2 z-10 flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm lg:flex-row lg:items-end lg:justify-between"
           data-testid="review-bulk-action-bar"
         >
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-orange-950">
               {selectedIds.length} pending item{selectedIds.length === 1 ? "" : "s"} selected
             </p>
             <p className="text-xs text-orange-900">Bulk actions apply only to eligible pending review items.</p>
+            <label className="mt-2 block text-xs font-medium uppercase tracking-wide text-orange-900" htmlFor="bulk-review-note">
+              Review note <span className="font-normal normal-case tracking-normal">(optional)</span>
+            </label>
+            <input
+              className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              id="bulk-review-note"
+              maxLength={500}
+              placeholder="Apply one note to this batch"
+              type="text"
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+            />
           </div>
           <div className="flex flex-wrap gap-2">
             <button

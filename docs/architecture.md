@@ -14,22 +14,23 @@ The review workflow surfaces documents with `duplicateStatus: LIKELY_DUPLICATE` 
 
 **Routes:**
 - `/review` — Review queue page. Lists all pending items for the authenticated user. Shows compact cards with key OCR-derived fields (amount, receiver, reference, date/time), similarity score, and the matched document name. Two quick actions per card: **Compare & review** (goes to the compare page) and **Full detail** (goes to the document detail page).
-- `/review/[id]` — Side-by-side compare page. Shows both images, a structured field comparison table with OCR-derived fields side by side, difference highlighting, and review action buttons (Confirm duplicate / Mark not duplicate). Low-confidence fields are excluded from the comparison table. Links to full detail for both documents. Also handles already-reviewed items gracefully (shows the recorded decision, no action buttons).
+- `/review/[id]` — Side-by-side compare page. Shows both images, a structured field comparison table with OCR-derived fields side by side, difference highlighting, optional review note input, and review action buttons (Confirm duplicate / Confirm distinct). Low-confidence fields are excluded from the comparison table. Links to full detail for both documents. Also handles already-reviewed items gracefully (shows the recorded decision, no action buttons).
 - `/dashboard` — Shows a pending-review count banner that links to `/review` when items are waiting.
 
-- `POST /api/review/bulk` - Owner-scoped bulk review endpoint for selected pending queue items. It accepts document ids plus `CONFIRMED_DUPLICATE` or `CONFIRMED_DISTINCT`, applies the same single-item review transition to each eligible item, and returns updated/skipped/not-found/failed counts.
+- `POST /api/review/bulk` - Owner-scoped bulk review endpoint for selected pending queue items. It accepts document ids plus `CONFIRMED_DUPLICATE` or `CONFIRMED_DISTINCT`, and an optional `reviewNote`. It applies the same single-item review transition to each eligible item and returns updated/skipped/not-found/failed counts.
 
 **Data layer:**
 - `getReviewQueueForUser(userId)` in `lib/documents.ts` — fetches LIKELY_DUPLICATE + PENDING documents for a user, batches the matched-document lookup in a single query, and returns pairs.
 
 - `bulkReviewLikelyDuplicateDocuments(...)` in `lib/documents.ts` - loops over selected ids and reuses `reviewLikelyDuplicateDocument`, so bulk and single-item semantics stay aligned.
+- `getReviewHistoryForDocument(...)` in `lib/documents.ts` - reads owner-scoped review audit entries for a document and returns compact history rows for the detail page.
 
 **Bulk queue actions:**
 - Queue cards include compact selection checkboxes plus select-all-on-page and clear-selection controls.
-- Once items are selected, a compact bulk action bar offers **Confirm duplicate** and **Confirm distinct**.
+- Once items are selected, a compact bulk action bar offers one optional Review note plus **Confirm duplicate** and **Confirm distinct**.
 - Each bulk action uses a confirmation prompt with the selected count before submitting.
-- The server updates only eligible `LIKELY_DUPLICATE` + `PENDING` documents owned by the current user. Already-reviewed items are skipped, and missing/non-owned ids are counted separately without exposing ownership.
-- After completion, the queue refreshes and shows a compact count summary such as "8 updated, 2 skipped".
+- The server updates only eligible `LIKELY_DUPLICATE` + `PENDING` documents owned by the current user. Already-reviewed items are skipped, missing/non-owned ids are counted separately without exposing ownership, and skipped items do not receive review history entries.
+- After completion, the queue refreshes and shows a compact count summary such as "8 updated, 2 skipped". If a note was provided, the feedback makes clear that the note was applied to updated items.
 
 **Information density:**
 - **Compact (default):** review queue cards and compare page show only decision-relevant fields. OCR fields, QR details, structural analysis, and technical identifiers are hidden.
@@ -39,7 +40,9 @@ The review workflow surfaces documents with `duplicateStatus: LIKELY_DUPLICATE` 
 
 **Field comparison helpers** (`lib/review-helpers.ts`): pure helpers for the compare page, exported and unit-tested independently of the page component. Includes `reviewValuesMatch` (display-only string comparison — does not apply OCR normalisation; that responsibility stays in `normalizeReferenceForCompare`), `getImageReadField`, `getImageReadConfidence`, and `isLowConfidence`.
 
-**Semantics preserved:** compact mode summarises existing stored truth. No new verification claims, no new duplicate logic, and no new statuses are introduced. Single and bulk review APIs only update human review status for pending likely duplicates.
+**Review history:** the document detail page shows a small Review history card when review audit entries exist. The latest action is visible immediately; earlier recent actions are behind a native disclosure. Entries show the human action, time, optional note, actor id when available, and whether the action came from a bulk batch.
+
+**Semantics preserved:** compact mode summarises existing stored truth. No new verification claims, no new duplicate logic, and no new statuses are introduced. Single and bulk review APIs only update human review status for pending likely duplicates. Review notes are human context on the audit event, not system truth claims.
 
 Imports use a TypeScript `paths` mapping for `@/*` without `baseUrl`. This keeps existing imports concise while avoiding deprecated `baseUrl` behavior in newer TypeScript versions.
 
@@ -65,7 +68,7 @@ MongoDB stores application records:
 - `users`: auth users and optional password hashes.
 - `documents`: uploaded document registry records.
 - `duplicate_review_pairs`: owner-scoped memory of reviewed document pairs.
-- `audit_logs`: lightweight audit entries for early lifecycle events.
+- `audit_logs`: lightweight audit entries for lifecycle and review events. Review entries carry the decision, matched document id, optional human Review note, actor user id, and optional bulk review batch id.
 
 The document service creates basic indexes lazily for user document listing, owner-scoped exact hash lookup, owner-scoped perceptual hash candidate lookup, and duplicate status lookup.
 
@@ -310,7 +313,7 @@ Correction behavior is intentionally narrow:
 - Existing QR-candidate analysis, QR decode, transfer metadata, slip-image-read, and slip-verification scaffold results are cleared on type correction because the document is not reprocessed in this v1 flow.
 - The corrected type becomes the current source of truth for future type-aware stages.
 
-Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. No audit-history UI is implemented yet.
+Each correction writes a `DOCUMENT_TYPE_UPDATED` audit record with old type, new type, labels, actor user id, and the unchanged duplicate/review/quality statuses. Review audit entries are exposed through the compact Review history card; broader audit-history UI remains out of scope.
 
 Exact-match selection is deterministic: matching candidates are sorted by `createdAt ASC` and then `_id ASC`. The pending upload's generated id is excluded from the lookup, so the current upload cannot become its own match. If several exact matches already exist for the same owner, new duplicates link to the earliest record by that ordering.
 
@@ -573,8 +576,11 @@ Machine detection and human review are intentionally separate:
 - `LIKELY_DUPLICATE` records enter `reviewStatus: "PENDING"`.
 - Owners can confirm the pair as `CONFIRMED_DUPLICATE` or mark it `CONFIRMED_DISTINCT`.
 - Review actions keep `matchedDocumentId` and `similarityScore` intact; a human disagreement does not erase the machine result.
+- Single-item review actions accept an optional short Review note. Blank notes are ignored.
+- Bulk review actions accept one optional note for the selected batch. The note is written only for documents that are actually updated; skipped, already-reviewed, missing, or non-owned ids do not get fake history entries.
+- Review notes and history are stored as review audit metadata. They are workflow traceability only and do not imply bank/provider verification, cheque parsing, payment completion, recipient truth, or slip authenticity.
 - The dashboard can filter all documents, pending review, confirmed duplicate, and confirmed distinct.
-- Document detail shows side-by-side original previews for likely duplicates.
+- Document detail shows side-by-side original previews for likely duplicates and a compact Review history card for reviewed documents.
 
 The review queue at `/review` is paginated and sortable:
 
@@ -588,6 +594,8 @@ Pagination uses URL state and preserves search and sort params. The page stays c
 Pairwise review memory is stored in `duplicate_review_pairs` with canonical sorted document ids. Both confirmed duplicate and confirmed distinct pairs are remembered. Candidate selection skips already reviewed exact pairs, and reviewed records no longer appear as unresolved because their document-level `reviewStatus` is no longer `PENDING`.
 
 Skipping reviewed pairs is pair-specific, not document-wide. If a pair was marked `CONFIRMED_DISTINCT`, that exact pair is suppressed, but the document can still surface a different likely-duplicate candidate later.
+
+Review history is intentionally separate from pair memory. `duplicate_review_pairs` remains the matching-suppression memory, while `audit_logs` provides the lightweight per-document action history shown to users.
 
 OCR, cheque field extraction, slip verification, and bank verification remain later pipeline stages, not the core v1 intake path.
 

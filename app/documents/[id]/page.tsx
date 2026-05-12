@@ -5,6 +5,7 @@ import { DocumentTypeCorrection } from "@/components/document-type-correction";
 import { DocumentStatusPill } from "@/components/document-status-pill";
 import { QualityStatusPill } from "@/components/quality-status-pill";
 import { ReviewActions } from "@/components/review-actions";
+import { ReviewHistoryCard } from "@/components/review-history-card";
 import { ReviewStatusPill } from "@/components/review-status-pill";
 import {
   buildResultSummary,
@@ -14,7 +15,13 @@ import {
 } from "@/lib/document-result-summary";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
 import { formatDocumentType, getDocumentTypeGuidance } from "@/lib/document-types";
-import { formatDuplicateStatus, formatQualityStatus, formatReviewStatus, getDocumentForUser } from "@/lib/documents";
+import {
+  formatDuplicateStatus,
+  formatQualityStatus,
+  formatReviewStatus,
+  getDocumentForUser,
+  getReviewHistoryForDocument
+} from "@/lib/documents";
 import { formatQualityWarning } from "@/lib/image-quality";
 import { requireUser } from "@/lib/session";
 
@@ -173,6 +180,11 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     document.matchedDocumentId === null
       ? null
       : await getDocumentForUser(document.matchedDocumentId, user.id);
+  const reviewHistory = await getReviewHistoryForDocument({
+    documentId: String(document._id),
+    userId: user.id,
+    limit: 5
+  });
   const canReview =
     document.duplicateStatus === "LIKELY_DUPLICATE" &&
     document.reviewStatus === "PENDING" &&
@@ -265,6 +277,8 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             </div>
           );
         })()}
+
+        <ReviewHistoryCard entries={reviewHistory} />
 
         {document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
           <div className="mt-4">

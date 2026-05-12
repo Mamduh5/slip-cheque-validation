@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DocumentReviewError, formatReviewStatus, reviewLikelyDuplicateDocument } from "@/lib/documents";
+import { DocumentReviewError, formatReviewStatus, normalizeReviewNote, reviewLikelyDuplicateDocument } from "@/lib/documents";
 import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
 const reviewSchema = z.object({
-  decision: z.enum(["CONFIRMED_DUPLICATE", "CONFIRMED_DISTINCT"])
+  decision: z.enum(["CONFIRMED_DUPLICATE", "CONFIRMED_DISTINCT"]),
+  reviewNote: z.string().max(500).optional().nullable()
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +30,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const document = await reviewLikelyDuplicateDocument({
       documentId: id,
       userId: user.id,
-      decision: parsed.data.decision
+      decision: parsed.data.decision,
+      reviewNote: parsed.data.reviewNote
     });
 
     if (!document) {
@@ -44,7 +46,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       reviewStatus: document.reviewStatus,
       reviewStatusLabel: formatReviewStatus(document.reviewStatus),
       reviewedAt: document.reviewedAt?.toISOString() ?? null,
-      reviewedMatchDocumentId: document.reviewedMatchDocumentId
+      reviewedMatchDocumentId: document.reviewedMatchDocumentId,
+      reviewNote: normalizeReviewNote(parsed.data.reviewNote)
     });
   } catch (error) {
     if (error instanceof DocumentReviewError) {

@@ -40,6 +40,8 @@
 - Dashboard and review queue extracted-field search for amount, reference, receiver/sender names, date/time, banks, and account tails, using comparison-safe normalization where existing helpers support it.
 - Review queue sorting and pagination for pending likely duplicates, with newest/oldest/highest-similarity/lowest-similarity ordering.
 - Bulk review actions for pending likely duplicates, with compact queue selection, select-all-on-page, confirmation prompts, confirm duplicate / confirm distinct actions, and updated/skipped result summaries.
+- Optional Review notes for single and bulk duplicate-review actions. Single-item reviews store one optional note with the decision; bulk review stores one optional note for each item actually updated in the selected batch.
+- Lightweight Review history on document detail, backed by review audit entries and showing the latest action, time, optional note, actor id when available, and recent earlier actions without adding a full comment/thread system.
 - Built-in workflow presets for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Presets are URL-driven query shortcuts, not user preference records.
 - CSV export for dashboard and review queue working sets, using current filter/search/sort URL state and compact operational fields only.
 - Clear docs, Docker Compose local development, and a focused operations runbook for write-mode maintenance commands.
@@ -75,8 +77,7 @@
 - Define external truth-provider requirements only if a real provider, credentials, data-retention policy, and claim semantics are selected.
 - Add migration/backfill handling for any older records that still have `NOT_CHECKED`.
 - Decide whether concurrent same-user exact uploads need stronger duplicate guarantees than v1's lookup-before-insert behavior.
-- Add richer review history and notes if users need audit comments.
-- Add optional review notes to bulk actions only if users need to record rationale alongside the decision.
+- Add richer audit search/export only if lightweight per-document review history is insufficient.
 - Add persisted normalized search keys and indexes if extracted-field search needs to scale beyond the current capped owner-scoped candidate set.
 - Add owner-scoped custom saved views only if built-in workflow presets prove insufficient.
 
