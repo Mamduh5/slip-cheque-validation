@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewQueueList, type ReviewQueueListItem } from "@/components/review-queue-list";
 import { WorkflowPresetRow } from "@/components/workflow-preset-row";
 import { getReviewQueueForUser, type ReviewQueueSort } from "@/lib/documents";
 import { reasonCodeToLabel } from "@/lib/document-result-summary";
@@ -64,93 +65,25 @@ function buildReviewExportUrl(params: { q: string; sort: ReviewQueueSort }) {
   return query ? `/api/exports/review?${query}` : "/api/exports/review";
 }
 
-function QueueCard({
+function toReviewQueueListItem({
   document,
   matchedDocument
 }: {
   document: DocumentRecord;
   matchedDocument: DocumentRecord | null;
-}) {
-  const docId = String(document._id);
-  const amount = getKeyField(document, "amount");
-  const receiver = getKeyField(document, "receiverName");
-  const reference = getKeyField(document, "transactionReference");
-  const dateTime = getKeyField(document, "dateTime");
-
-  const similarity = formatSimilarity(document.similarityScore);
-
-  return (
-    <div className="rounded-lg border border-line bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-medium text-ink">{document.originalFilename}</span>
-            <span className="inline-flex shrink-0 items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-800">
-              Likely duplicate
-            </span>
-            {similarity && (
-              <span className="shrink-0 text-xs text-slate-500">{similarity}</span>
-            )}
-          </div>
-          <p className="mt-1 text-xs text-slate-500">Uploaded {formatDate(document.createdAt)}</p>
-
-          {(amount || receiver || reference || dateTime) && (
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4">
-              {amount && (
-                <div>
-                  <dt className="text-slate-400">Amount</dt>
-                  <dd className="font-medium text-ink">฿{amount}</dd>
-                </div>
-              )}
-              {receiver && (
-                <div>
-                  <dt className="text-slate-400">Receiver</dt>
-                  <dd className="truncate font-medium text-ink">{receiver}</dd>
-                </div>
-              )}
-              {reference && (
-                <div>
-                  <dt className="text-slate-400">Reference</dt>
-                  <dd className="truncate font-mono font-medium text-ink">{reference}</dd>
-                </div>
-              )}
-              {dateTime && (
-                <div>
-                  <dt className="text-slate-400">Date / time</dt>
-                  <dd className="font-medium text-ink">{dateTime}</dd>
-                </div>
-              )}
-            </dl>
-          )}
-
-          {matchedDocument && (
-            <p className="mt-2 text-xs text-slate-500">
-              Matched with:{" "}
-              <span className="font-medium text-slate-700">{matchedDocument.originalFilename}</span>
-            </p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Reason: <span className="font-medium text-slate-700">{getReasonSummary(document)}</span>
-          </p>
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-          <Link
-            href={`/review/${docId}`}
-            className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-dark"
-          >
-            Compare &amp; review
-          </Link>
-          <Link
-            href={`/documents/${docId}`}
-            className="inline-flex items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400"
-          >
-            Full detail
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+}): ReviewQueueListItem {
+  return {
+    documentId: String(document._id),
+    filename: document.originalFilename,
+    uploadedAt: formatDate(document.createdAt),
+    amount: getKeyField(document, "amount"),
+    receiver: getKeyField(document, "receiverName"),
+    reference: getKeyField(document, "transactionReference"),
+    dateTime: getKeyField(document, "dateTime"),
+    similarityLabel: formatSimilarity(document.similarityScore),
+    matchedFilename: matchedDocument?.originalFilename ?? null,
+    reasonSummary: getReasonSummary(document)
+  };
 }
 
 export default async function ReviewQueuePage({
@@ -261,13 +194,7 @@ export default async function ReviewQueuePage({
           <p className="text-sm text-slate-500">
             Showing {queue.items.length} of {queue.total} item{queue.total === 1 ? "" : "s"} pending review
           </p>
-          {queue.items.map(({ document, matchedDocument }) => (
-            <QueueCard
-              key={String(document._id)}
-              document={document}
-              matchedDocument={matchedDocument}
-            />
-          ))}
+          <ReviewQueueList items={queue.items.map(toReviewQueueListItem)} />
           {queue.totalPages > 1 ? (
             <nav className="mt-2 flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-sm">
               <Link

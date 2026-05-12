@@ -25,6 +25,7 @@ This is not real bank verification, OCR-first processing, cheque clearing, or ba
 - Dashboard list shows subtle suppression badges for near-duplicates that were suppressed by structured evidence, so users can distinguish them from plain new uploads at a glance.
 - Dashboard and review queue search extracted fields from transfer slips: amount, transaction/reference number, receiver/sender names, date/time, banks, and account tails. Search uses structured fields and comparison-safe normalization where available; it does not search raw OCR text by default.
 - Review queue supports compact search, explicit sorting, and pagination so pending likely duplicates stay manageable as volume grows.
+- Review queue supports bulk review actions for pending likely duplicates: select one or more queue items, confirm duplicate or confirm distinct after a confirmation step, then see a compact updated/skipped summary.
 - Built-in workflow presets provide quick URL-driven views for recent uploads, needs review, exact duplicates, new uploads, suppressed near-duplicates, strongest review matches, hardest review cases, and oldest pending review items. Custom saved views are deferred.
 - Dashboard and review queue support CSV export of the current filtered/search/sorted working set. Export includes compact operational fields and covers the full matching set, not just the visible page.
 - Uploads require an explicit document type: bank transfer slip, deposit/payment slip, cheque, or not sure/unknown.
@@ -139,6 +140,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 - Non-slip document types and transfer slips without parsed metadata continue to use the generic image-based near-duplicate path.
 - Machine detection and human review are separate. `duplicateStatus` stores algorithm output; `reviewStatus` stores the user decision.
 - Likely duplicates start with `reviewStatus: PENDING`. Users can confirm duplicate or mark not duplicate from the document detail page.
+- Bulk review uses the same owner-scoped review transition as single-item review. It updates only eligible pending likely duplicates, skips already-reviewed or non-owned/missing items safely, and returns updated/skipped counts for operational feedback.
 - The dashboard supports filtering documents by document type, duplicate status, and review status using server-side MongoDB queries scoped to the authenticated owner.
 - Dashboard search is owner-scoped and applies to stored extracted fields after the normal filters. The first version is intentionally simple and capped; it is not a full-text search platform.
 - The review queue supports newest first, oldest first, highest similarity first, and lowest similarity first. It paginates pending likely duplicates and preserves search/sort state across pages.
@@ -156,7 +158,7 @@ For non-Docker local development, set `MONGODB_URI` and MinIO values to reachabl
 
 ## Verification Coverage
 
-Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, review actions, reviewed pair memory, dashboard review filtering and extracted-field search, workflow preset URL mappings, CSV export formatting and route mapping, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
+Vitest covers upload and authorization route boundaries for authenticated new uploads, authenticated exact duplicate uploads, likely duplicate outcomes, single and bulk review actions, reviewed pair memory, dashboard review filtering and extracted-field search, workflow preset URL mappings, CSV export formatting and route mapping, review queue search/sort/pagination, quality warnings/failures, upload preview helper behavior, batch upload outcome/count helpers, unauthenticated upload rejection, owner-only document access, image normalization, dHash helpers, and deterministic perceptual candidate selection.
 
 Vitest also covers the transfer-slip QR-candidate heuristic, no-candidate behavior for plain images, transfer-slip-only stage execution/exposure, local-only structural slip validation, and conservative non-slip profile behavior.
 

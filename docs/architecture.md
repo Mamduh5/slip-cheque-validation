@@ -17,8 +17,19 @@ The review workflow surfaces documents with `duplicateStatus: LIKELY_DUPLICATE` 
 - `/review/[id]` — Side-by-side compare page. Shows both images, a structured field comparison table with OCR-derived fields side by side, difference highlighting, and review action buttons (Confirm duplicate / Mark not duplicate). Low-confidence fields are excluded from the comparison table. Links to full detail for both documents. Also handles already-reviewed items gracefully (shows the recorded decision, no action buttons).
 - `/dashboard` — Shows a pending-review count banner that links to `/review` when items are waiting.
 
+- `POST /api/review/bulk` - Owner-scoped bulk review endpoint for selected pending queue items. It accepts document ids plus `CONFIRMED_DUPLICATE` or `CONFIRMED_DISTINCT`, applies the same single-item review transition to each eligible item, and returns updated/skipped/not-found/failed counts.
+
 **Data layer:**
 - `getReviewQueueForUser(userId)` in `lib/documents.ts` — fetches LIKELY_DUPLICATE + PENDING documents for a user, batches the matched-document lookup in a single query, and returns pairs.
+
+- `bulkReviewLikelyDuplicateDocuments(...)` in `lib/documents.ts` - loops over selected ids and reuses `reviewLikelyDuplicateDocument`, so bulk and single-item semantics stay aligned.
+
+**Bulk queue actions:**
+- Queue cards include compact selection checkboxes plus select-all-on-page and clear-selection controls.
+- Once items are selected, a compact bulk action bar offers **Confirm duplicate** and **Confirm distinct**.
+- Each bulk action uses a confirmation prompt with the selected count before submitting.
+- The server updates only eligible `LIKELY_DUPLICATE` + `PENDING` documents owned by the current user. Already-reviewed items are skipped, and missing/non-owned ids are counted separately without exposing ownership.
+- After completion, the queue refreshes and shows a compact count summary such as "8 updated, 2 skipped".
 
 **Information density:**
 - **Compact (default):** review queue cards and compare page show only decision-relevant fields. OCR fields, QR details, structural analysis, and technical identifiers are hidden.
@@ -28,7 +39,7 @@ The review workflow surfaces documents with `duplicateStatus: LIKELY_DUPLICATE` 
 
 **Field comparison helpers** (`lib/review-helpers.ts`): pure helpers for the compare page, exported and unit-tested independently of the page component. Includes `reviewValuesMatch` (display-only string comparison — does not apply OCR normalisation; that responsibility stays in `normalizeReferenceForCompare`), `getImageReadField`, `getImageReadConfidence`, and `isLowConfidence`.
 
-**Semantics preserved:** compact mode summarises existing stored truth. No new verification claims, no new duplicate logic, and no new statuses are introduced. The review decision API (`POST /api/documents/[id]/review`) is unchanged.
+**Semantics preserved:** compact mode summarises existing stored truth. No new verification claims, no new duplicate logic, and no new statuses are introduced. Single and bulk review APIs only update human review status for pending likely duplicates.
 
 Imports use a TypeScript `paths` mapping for `@/*` without `baseUrl`. This keeps existing imports concise while avoiding deprecated `baseUrl` behavior in newer TypeScript versions.
 
@@ -41,7 +52,7 @@ Auth is handled by NextAuth in the same Next.js app.
 - Sessions use JWT strategy.
 - User records are stored in MongoDB in the `users` collection.
 - `proxy.ts` protects `/dashboard`, `/upload`, and `/documents/*` using NextAuth.
-- `POST /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/original`, and `POST /api/documents/{id}/review` require an authenticated session.
+- `POST /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/original`, `POST /api/documents/{id}/review`, and `POST /api/review/bulk` require an authenticated session.
 - Document access is owner-only in v1. Non-owned and missing documents both return `404` from owner-scoped API lookups to avoid exposing whether another user's document exists.
 - Review actions are owner-only and only apply to pending likely duplicates.
 

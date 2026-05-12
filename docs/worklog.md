@@ -2,6 +2,52 @@
 
 ## 2026-05-12
 
+### Bulk Review Actions
+
+#### Changed
+
+- Added `POST /api/review/bulk` for owner-scoped bulk review decisions.
+- Added `bulkReviewLikelyDuplicateDocuments` in `lib/documents.ts`.
+  - Reuses `reviewLikelyDuplicateDocument` for every selected item.
+  - Updates only eligible pending likely duplicates.
+  - Counts already-reviewed/non-eligible items as skipped.
+  - Counts missing or non-owned ids separately as not found.
+- Replaced server-rendered review queue cards with a compact client list wrapper.
+  - Per-item checkbox selection.
+  - Select all on current page.
+  - Clear selection.
+  - Bulk action bar shown only when items are selected.
+  - Bulk actions: Confirm duplicate and Confirm distinct.
+- Added confirmation prompts before bulk decisions are submitted.
+- Added compact completion feedback with updated/skipped counts and queue refresh.
+- Added route/integration coverage for:
+  - bulk confirm duplicate,
+  - bulk confirm distinct,
+  - already-reviewed and missing items skipped safely,
+  - owner scoping.
+
+#### Key Decisions
+
+- Bulk review is a thin wrapper around the existing single-item review transition. This keeps review semantics, audit writes, reviewed-pair memory, and owner scoping aligned.
+- Bulk selection is page-local. It does not select hidden pages of results, which keeps the action count explicit and avoids surprising users.
+- Bulk actions affect human review status only. No duplicate detection, verification, parsing, or provider-truth semantics were added.
+
+#### Verification
+
+- Focused run: `npx vitest run tests/document-routes.test.ts tests/review-queue.test.ts` - 2 files passed, 56 tests passed
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 22 files passed, 318 tests passed
+- `npm run build` - clean
+
+#### Known Limitations
+
+- No review notes or rationale are captured during bulk actions.
+- No cross-page selection; users act on the visible page only.
+- No undo flow beyond applying another eligible single-item workflow before an item leaves pending state.
+
+## 2026-05-12
+
 ### CSV Export of Current Workflow Results
 
 #### Changed

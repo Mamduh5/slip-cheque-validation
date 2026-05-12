@@ -59,6 +59,23 @@ export interface ExportDocumentResult {
   matchedDocument: DocumentRecord | null;
 }
 
+export type BulkReviewItemStatus = "updated" | "skipped" | "not_found" | "failed";
+
+export interface BulkReviewItemResult {
+  documentId: string;
+  status: BulkReviewItemStatus;
+  error?: string;
+}
+
+export interface BulkReviewResult {
+  requestedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  notFoundCount: number;
+  failedCount: number;
+  results: BulkReviewItemResult[];
+}
+
 const exportResultLimit = 5000;
 
 async function ensureDocumentIndexes() {
@@ -922,6 +939,55 @@ export async function reviewLikelyDuplicateDocument(input: {
   });
 
   return getDocumentForUser(input.documentId, input.userId);
+}
+
+export async function bulkReviewLikelyDuplicateDocuments(input: {
+  documentIds: string[];
+  userId: string;
+  decision: ReviewPairDecision;
+}): Promise<BulkReviewResult> {
+  const documentIds = Array.from(new Set(input.documentIds.map((id) => id.trim()).filter(Boolean)));
+  const result: BulkReviewResult = {
+    requestedCount: documentIds.length,
+    updatedCount: 0,
+    skippedCount: 0,
+    notFoundCount: 0,
+    failedCount: 0,
+    results: []
+  };
+
+  for (const documentId of documentIds) {
+    try {
+      await reviewLikelyDuplicateDocument({
+        documentId,
+        userId: input.userId,
+        decision: input.decision
+      });
+
+      result.updatedCount += 1;
+      result.results.push({ documentId, status: "updated" });
+    } catch (error) {
+      if (error instanceof DocumentReviewError) {
+        if (error.status === 404) {
+          result.notFoundCount += 1;
+          result.results.push({ documentId, status: "not_found", error: error.message });
+        } else {
+          result.skippedCount += 1;
+          result.results.push({ documentId, status: "skipped", error: error.message });
+        }
+        continue;
+      }
+
+      result.failedCount += 1;
+      result.results.push({
+        documentId,
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unexpected review error."
+      });
+    }
+  }
+
+  return result;
 }
 
 export { formatDocumentType } from "@/lib/document-types";

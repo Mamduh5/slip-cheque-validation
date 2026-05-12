@@ -5,6 +5,7 @@ import { GET as getDocument, PATCH as updateDocument } from "../app/api/document
 import { GET as getOriginalDocument } from "../app/api/documents/[id]/original/route";
 import { POST as reviewDocument } from "../app/api/documents/[id]/review/route";
 import { POST as uploadDocument } from "../app/api/documents/route";
+import { POST as bulkReviewDocuments } from "../app/api/review/bulk/route";
 import { getDocumentProcessingProfile } from "../lib/document-processing-profiles";
 import { findLikelyDuplicateMatchForUser, getRecentDocumentsForUser } from "../lib/documents";
 import { ImageQualityFailureError } from "../lib/image-quality";
@@ -967,6 +968,175 @@ describe("document API integration boundaries", () => {
       userId: "user-1",
       decision: "CONFIRMED_DISTINCT"
     });
+  });
+
+  it("bulk confirms multiple pending likely duplicates for the owner", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    const third = await upload("near third image bytes");
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          documentIds: [second.body.documentId, third.body.documentId]
+        })
+      })
+    );
+    const body = (await response.json()) as {
+      requestedCount: number;
+      updatedCount: number;
+      skippedCount: number;
+      notFoundCount: number;
+      failedCount: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      requestedCount: 2,
+      updatedCount: 2,
+      skippedCount: 0,
+      notFoundCount: 0,
+      failedCount: 0
+    });
+    expect(testState.documents.find((document) => String(document._id) === second.body.documentId)).toMatchObject({
+      reviewStatus: "CONFIRMED_DUPLICATE"
+    });
+    expect(testState.documents.find((document) => String(document._id) === third.body.documentId)).toMatchObject({
+      reviewStatus: "CONFIRMED_DUPLICATE"
+    });
+    expect(testState.reviewPairs).toHaveLength(2);
+  });
+
+  it("bulk marks selected pending likely duplicates as distinct", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DISTINCT",
+          documentIds: [second.body.documentId]
+        })
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(testState.documents.find((document) => String(document._id) === second.body.documentId)).toMatchObject({
+      reviewStatus: "CONFIRMED_DISTINCT"
+    });
+    expect(testState.reviewPairs[0]).toMatchObject({
+      decision: "CONFIRMED_DISTINCT"
+    });
+  });
+
+  it("bulk review skips already-reviewed and missing items safely", async () => {
+    setSession("user-1");
+
+    await upload("near original image bytes");
+    const second = await upload("near recompressed image bytes");
+    await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          documentIds: [second.body.documentId]
+        })
+      })
+    );
+
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DISTINCT",
+          documentIds: [second.body.documentId, String(new ObjectId())]
+        })
+      })
+    );
+    const body = (await response.json()) as {
+      requestedCount: number;
+      updatedCount: number;
+      skippedCount: number;
+      notFoundCount: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      requestedCount: 2,
+      updatedCount: 0,
+      skippedCount: 1,
+      notFoundCount: 1
+    });
+    expect(testState.documents.find((document) => String(document._id) === second.body.documentId)).toMatchObject({
+      reviewStatus: "CONFIRMED_DUPLICATE"
+    });
+  });
+
+  it("bulk review keeps owner scoping intact", async () => {
+    setSession("owner-user");
+    await upload("near original image bytes");
+    const likelyDuplicate = await upload("near recompressed image bytes");
+
+    setSession("other-user");
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          documentIds: [likelyDuplicate.body.documentId]
+        })
+      })
+    );
+    const body = (await response.json()) as {
+      updatedCount: number;
+      notFoundCount: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      updatedCount: 0,
+      notFoundCount: 1
+    });
+    expect(testState.documents.find((document) => String(document._id) === likelyDuplicate.body.documentId)).toMatchObject({
+      reviewStatus: "PENDING"
+    });
+  });
+
+  it("rejects unauthenticated bulk review", async () => {
+    setSession(null);
+
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          documentIds: [String(new ObjectId())]
+        })
+      })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects bulk review without selected document ids", async () => {
+    setSession("user-1");
+
+    const response = await bulkReviewDocuments(
+      new Request("http://localhost/api/review/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: "CONFIRMED_DUPLICATE",
+          documentIds: []
+        })
+      })
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it("rejects non-owner review of another user's likely duplicate", async () => {
