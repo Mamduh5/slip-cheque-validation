@@ -190,6 +190,40 @@ The heuristic is intentionally explainable and lightweight. It can miss poor, cr
 
 The dashboard supports server-side filtering of documents by `documentType`, `duplicateStatus`, and `reviewStatus`. Filtering is implemented via MongoDB queries scoped to the authenticated owner and uses URL search params for state. Filter state is managed by a client component that updates the URL, keeping the server-side rendering approach deterministic and owner-scoped. Empty states distinguish between "no documents yet" and "no documents match current filters".
 
+## Extracted-Field Search
+
+Dashboard and review queue search use stored structured fields, not raw OCR text. The first version is deliberately small and workflow-oriented.
+
+Searchable fields:
+
+- Amount
+- Transaction/reference number
+- Receiver name
+- Sender name
+- Date/time
+- Receiver bank
+- Sender bank
+- Receiver account tail
+- Sender account tail
+
+For transfer slips, the search helper also checks structured transfer metadata where it already exists, such as parsed QR amount and reference fields.
+
+Normalization is comparison-path only:
+
+- Amount search normalizes comma/currency formatting and compares numeric values as two-decimal strings.
+- Reference search uses `normalizeReferenceForCompare`, including common OCR O/0 and I/1/l/1 corrections in bank reference digit positions.
+- Thai name search uses `normalizeThaiNameForCompare`, including title stripping and OCR spacing normalization.
+- Thai date/time search uses `normalizeThaiDateTimeForCompare`, including spacing around Thai month abbreviations.
+
+Stored values are not modified. Search results expose extracted/system fields only and do not imply bank/provider verification, payment truth, or authenticity.
+
+Implementation notes:
+
+- `lib/extracted-field-search.ts` contains the pure field matcher.
+- `getRecentDocumentsForUser` keeps existing owner-scoped Mongo filters, then applies extracted-field search to a capped recent candidate set.
+- `getReviewQueueForUser` keeps the owner-scoped pending likely-duplicate query, then applies extracted-field search to a capped queue candidate set when `q` is present.
+- This is not a full-text search subsystem. If volume grows beyond the cap, the next step should be persisted normalized search keys and indexes.
+
 ## Document-Type Correction
 
 Owners can correct `documentType` after upload from the document detail page. The update is handled by `PATCH /api/documents/{id}` and is owner-scoped like the detail and original-image routes.
@@ -468,6 +502,15 @@ Machine detection and human review are intentionally separate:
 - Review actions keep `matchedDocumentId` and `similarityScore` intact; a human disagreement does not erase the machine result.
 - The dashboard can filter all documents, pending review, confirmed duplicate, and confirmed distinct.
 - Document detail shows side-by-side original previews for likely duplicates.
+
+The review queue at `/review` is paginated and sortable:
+
+- Default: newest first.
+- Oldest first: useful for clearing backlog fairly.
+- Highest similarity first: surfaces strongest visual matches first.
+- Lowest similarity first: surfaces harder/less obvious cases first.
+
+Pagination uses URL state and preserves search and sort params. The page stays compact: cards show filename, similarity, extracted amount/receiver/reference/date-time, duplicate reason summary, matched filename, and links to compare/review or full detail. OCR detail, QR payloads, metadata, and technical identifiers remain on compare/detail pages.
 
 Pairwise review memory is stored in `duplicate_review_pairs` with canonical sorted document ids. Both confirmed duplicate and confirmed distinct pairs are remembered. Candidate selection skips already reviewed exact pairs, and reviewed records no longer appear as unresolved because their document-level `reviewStatus` is no longer `PENDING`.
 

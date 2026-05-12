@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { duplicateStatuses, documentTypes } from "@/lib/models";
 import { formatDocumentType } from "@/lib/document-types";
@@ -10,6 +11,7 @@ interface DashboardFiltersProps {
   reviewFilter: DocumentReviewFilter;
   documentTypeFilter?: typeof documentTypes[number];
   duplicateStatusFilter?: typeof duplicateStatuses[number];
+  searchQuery?: string;
 }
 
 const reviewFilters: Array<{ label: string; value: DocumentReviewFilter }> = [
@@ -22,7 +24,8 @@ const reviewFilters: Array<{ label: string; value: DocumentReviewFilter }> = [
 export function DashboardFilters({
   reviewFilter,
   documentTypeFilter,
-  duplicateStatusFilter
+  duplicateStatusFilter,
+  searchQuery = ""
 }: DashboardFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,6 +34,7 @@ export function DashboardFilters({
     review?: DocumentReviewFilter;
     documentType?: typeof documentTypes[number];
     duplicateStatus?: typeof duplicateStatuses[number];
+    q?: string;
   }): string {
     const newSearchParams = new URLSearchParams(searchParams.toString());
     if (params.review && params.review !== "all") {
@@ -48,16 +52,21 @@ export function DashboardFilters({
     } else {
       newSearchParams.delete("duplicateStatus");
     }
+    if (params.q?.trim()) {
+      newSearchParams.set("q", params.q.trim());
+    } else if (params.q !== undefined) {
+      newSearchParams.delete("q");
+    }
     const queryString = newSearchParams.toString();
     return queryString ? `/dashboard?${queryString}` : "/dashboard";
   }
 
   function hasActiveFilters(): boolean {
-    return reviewFilter !== "all" || !!documentTypeFilter || !!duplicateStatusFilter;
+    return reviewFilter !== "all" || !!documentTypeFilter || !!duplicateStatusFilter || !!searchQuery;
   }
 
   function handleReviewChange(value: DocumentReviewFilter) {
-    router.push(buildSearchUrl({ review: value, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter }));
+    router.push(buildSearchUrl({ review: value, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter, q: searchQuery }));
   }
 
   function handleDocumentTypeChange(value: string) {
@@ -65,7 +74,8 @@ export function DashboardFilters({
       buildSearchUrl({
         review: reviewFilter,
         documentType: value ? (value as typeof documentTypes[number]) : undefined,
-        duplicateStatus: duplicateStatusFilter
+        duplicateStatus: duplicateStatusFilter,
+        q: searchQuery
       })
     );
   }
@@ -75,68 +85,107 @@ export function DashboardFilters({
       buildSearchUrl({
         review: reviewFilter,
         documentType: documentTypeFilter,
-        duplicateStatus: value ? (value as typeof duplicateStatuses[number]) : undefined
+        duplicateStatus: value ? (value as typeof duplicateStatuses[number]) : undefined,
+        q: searchQuery
+      })
+    );
+  }
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    router.push(
+      buildSearchUrl({
+        review: reviewFilter,
+        documentType: documentTypeFilter,
+        duplicateStatus: duplicateStatusFilter,
+        q: String(formData.get("q") ?? "")
       })
     );
   }
 
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <nav className="flex gap-2 overflow-x-auto pb-1 text-sm" aria-label="Review filters">
-        {reviewFilters.map((filter) => {
-          const active = filter.value === reviewFilter;
-
-          return (
-            <button
-              className={`shrink-0 rounded-md border px-3 py-2 ${
-                active
-                  ? "border-accent bg-accent text-white"
-                  : "border-line bg-white text-slate-700 hover:border-slate-400"
-              }`}
-              onClick={() => handleReviewChange(filter.value)}
-              key={filter.value}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="flex flex-wrap gap-2 text-sm">
-        <select
-          className="rounded-md border border-line bg-white px-3 py-2 text-slate-700"
-          value={documentTypeFilter ?? ""}
-          onChange={(e) => handleDocumentTypeChange(e.target.value)}
-        >
-          <option value="">All types</option>
-          {documentTypes.map((type) => (
-            <option key={type} value={type}>
-              {formatDocumentType(type)}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="rounded-md border border-line bg-white px-3 py-2 text-slate-700"
-          value={duplicateStatusFilter ?? ""}
-          onChange={(e) => handleDuplicateStatusChange(e.target.value)}
-        >
-          <option value="">All statuses</option>
-          {duplicateStatuses.map((status) => (
-            <option key={status} value={status}>
-              {formatDuplicateStatus(status)}
-            </option>
-          ))}
-        </select>
-
-        {hasActiveFilters() && (
-          <Link
-            className="rounded-md border border-line bg-white px-3 py-2 text-slate-700 hover:border-slate-400"
-            href="/dashboard"
+    <div className="mb-5 space-y-3">
+      <form onSubmit={handleSearchSubmit} className="rounded-lg border border-line bg-white p-3">
+        <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="dashboard-search">
+          Search extracted fields
+        </label>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+          <input
+            className="focus-ring min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-sm"
+            id="dashboard-search"
+            name="q"
+            defaultValue={searchQuery}
+            placeholder="Amount, reference, receiver, sender, date, bank, account tail"
+          />
+          <button
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark"
+            type="submit"
           >
-            Clear filters
-          </Link>
-        )}
+            Search
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">Examples: amount, reference number, receiver name, sender name, date.</p>
+      </form>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <nav className="flex gap-2 overflow-x-auto pb-1 text-sm" aria-label="Review filters">
+          {reviewFilters.map((filter) => {
+            const active = filter.value === reviewFilter;
+
+            return (
+              <button
+                className={`shrink-0 rounded-md border px-3 py-2 ${
+                  active
+                    ? "border-accent bg-accent text-white"
+                    : "border-line bg-white text-slate-700 hover:border-slate-400"
+                }`}
+                onClick={() => handleReviewChange(filter.value)}
+                key={filter.value}
+                type="button"
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex flex-wrap gap-2 text-sm">
+          <select
+            className="rounded-md border border-line bg-white px-3 py-2 text-slate-700"
+            value={documentTypeFilter ?? ""}
+            onChange={(e) => handleDocumentTypeChange(e.target.value)}
+          >
+            <option value="">All types</option>
+            {documentTypes.map((type) => (
+              <option key={type} value={type}>
+                {formatDocumentType(type)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="rounded-md border border-line bg-white px-3 py-2 text-slate-700"
+            value={duplicateStatusFilter ?? ""}
+            onChange={(e) => handleDuplicateStatusChange(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {duplicateStatuses.map((status) => (
+              <option key={status} value={status}>
+                {formatDuplicateStatus(status)}
+              </option>
+            ))}
+          </select>
+
+          {hasActiveFilters() && (
+            <Link
+              className="rounded-md border border-line bg-white px-3 py-2 text-slate-700 hover:border-slate-400"
+              href="/dashboard"
+            >
+              Clear filters
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

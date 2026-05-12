@@ -16,6 +16,36 @@ import {
 import { getDb } from "../lib/mongodb";
 import type { DocumentRecord } from "../lib/models";
 
+function makeSlipImageRead(fields: {
+  amount?: string;
+  receiverName?: string;
+  senderName?: string;
+  transactionReference?: string;
+  dateTime?: string;
+}): NonNullable<DocumentRecord["slipImageRead"]> {
+  return {
+    stage: "SLIP_IMAGE_READ",
+    algorithm: "slip-image-read-v1",
+    status: "COMPLETED",
+    result: "EXTRACTED",
+    readAt: new Date("2026-05-10T10:00:00.000Z"),
+    rawOcrText: null,
+    notes: [],
+    warnings: [],
+    extractedFields: {
+      amount: { value: fields.amount ?? null, confidence: "HIGH", source: "test" },
+      receiverName: { value: fields.receiverName ?? null, confidence: "HIGH", source: "test" },
+      senderName: { value: fields.senderName ?? null, confidence: "HIGH", source: "test" },
+      dateTime: { value: fields.dateTime ?? null, confidence: "HIGH", source: "test" },
+      transactionReference: { value: fields.transactionReference ?? null, confidence: "HIGH", source: "test" },
+      senderBank: { value: null, confidence: "NONE", source: "test" },
+      receiverBank: { value: null, confidence: "NONE", source: "test" },
+      senderAccountTail: { value: null, confidence: "NONE", source: "test" },
+      receiverAccountTail: { value: null, confidence: "NONE", source: "test" }
+    }
+  };
+}
+
 describe("document helpers", () => {
   it("formats and describes supported document types", () => {
     expect(formatDocumentType("BANK_TRANSFER_SLIP")).toBe("Bank transfer slip");
@@ -312,7 +342,13 @@ describe("document list filtering", () => {
         qrDecode: null,
         transferMetadata: null,
         slipVerification: null,
-        slipImageRead: null,
+        slipImageRead: makeSlipImageRead({
+          amount: "500.00",
+          receiverName: "นาย สมชาย ใจดี",
+          senderName: "Alice Sender",
+          transactionReference: "016126175244BTF00250",
+          dateTime: "6 พ.ค.69 17:52"
+        }),
         exactHash: "abc123",
         perceptualHash: "0000000000000001",
         qualityStatus: "PASS",
@@ -520,5 +556,33 @@ describe("document list filtering", () => {
     const documents = await getRecentDocumentsForUser(userId, { limit: 2 });
 
     expect(documents).toHaveLength(2);
+  });
+
+  it("searches documents by extracted amount", async () => {
+    const documents = await getRecentDocumentsForUser(userId, { searchQuery: "500" });
+
+    expect(documents).toHaveLength(1);
+    expect(String(documents[0]._id)).toBe(String(documentIds[0]));
+  });
+
+  it("searches documents by normalized reference", async () => {
+    const documents = await getRecentDocumentsForUser(userId, { searchQuery: "O16126175244BTF00250" });
+
+    expect(documents).toHaveLength(1);
+    expect(String(documents[0]._id)).toBe(String(documentIds[0]));
+  });
+
+  it("searches documents by normalized receiver and sender names", async () => {
+    const receiverMatches = await getRecentDocumentsForUser(userId, { searchQuery: "สมชายใจดี" });
+    const senderMatches = await getRecentDocumentsForUser(userId, { searchQuery: "alice sender" });
+
+    expect(receiverMatches).toHaveLength(1);
+    expect(senderMatches).toHaveLength(1);
+  });
+
+  it("returns empty array when extracted-field search has no match", async () => {
+    const documents = await getRecentDocumentsForUser(userId, { searchQuery: "does-not-exist" });
+
+    expect(documents).toHaveLength(0);
   });
 });

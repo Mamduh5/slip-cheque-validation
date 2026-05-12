@@ -16,6 +16,7 @@ import {
   selectBestPerceptualMatch,
   similarityScoreFromHammingDistance
 } from "@/lib/perceptual-hash";
+import { documentMatchesExtractedFieldSearch } from "@/lib/extracted-field-search";
 import { filterUnreviewedCandidatePairs, upsertReviewedPair } from "@/lib/review-pairs";
 import { assessTransferSlipDuplicateCandidate } from "@/lib/transfer-slip-duplicate-assessment";
 import type {
@@ -32,6 +33,25 @@ import type { DuplicateDecision } from "@/lib/duplicate-detection";
 import type { DocumentReviewFilter } from "@/lib/formatters";
 
 let indexesReady = false;
+
+export type ReviewQueueSort = "newest" | "oldest" | "highest-similarity" | "lowest-similarity";
+
+export interface ReviewQueueOptions {
+  searchQuery?: string;
+  sort?: ReviewQueueSort;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ReviewQueueResult {
+  items: Array<{ document: DocumentRecord; matchedDocument: DocumentRecord | null }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  sort: ReviewQueueSort;
+  searchQuery: string;
+}
 
 async function ensureDocumentIndexes() {
   if (indexesReady) {
@@ -54,7 +74,11 @@ async function ensureDocumentIndexes() {
       sparse: true
     },
     { key: { duplicateStatus: 1 }, name: "documents_duplicate_status" },
-    { key: { userId: 1, reviewStatus: 1, createdAt: -1 }, name: "documents_user_review_status_created_at" }
+    { key: { userId: 1, reviewStatus: 1, createdAt: -1 }, name: "documents_user_review_status_created_at" },
+    {
+      key: { userId: 1, duplicateStatus: 1, reviewStatus: 1, similarityScore: -1, createdAt: -1 },
+      name: "documents_user_review_queue_similarity_created_at"
+    }
   ]);
   indexesReady = true;
 }
@@ -484,18 +508,81 @@ export async function createUploadedDocument(input: {
 }
 
 
-export async function getReviewQueueForUser(userId: string): Promise<
-  Array<{ document: DocumentRecord; matchedDocument: DocumentRecord | null }>
-> {
+function normalizePage(value: number | undefined) {
+  return Number.isInteger(value) && value && value > 0 ? value : 1;
+}
+
+function normalizePageSize(value: number | undefined) {
+  if (!Number.isInteger(value) || !value || value <= 0) return 10;
+  return Math.min(value, 50);
+}
+
+function reviewQueueSort(sort: ReviewQueueSort): Record<string, 1 | -1> {
+  switch (sort) {
+    case "oldest":
+      return { createdAt: 1, _id: 1 };
+    case "highest-similarity":
+      return { similarityScore: -1, createdAt: -1, _id: -1 };
+    case "lowest-similarity":
+      return { similarityScore: 1, createdAt: -1, _id: -1 };
+    default:
+      return { createdAt: -1, _id: -1 };
+  }
+}
+
+function sortReviewDocuments(documents: DocumentRecord[], sort: ReviewQueueSort): DocumentRecord[] {
+  return [...documents].sort((left, right) => {
+    if (sort === "oldest") {
+      return left.createdAt.getTime() - right.createdAt.getTime() || String(left._id).localeCompare(String(right._id));
+    }
+
+    if (sort === "highest-similarity" || sort === "lowest-similarity") {
+      const leftScore = left.similarityScore ?? -1;
+      const rightScore = right.similarityScore ?? -1;
+      const scoreComparison = leftScore - rightScore;
+      if (scoreComparison !== 0) {
+        return sort === "highest-similarity" ? -scoreComparison : scoreComparison;
+      }
+    }
+
+    return right.createdAt.getTime() - left.createdAt.getTime() || String(right._id).localeCompare(String(left._id));
+  });
+}
+
+export async function getReviewQueueForUser(userId: string, options: ReviewQueueOptions = {}): Promise<ReviewQueueResult> {
   await ensureDocumentIndexes();
   const db = await getDb();
+  const sort = options.sort ?? "newest";
+  const page = normalizePage(options.page);
+  const pageSize = normalizePageSize(options.pageSize);
+  const searchQuery = (options.searchQuery ?? "").trim();
+  const query = { userId, duplicateStatus: "LIKELY_DUPLICATE" as const, reviewStatus: "PENDING" as const };
+  let pending: DocumentRecord[];
+  let total: number;
 
-  const pending = await db
-    .collection<DocumentRecord>("documents")
-    .find({ userId, duplicateStatus: "LIKELY_DUPLICATE", reviewStatus: "PENDING" })
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .toArray();
+  if (searchQuery) {
+    const searchCandidates = await db
+      .collection<DocumentRecord>("documents")
+      .find(query)
+      .sort(reviewQueueSort(sort))
+      .limit(500)
+      .toArray();
+    const filtered = sortReviewDocuments(
+      searchCandidates.filter((document) => documentMatchesExtractedFieldSearch(document, searchQuery)),
+      sort
+    );
+    total = filtered.length;
+    pending = filtered.slice((page - 1) * pageSize, page * pageSize);
+  } else {
+    total = await db.collection<DocumentRecord>("documents").countDocuments(query);
+    pending = await db
+      .collection<DocumentRecord>("documents")
+      .find(query)
+      .sort(reviewQueueSort(sort))
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .toArray();
+  }
 
   const validMatchedIds = pending
     .filter((d) => d.matchedDocumentId && ObjectId.isValid(d.matchedDocumentId))
@@ -511,10 +598,18 @@ export async function getReviewQueueForUser(userId: string): Promise<
 
   const matchedById = new Map(matchedDocs.map((d) => [String(d._id), d]));
 
-  return pending.map((doc) => ({
-    document: doc,
-    matchedDocument: doc.matchedDocumentId ? (matchedById.get(doc.matchedDocumentId) ?? null) : null
-  }));
+  return {
+    items: pending.map((doc) => ({
+      document: doc,
+      matchedDocument: doc.matchedDocumentId ? (matchedById.get(doc.matchedDocumentId) ?? null) : null
+    })),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    sort,
+    searchQuery
+  };
 }
 
 export async function getRecentDocumentsForUser(
@@ -524,6 +619,7 @@ export async function getRecentDocumentsForUser(
     reviewFilter?: DocumentReviewFilter;
     documentType?: DocumentType;
     duplicateStatus?: DuplicateStatus;
+    searchQuery?: string;
   } = {}
 ) {
   await ensureDocumentIndexes();
@@ -553,12 +649,20 @@ export async function getRecentDocumentsForUser(
     query.duplicateStatus = input.duplicateStatus;
   }
 
-  return db
+  const searchQuery = input.searchQuery?.trim();
+  const baseCursor = db
     .collection<DocumentRecord>("documents")
     .find(query)
-    .sort({ createdAt: -1 })
-    .limit(input.limit ?? 12)
-    .toArray();
+    .sort({ createdAt: -1 });
+
+  if (searchQuery) {
+    const candidates = await baseCursor.limit(200).toArray();
+    return candidates
+      .filter((document) => documentMatchesExtractedFieldSearch(document, searchQuery))
+      .slice(0, input.limit ?? 12);
+  }
+
+  return baseCursor.limit(input.limit ?? 12).toArray();
 }
 
 export async function getDocumentForUser(id: string, userId: string) {

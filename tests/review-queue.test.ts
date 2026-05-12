@@ -8,7 +8,7 @@ import {
   isLowConfidence,
   REVIEW_FIELD_LABELS
 } from "../lib/review-helpers";
-import type { DocumentRecord } from "../lib/models";
+import type { DocumentRecord, ImageReadTransferFields } from "../lib/models";
 
 // ---------------------------------------------------------------------------
 // MongoDB mock (minimal, covers the query patterns used by getReviewQueueForUser)
@@ -22,25 +22,36 @@ vi.mock("@/lib/mongodb", () => ({
       if (name === "documents") {
         return {
           createIndexes: vi.fn(async () => undefined),
+          countDocuments: vi.fn(async (query: Record<string, unknown>) => {
+            return mockDocuments.filter((doc) => matchesQuery(doc, query)).length;
+          }),
           find: vi.fn((query: Record<string, unknown>) => {
             const matches = mockDocuments.filter((doc) => {
-              const entries = Object.entries(query);
-              const docRecord = doc as unknown as Record<string, unknown>;
-              return entries.every(([key, value]) => {
-                if (key === "_id" && typeof value === "object" && value !== null && "$in" in value) {
-                  const ids = (value as { $in: ObjectId[] }).$in.map(String);
-                  return ids.includes(String(docRecord[key]));
-                }
-                return docRecord[key] === value;
-              });
+              return matchesQuery(doc, query);
             });
+            let sorted = [...matches];
+            let skipCount = 0;
+            let limitCount: number | null = null;
+            const cursor = {
+              sort(sort: Record<string, 1 | -1>) {
+                sorted = sortDocuments(sorted, sort);
+                return cursor;
+              },
+              skip(value: number) {
+                skipCount = value;
+                return cursor;
+              },
+              limit(value: number) {
+                limitCount = value;
+                return cursor;
+              },
+              toArray: async () => {
+                const skipped = sorted.slice(skipCount);
+                return limitCount === null ? skipped : skipped.slice(0, limitCount);
+              }
+            };
             return {
-              sort: () => ({
-                limit: () => ({
-                  toArray: async () => matches
-                })
-              }),
-              toArray: async () => matches
+              ...cursor
             };
           })
         };
@@ -55,6 +66,41 @@ vi.mock("@/lib/mongodb", () => ({
     }
   }))
 }));
+
+function matchesQuery(doc: DocumentRecord, query: Record<string, unknown>) {
+  const docRecord = doc as unknown as Record<string, unknown>;
+  return Object.entries(query).every(([key, value]) => {
+    if (key === "_id" && typeof value === "object" && value !== null && "$in" in value) {
+      const ids = (value as { $in: ObjectId[] }).$in.map(String);
+      return ids.includes(String(docRecord[key]));
+    }
+    return docRecord[key] === value;
+  });
+}
+
+function sortDocuments(documents: DocumentRecord[], sort: Record<string, 1 | -1>) {
+  return [...documents].sort((left, right) => {
+    for (const [field, direction] of Object.entries(sort)) {
+      const leftValue = left[field as keyof DocumentRecord];
+      const rightValue = right[field as keyof DocumentRecord];
+      const comparison =
+        leftValue instanceof Date && rightValue instanceof Date
+          ? leftValue.getTime() - rightValue.getTime()
+          : Number(leftValue ?? -1) - Number(rightValue ?? -1);
+
+      if (comparison !== 0 && Number.isFinite(comparison)) {
+        return direction === 1 ? comparison : -comparison;
+      }
+
+      const stringComparison = String(leftValue ?? "").localeCompare(String(rightValue ?? ""));
+      if (stringComparison !== 0) {
+        return direction === 1 ? stringComparison : -stringComparison;
+      }
+    }
+
+    return 0;
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Minimal document factory
@@ -108,7 +154,8 @@ describe("getReviewQueueForUser", () => {
 
   it("returns an empty array when no pending items exist", async () => {
     const result = await getReviewQueueForUser("user-1");
-    expect(result).toEqual([]);
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
   });
 
   it("returns pending LIKELY_DUPLICATE items for the correct user", async () => {
@@ -121,9 +168,9 @@ describe("getReviewQueueForUser", () => {
 
     const result = await getReviewQueueForUser("user-1");
 
-    expect(result).toHaveLength(1);
-    expect(String(result[0].document._id)).toBe(String(docId));
-    expect(String(result[0].matchedDocument?._id)).toBe(String(matchedId));
+    expect(result.items).toHaveLength(1);
+    expect(String(result.items[0].document._id)).toBe(String(docId));
+    expect(String(result.items[0].matchedDocument?._id)).toBe(String(matchedId));
   });
 
   it("returns null for matchedDocument when it belongs to another user", async () => {
@@ -137,8 +184,8 @@ describe("getReviewQueueForUser", () => {
 
     const result = await getReviewQueueForUser("user-1");
 
-    expect(result).toHaveLength(1);
-    expect(result[0].matchedDocument).toBeNull();
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].matchedDocument).toBeNull();
   });
 
   it("excludes documents that are not LIKELY_DUPLICATE", async () => {
@@ -148,7 +195,7 @@ describe("getReviewQueueForUser", () => {
     );
 
     const result = await getReviewQueueForUser("user-1");
-    expect(result).toHaveLength(0);
+    expect(result.items).toHaveLength(0);
   });
 
   it("excludes documents that are already reviewed (not PENDING)", async () => {
@@ -158,7 +205,7 @@ describe("getReviewQueueForUser", () => {
     );
 
     const result = await getReviewQueueForUser("user-1");
-    expect(result).toHaveLength(0);
+    expect(result.items).toHaveLength(0);
   });
 
   it("handles missing matchedDocumentId gracefully", async () => {
@@ -166,10 +213,120 @@ describe("getReviewQueueForUser", () => {
 
     const result = await getReviewQueueForUser("user-1");
 
-    expect(result).toHaveLength(1);
-    expect(result[0].matchedDocument).toBeNull();
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].matchedDocument).toBeNull();
+  });
+
+  it("sorts review queue by highest similarity", async () => {
+    const lower = new ObjectId();
+    const higher = new ObjectId();
+    mockDocuments.push(
+      makeDoc({ _id: lower, originalFilename: "lower.jpg", similarityScore: 0.84 }),
+      makeDoc({ _id: higher, originalFilename: "higher.jpg", similarityScore: 0.98 })
+    );
+
+    const result = await getReviewQueueForUser("user-1", { sort: "highest-similarity" });
+
+    expect(result.items.map((item) => item.document.originalFilename)).toEqual(["higher.jpg", "lower.jpg"]);
+  });
+
+  it("paginates review queue results", async () => {
+    for (let index = 0; index < 12; index += 1) {
+      mockDocuments.push(
+        makeDoc({
+          originalFilename: `doc-${index}.jpg`,
+          createdAt: new Date(`2026-05-08T10:${String(index).padStart(2, "0")}:00Z`)
+        })
+      );
+    }
+
+    const result = await getReviewQueueForUser("user-1", { page: 2, pageSize: 5 });
+
+    expect(result.total).toBe(12);
+    expect(result.totalPages).toBe(3);
+    expect(result.items).toHaveLength(5);
+    expect(result.page).toBe(2);
+  });
+
+  it("searches review queue extracted fields and keeps owner scoping", async () => {
+    mockDocuments.push(
+      makeDoc({
+        userId: "user-1",
+        originalFilename: "target.jpg",
+        slipImageRead: makeSlipImageRead({ amount: "500.00", receiverName: "Alice Receiver" })
+      }),
+      makeDoc({
+        userId: "user-1",
+        originalFilename: "other.jpg",
+        slipImageRead: makeSlipImageRead({ amount: "750.00", receiverName: "Other Receiver" })
+      }),
+      makeDoc({
+        userId: "other-user",
+        originalFilename: "leak.jpg",
+        slipImageRead: makeSlipImageRead({ amount: "500.00", receiverName: "Alice Receiver" })
+      })
+    );
+
+    const result = await getReviewQueueForUser("user-1", { searchQuery: "500" });
+
+    expect(result.total).toBe(1);
+    expect(result.items[0].document.originalFilename).toBe("target.jpg");
+  });
+
+  it("combines review queue search and sorting", async () => {
+    mockDocuments.push(
+      makeDoc({
+        originalFilename: "lower-match.jpg",
+        similarityScore: 0.82,
+        slipImageRead: makeSlipImageRead({ receiverName: "Shared Receiver" })
+      }),
+      makeDoc({
+        originalFilename: "higher-match.jpg",
+        similarityScore: 0.97,
+        slipImageRead: makeSlipImageRead({ receiverName: "Shared Receiver" })
+      }),
+      makeDoc({
+        originalFilename: "non-match.jpg",
+        similarityScore: 0.99,
+        slipImageRead: makeSlipImageRead({ receiverName: "Other Receiver" })
+      })
+    );
+
+    const result = await getReviewQueueForUser("user-1", {
+      searchQuery: "Shared Receiver",
+      sort: "highest-similarity"
+    });
+
+    expect(result.items.map((item) => item.document.originalFilename)).toEqual([
+      "higher-match.jpg",
+      "lower-match.jpg"
+    ]);
   });
 });
+
+function makeSlipImageRead(overrides: Partial<Record<keyof ImageReadTransferFields, string>>) {
+  return {
+    stage: "SLIP_IMAGE_READ" as const,
+    algorithm: "slip-image-read-v1" as const,
+    status: "COMPLETED" as const,
+    result: "EXTRACTED" as const,
+    readAt: new Date(),
+    rawOcrText: null,
+    notes: [],
+    warnings: [],
+    extractedFields: {
+      amount: { value: overrides.amount ?? null, confidence: "HIGH" as const, source: "test" },
+      receiverName: { value: overrides.receiverName ?? null, confidence: "HIGH" as const, source: "test" },
+      senderName: { value: overrides.senderName ?? null, confidence: "HIGH" as const, source: "test" },
+      dateTime: { value: overrides.dateTime ?? null, confidence: "HIGH" as const, source: "test" },
+      transactionReference: { value: overrides.transactionReference ?? null, confidence: "HIGH" as const, source: "test" },
+      senderBank: { value: overrides.senderBank ?? null, confidence: "HIGH" as const, source: "test" },
+      receiverBank: { value: overrides.receiverBank ?? null, confidence: "HIGH" as const, source: "test" },
+      senderAccountTail: { value: overrides.senderAccountTail ?? null, confidence: "HIGH" as const, source: "test" },
+      receiverAccountTail: { value: overrides.receiverAccountTail ?? null, confidence: "HIGH" as const, source: "test" }
+    }
+  };
+}
 
 // ---------------------------------------------------------------------------
 // reviewValuesMatch (compare page logic)

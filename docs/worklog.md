@@ -2,6 +2,52 @@
 
 ## 2026-05-12
 
+### Extracted-Field Search and Review Queue Scale Polish
+
+#### Changed
+
+- Added `lib/extracted-field-search.ts` for focused structured-field search.
+  - Searches amount, transaction/reference number, receiver name, sender name, date/time, receiver/sender bank, and receiver/sender account tails.
+  - Also checks existing parsed transfer metadata amount/reference fields where available.
+  - Uses existing comparison-safe normalization for references, Thai names, and Thai date/time values.
+  - Uses numeric amount normalization so `500`, `500.00`, and formatted amount strings compare cleanly.
+  - Does not search raw OCR text by default.
+- Added dashboard extracted-field search through the existing compact filter bar.
+  - Search state uses the `q` URL param.
+  - Search composes with existing review, document type, and duplicate status filters.
+  - Empty state distinguishes no matches from no documents.
+- Upgraded the review queue at `/review`.
+  - Added a compact search box for extracted fields.
+  - Added explicit sort choices: newest first, oldest first, highest similarity first, lowest similarity first.
+  - Added pagination with previous/next links and preserved `q`/`sort` state.
+  - Queue cards now include a concise duplicate reason summary.
+- Updated `getReviewQueueForUser` to return paginated metadata: `items`, `total`, `page`, `pageSize`, `totalPages`, `sort`, and `searchQuery`.
+- Kept owner scoping intact for dashboard and review queue search.
+
+#### Key Decisions
+
+- This is not a full-text search platform. The first version searches stored structured fields and applies normalization in application code after owner-scoped Mongo filtering.
+- Search candidates are capped to keep the implementation simple. If volume grows, the next step should be persisted normalized search keys with indexes.
+- Sorting stays explicit and user-controlled. Default remains newest first for triage continuity.
+- Search wording stays honest: results are based on extracted fields and system states, not bank/provider verification.
+
+#### Verification
+
+- Focused run: `npx vitest run tests/extracted-field-search.test.ts tests/review-queue.test.ts tests/documents.test.ts` - 3 files passed, 50 tests passed
+- `npm run typecheck` - clean
+- `npm run lint` - clean
+- `npm run test` - 18 files passed, 294 tests passed
+- `npm run build` - clean
+
+#### Known Limitations
+
+- Search does not cover raw OCR text by default.
+- Search uses capped owner-scoped candidates instead of persisted normalized search indexes.
+- Date search is string/normalization based; no full date-range query syntax is implemented.
+- Review queue pagination is offset/page based, not cursor based.
+
+## 2026-05-12
+
 ### Bulk Upload and Batch Result Handling
 
 #### Changed

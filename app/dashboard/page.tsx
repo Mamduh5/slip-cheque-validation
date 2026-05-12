@@ -89,29 +89,32 @@ function hasActiveFilters(params: {
   review: DocumentReviewFilter;
   documentType?: typeof documentTypes[number];
   duplicateStatus?: typeof duplicateStatuses[number];
+  searchQuery?: string;
 }): boolean {
-  return params.review !== "all" || !!params.documentType || !!params.duplicateStatus;
+  return params.review !== "all" || !!params.documentType || !!params.duplicateStatus || !!params.searchQuery;
 }
 
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: Promise<{ review?: string; documentType?: string; duplicateStatus?: string }>;
+  searchParams?: Promise<{ review?: string; documentType?: string; duplicateStatus?: string; q?: string }>;
 }) {
   const user = await requireUser();
   const resolvedSearchParams = await searchParams;
   const reviewFilter = parseReviewFilter(resolvedSearchParams?.review);
   const documentTypeFilter = parseDocumentTypeFilter(resolvedSearchParams?.documentType);
   const duplicateStatusFilter = parseDuplicateStatusFilter(resolvedSearchParams?.duplicateStatus);
+  const searchQuery = (resolvedSearchParams?.q ?? "").trim();
   const [documents, reviewQueue] = await Promise.all([
     getRecentDocumentsForUser(user.id, {
       reviewFilter,
       documentType: documentTypeFilter,
-      duplicateStatus: duplicateStatusFilter
+      duplicateStatus: duplicateStatusFilter,
+      searchQuery
     }),
     getReviewQueueForUser(user.id)
   ]);
-  const pendingCount = reviewQueue.length;
+  const pendingCount = reviewQueue.total;
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
@@ -146,14 +149,15 @@ export default async function DashboardPage({
         reviewFilter={reviewFilter}
         documentTypeFilter={documentTypeFilter}
         duplicateStatusFilter={duplicateStatusFilter}
+        searchQuery={searchQuery}
       />
 
       {documents.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
           <h2 className="text-xl font-semibold">No documents found</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">
-            {hasActiveFilters({ review: reviewFilter, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter })
-              ? "No documents match the current filters."
+            {hasActiveFilters({ review: reviewFilter, documentType: documentTypeFilter, duplicateStatus: duplicateStatusFilter, searchQuery })
+              ? "No documents match the current filters or search."
               : "Upload a paper financial document image to create the first registry record."}
           </p>
           <Link
