@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { AuthNav } from "@/components/auth-nav";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import type { SupportedLocale } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/session";
 
-export async function AppHeader() {
+export async function AppHeader({ locale }: { locale: SupportedLocale }) {
   const user = await getCurrentUser();
 
   return (
@@ -14,7 +16,10 @@ export async function AppHeader() {
           </span>
           <span className="truncate font-semibold">Document Registry Checker</span>
         </Link>
-        <AuthNav isSignedIn={Boolean(user)} userName={user?.name ?? user?.email} />
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <LanguageSwitcher locale={locale} />
+          <AuthNav isSignedIn={Boolean(user)} userName={user?.name ?? user?.email} />
+        </div>
       </div>
     </header>
   );

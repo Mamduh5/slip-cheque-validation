@@ -24,7 +24,7 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <body>
-        <AppHeader />
+        <AppHeader locale={locale} />
         <main>{children}</main>
       </body>
     </html>
