@@ -68,7 +68,7 @@ function dashboardDuplicateSublabel(document: {
   // Legacy fallback for older records without structured decision type
   if (!document.notes || !document.notes.startsWith("Suppressed near-duplicate")) return null;
 
-  const reasons = parseSuppressionReasons(document.notes);
+  const reasons = parseSuppressionReasons(document.notes, locale);
   if (reasons.length === 0) return t("dashboard.duplicateSublabels.suppressedNearDuplicate");
   if (reasons.length === 1) return t("dashboard.duplicateSublabels.suppressedPrefix", { reasons: reasons[0] });
   return t("dashboard.duplicateSublabels.suppressedPrefix", {

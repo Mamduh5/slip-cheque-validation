@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildResultSummary, parseSuppressionReasons, toneClasses } from "../lib/document-result-summary";
+import { translate } from "../lib/i18n";
 import type { DocumentRecord } from "../lib/models";
 
 function makeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
@@ -407,6 +408,12 @@ describe("parseSuppressionReasons", () => {
         "Suppressed near-duplicate: different amount, image-read different recipient, image-read different transaction reference"
       )
     ).toEqual(["amount differed", "image-read recipient differed", "image-read transaction reference differed"]);
+  });
+
+  it("localizes legacy suppression reasons when a locale is provided", () => {
+    expect(parseSuppressionReasons("Suppressed near-duplicate: different amount", "th")).toEqual([
+      translate("th", "duplicateReasons.AMOUNT_MISMATCH")
+    ]);
   });
 
   it("parses all image-read conflict types", () => {

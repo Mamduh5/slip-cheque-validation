@@ -53,7 +53,7 @@ function duplicateDecisionLabel(document: Awaited<ReturnType<typeof getDocumentF
     const reasons =
       decisionType === "SUPPRESSED_NEAR_DUPLICATE" && document.duplicateDecisionReasons.length > 0
         ? document.duplicateDecisionReasons.map((reason) => reasonCodeToLabel(reason, locale))
-        : parseSuppressionReasons(document.notes ?? null);
+        : parseSuppressionReasons(document.notes ?? null, locale);
 
     const reasonText =
       reasons.length === 1

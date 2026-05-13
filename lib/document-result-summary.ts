@@ -18,7 +18,7 @@ export function reasonCodeToLabel(reason: DuplicateDecisionReason, localeOrIndex
  * into an array of human-readable reason fragments.
  * Legacy fallback for records created before structured reason codes existed.
  */
-export function parseSuppressionReasons(note: string | null): string[] {
+export function parseSuppressionReasons(note: string | null, locale: SupportedLocale = "en"): string[] {
   if (!note || !note.startsWith("Suppressed near-duplicate:")) {
     return [];
   }
@@ -31,27 +31,27 @@ export function parseSuppressionReasons(note: string | null): string[] {
   return rawReasons.map((reason) => {
     switch (reason) {
       case "different amount":
-        return "amount differed";
+        return translate(locale, "duplicateReasons.AMOUNT_MISMATCH");
       case "different recipient":
-        return "recipient differed";
+        return translate(locale, "duplicateReasons.RECIPIENT_MISMATCH");
       case "different transaction reference":
-        return "transaction reference differed";
+        return translate(locale, "duplicateReasons.REFERENCE_MISMATCH");
       case "different raw QR payload":
-        return "QR payload differed";
+        return translate(locale, "duplicateReasons.QR_PAYLOAD_MISMATCH");
       case "different transfer metadata payload":
-        return "transfer metadata payload differed";
+        return translate(locale, "duplicateReasons.TRANSFER_METADATA_PAYLOAD_MISMATCH");
       case "image-read different amount":
-        return "image-read amount differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_AMOUNT_MISMATCH");
       case "image-read different recipient":
-        return "image-read recipient differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_RECIPIENT_MISMATCH");
       case "image-read different sender":
-        return "image-read sender differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_SENDER_MISMATCH");
       case "image-read different transaction reference":
-        return "image-read transaction reference differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_REFERENCE_MISMATCH");
       case "image-read different date/time":
-        return "image-read date/time differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_DATETIME_MISMATCH");
       case "image-read different receiver bank":
-        return "image-read receiver bank differed";
+        return translate(locale, "duplicateReasons.IMAGE_READ_BANK_MISMATCH");
       default:
         return reason;
     }
@@ -83,7 +83,7 @@ function getSuppressionReasons(document: DocumentRecord, locale: SupportedLocale
   }
 
   // Legacy fallback for older records that only have note strings
-  return parseSuppressionReasons(document.notes ?? null);
+  return parseSuppressionReasons(document.notes ?? null, locale);
 }
 
 export function buildResultSummary(document: DocumentRecord, locale: SupportedLocale = "en"): ResultSummaryItem[] {
@@ -118,7 +118,7 @@ export function buildResultSummary(document: DocumentRecord, locale: SupportedLo
     });
   } else if (document.notes?.startsWith("Suppressed near-duplicate")) {
     // Legacy fallback for records without structured decision type
-    const reasons = parseSuppressionReasons(document.notes);
+    const reasons = parseSuppressionReasons(document.notes, locale);
     parts.push({
       label: translate(locale, "documentDetail.results.duplicateCheck"),
       value: translate(locale, "documentDetail.results.suppressed"),
