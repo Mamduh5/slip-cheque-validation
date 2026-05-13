@@ -32,4 +32,21 @@ describe("dashboard filter state", () => {
       { key: "search", label: "Search: 500", href: "/dashboard?review=confirmed-distinct&duplicateStatus=NEW" }
     ]);
   });
+
+  it("localizes active chip labels without changing clear links", () => {
+    const chips = getActiveDashboardFilterChips(
+      {
+        review: "pending",
+        duplicateStatus: "LIKELY_DUPLICATE",
+        searchQuery: "500"
+      },
+      "th"
+    );
+
+    expect(chips).toEqual([
+      { key: "review", label: "รอตรวจทาน", href: "/dashboard?duplicateStatus=LIKELY_DUPLICATE&q=500" },
+      { key: "duplicateStatus", label: "อาจซ้ำ", href: "/dashboard?review=pending&q=500" },
+      { key: "search", label: "ค้นหา: 500", href: "/dashboard?review=pending&duplicateStatus=LIKELY_DUPLICATE" }
+    ]);
+  });
 });

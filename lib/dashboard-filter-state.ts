@@ -1,5 +1,6 @@
 import { formatDocumentType } from "@/lib/document-types";
 import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/formatters";
+import { translate, type SupportedLocale } from "@/lib/i18n";
 import type { DocumentType, DuplicateDecisionType, DuplicateStatus } from "@/lib/models";
 
 export type DashboardFilterKey = "review" | "documentType" | "duplicateStatus" | "duplicateDecisionType" | "search";
@@ -12,19 +13,16 @@ export interface DashboardFilterState {
   searchQuery?: string;
 }
 
-const reviewFilterLabels: Record<DocumentReviewFilter, string> = {
-  all: "All reviews",
-  pending: "Pending review",
-  "confirmed-duplicate": "Confirmed duplicate",
-  "confirmed-distinct": "Confirmed distinct"
-};
+function formatReviewFilterLabel(filter: DocumentReviewFilter, locale: SupportedLocale) {
+  const keys: Record<DocumentReviewFilter, "reviewFilters.all" | "reviewFilters.pending" | "reviewFilters.confirmedDuplicate" | "reviewFilters.confirmedDistinct"> = {
+    all: "reviewFilters.all",
+    pending: "reviewFilters.pending",
+    "confirmed-duplicate": "reviewFilters.confirmedDuplicate",
+    "confirmed-distinct": "reviewFilters.confirmedDistinct"
+  };
 
-const duplicateDecisionLabels: Record<DuplicateDecisionType, string> = {
-  EXACT_DUPLICATE: "Exact duplicate",
-  LIKELY_DUPLICATE_REVIEW: "Likely duplicate review",
-  NEW_UPLOAD: "New upload",
-  SUPPRESSED_NEAR_DUPLICATE: "Suppressed near-duplicate"
-};
+  return translate(locale, keys[filter]);
+}
 
 export function buildDashboardFilterHref(state: DashboardFilterState, clearKey?: DashboardFilterKey) {
   const params = new URLSearchParams();
@@ -53,13 +51,13 @@ export function buildDashboardFilterHref(state: DashboardFilterState, clearKey?:
   return query ? `/dashboard?${query}` : "/dashboard";
 }
 
-export function getActiveDashboardFilterChips(state: DashboardFilterState) {
+export function getActiveDashboardFilterChips(state: DashboardFilterState, locale: SupportedLocale = "en") {
   const chips: Array<{ key: DashboardFilterKey; label: string; href: string }> = [];
 
   if (state.review !== "all") {
     chips.push({
       key: "review",
-      label: reviewFilterLabels[state.review],
+      label: formatReviewFilterLabel(state.review, locale),
       href: buildDashboardFilterHref(state, "review")
     });
   }
@@ -67,7 +65,7 @@ export function getActiveDashboardFilterChips(state: DashboardFilterState) {
   if (state.documentType) {
     chips.push({
       key: "documentType",
-      label: formatDocumentType(state.documentType),
+      label: formatDocumentType(state.documentType, locale),
       href: buildDashboardFilterHref(state, "documentType")
     });
   }
@@ -75,7 +73,7 @@ export function getActiveDashboardFilterChips(state: DashboardFilterState) {
   if (state.duplicateStatus) {
     chips.push({
       key: "duplicateStatus",
-      label: formatDuplicateStatus(state.duplicateStatus),
+      label: formatDuplicateStatus(state.duplicateStatus, locale),
       href: buildDashboardFilterHref(state, "duplicateStatus")
     });
   }
@@ -83,7 +81,7 @@ export function getActiveDashboardFilterChips(state: DashboardFilterState) {
   if (state.duplicateDecisionType) {
     chips.push({
       key: "duplicateDecisionType",
-      label: duplicateDecisionLabels[state.duplicateDecisionType],
+      label: translate(locale, `statuses.duplicateDecision.${state.duplicateDecisionType}`),
       href: buildDashboardFilterHref(state, "duplicateDecisionType")
     });
   }
@@ -91,7 +89,7 @@ export function getActiveDashboardFilterChips(state: DashboardFilterState) {
   if (state.searchQuery?.trim()) {
     chips.push({
       key: "search",
-      label: `Search: ${state.searchQuery.trim()}`,
+      label: translate(locale, "dashboard.filters.searchChip", { query: state.searchQuery.trim() }),
       href: buildDashboardFilterHref(state, "search")
     });
   }

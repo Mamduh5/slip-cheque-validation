@@ -1,4 +1,5 @@
 import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
+import { translate, type SupportedLocale } from "@/lib/i18n";
 
 export interface ResultSummaryItem {
   label: string;
@@ -6,39 +7,10 @@ export interface ResultSummaryItem {
   tone: "neutral" | "positive" | "warning" | "info";
 }
 
-export function reasonCodeToLabel(reason: DuplicateDecisionReason): string {
-  switch (reason) {
-    case "AMOUNT_MISMATCH":
-      return "amount differed";
-    case "RECIPIENT_MISMATCH":
-      return "recipient differed";
-    case "REFERENCE_MISMATCH":
-      return "transaction reference differed";
-    case "QR_PAYLOAD_MISMATCH":
-      return "QR payload differed";
-    case "TRANSFER_METADATA_PAYLOAD_MISMATCH":
-      return "transfer metadata payload differed";
-    case "IMAGE_SIMILARITY_ONLY":
-      return "image similarity only";
-    case "IDENTICAL_QR_PAYLOAD":
-      return "identical QR payload";
-    case "IDENTICAL_TRANSFER_METADATA_PAYLOAD":
-      return "identical transfer metadata payload";
-    case "IMAGE_READ_AMOUNT_MISMATCH":
-      return "image-read amount differed";
-    case "IMAGE_READ_RECIPIENT_MISMATCH":
-      return "image-read recipient differed";
-    case "IMAGE_READ_SENDER_MISMATCH":
-      return "image-read sender differed";
-    case "IMAGE_READ_REFERENCE_MISMATCH":
-      return "image-read transaction reference differed";
-    case "IMAGE_READ_DATETIME_MISMATCH":
-      return "image-read date/time differed";
-    case "IMAGE_READ_BANK_MISMATCH":
-      return "image-read receiver bank differed";
-    default:
-      return reason;
-  }
+export function reasonCodeToLabel(reason: DuplicateDecisionReason, localeOrIndex: SupportedLocale | number = "en"): string {
+  const locale = typeof localeOrIndex === "string" ? localeOrIndex : "en";
+
+  return translate(locale, `duplicateReasons.${reason}`);
 }
 
 /**

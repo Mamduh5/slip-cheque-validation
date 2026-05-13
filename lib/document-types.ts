@@ -1,5 +1,6 @@
 import type { DocumentType } from "@/lib/models";
 import { getDocumentProcessingProfile } from "@/lib/document-processing-profiles";
+import { translate, type SupportedLocale } from "@/lib/i18n";
 
 export const documentTypeLabels: Record<DocumentType, string> = {
   BANK_TRANSFER_SLIP: "Bank transfer slip",
@@ -41,8 +42,8 @@ export const documentTypeOptions = [
   "UNKNOWN"
 ] as const satisfies readonly DocumentType[];
 
-export function formatDocumentType(type: DocumentType) {
-  return documentTypeLabels[type];
+export function formatDocumentType(type: DocumentType, locale: SupportedLocale = "en") {
+  return translate(locale, `documentTypes.${type}`);
 }
 
 export function getDocumentTypeDescription(type: DocumentType) {

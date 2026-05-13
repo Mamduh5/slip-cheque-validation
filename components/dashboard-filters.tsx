@@ -6,6 +6,7 @@ import { getActiveDashboardFilterChips } from "@/lib/dashboard-filter-state";
 import { duplicateDecisionTypes, duplicateStatuses, documentTypes } from "@/lib/models";
 import { formatDocumentType } from "@/lib/document-types";
 import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/formatters";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface DashboardFiltersProps {
@@ -14,13 +15,14 @@ interface DashboardFiltersProps {
   duplicateStatusFilter?: typeof duplicateStatuses[number];
   duplicateDecisionTypeFilter?: typeof duplicateDecisionTypes[number];
   searchQuery?: string;
+  locale: SupportedLocale;
 }
 
-const reviewFilters: Array<{ label: string; value: DocumentReviewFilter }> = [
-  { label: "All reviews", value: "all" },
-  { label: "Pending review", value: "pending" },
-  { label: "Confirmed duplicate", value: "confirmed-duplicate" },
-  { label: "Confirmed distinct", value: "confirmed-distinct" }
+const reviewFilters: Array<{ labelKey: "reviewFilters.all" | "reviewFilters.pending" | "reviewFilters.confirmedDuplicate" | "reviewFilters.confirmedDistinct"; value: DocumentReviewFilter }> = [
+  { labelKey: "reviewFilters.all", value: "all" },
+  { labelKey: "reviewFilters.pending", value: "pending" },
+  { labelKey: "reviewFilters.confirmedDuplicate", value: "confirmed-duplicate" },
+  { labelKey: "reviewFilters.confirmedDistinct", value: "confirmed-distinct" }
 ];
 
 export function DashboardFilters({
@@ -28,17 +30,19 @@ export function DashboardFilters({
   documentTypeFilter,
   duplicateStatusFilter,
   duplicateDecisionTypeFilter,
-  searchQuery = ""
+  searchQuery = "",
+  locale
 }: DashboardFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = createTranslator(locale);
   const activeFilterChips = getActiveDashboardFilterChips({
     review: reviewFilter,
     documentType: documentTypeFilter,
     duplicateStatus: duplicateStatusFilter,
     duplicateDecisionType: duplicateDecisionTypeFilter,
     searchQuery
-  });
+  }, locale);
 
   function buildSearchUrl(params: {
     review?: DocumentReviewFilter;
@@ -143,7 +147,7 @@ export function DashboardFilters({
         <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Active filters</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("dashboard.filters.active")}</span>
               {activeFilterChips.map((chip) => (
                 <Link
                   className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-400"
@@ -151,7 +155,7 @@ export function DashboardFilters({
                   key={chip.key}
                 >
                   {chip.label} <span aria-hidden="true">x</span>
-                  <span className="sr-only">Remove {chip.label} filter</span>
+                  <span className="sr-only">{t("dashboard.filters.remove", { label: chip.label })}</span>
                 </Link>
               ))}
             </div>
@@ -159,7 +163,7 @@ export function DashboardFilters({
               className="text-xs font-medium text-accent hover:text-accent-dark"
               href="/dashboard"
             >
-              Clear all
+              {t("dashboard.filters.clearAll")}
             </Link>
           </div>
         </div>
@@ -167,7 +171,7 @@ export function DashboardFilters({
 
       <form onSubmit={handleSearchSubmit} className="rounded-lg border border-line bg-white p-3">
         <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="dashboard-search">
-          Search extracted fields
+          {t("dashboard.filters.searchLabel")}
         </label>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input
@@ -175,20 +179,20 @@ export function DashboardFilters({
             id="dashboard-search"
             name="q"
             defaultValue={searchQuery}
-            placeholder="Amount, reference, receiver, sender, date, bank, account tail"
+            placeholder={t("dashboard.filters.searchPlaceholder")}
           />
           <button
             className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark"
             type="submit"
           >
-            Search
+            {t("dashboard.filters.searchButton")}
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-500">Examples: amount, reference number, receiver name, sender name, date.</p>
+        <p className="mt-2 text-xs text-slate-500">{t("dashboard.filters.searchExamples")}</p>
       </form>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <nav className="flex gap-2 overflow-x-auto pb-1 text-sm" aria-label="Review filters">
+        <nav className="flex gap-2 overflow-x-auto pb-1 text-sm" aria-label={t("dashboard.filters.reviewAria")}>
           {reviewFilters.map((filter) => {
             const active = filter.value === reviewFilter;
 
@@ -203,7 +207,7 @@ export function DashboardFilters({
                 key={filter.value}
                 type="button"
               >
-                {filter.label}
+                {t(filter.labelKey)}
               </button>
             );
           })}
@@ -215,10 +219,10 @@ export function DashboardFilters({
             value={documentTypeFilter ?? ""}
             onChange={(e) => handleDocumentTypeChange(e.target.value)}
           >
-            <option value="">All types</option>
+            <option value="">{t("dashboard.filters.allTypes")}</option>
             {documentTypes.map((type) => (
               <option key={type} value={type}>
-                {type === "CHEQUE" ? "Paper check documents" : formatDocumentType(type)}
+                {type === "CHEQUE" ? t("documentTypes.CHEQUE_PAPER_DOCUMENTS") : formatDocumentType(type, locale)}
               </option>
             ))}
           </select>
@@ -228,10 +232,10 @@ export function DashboardFilters({
             value={duplicateStatusFilter ?? ""}
             onChange={(e) => handleDuplicateStatusChange(e.target.value)}
           >
-            <option value="">All statuses</option>
+            <option value="">{t("dashboard.filters.allStatuses")}</option>
             {duplicateStatuses.map((status) => (
               <option key={status} value={status}>
-                {formatDuplicateStatus(status)}
+                {formatDuplicateStatus(status, locale)}
               </option>
             ))}
           </select>
@@ -241,7 +245,7 @@ export function DashboardFilters({
               className="rounded-md border border-line bg-white px-3 py-2 text-slate-700 hover:border-slate-400"
               href="/dashboard"
             >
-              Clear filters
+              {t("dashboard.filters.clearFilters")}
             </Link>
           )}
         </div>

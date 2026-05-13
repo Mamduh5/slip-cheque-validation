@@ -1,7 +1,8 @@
 import { formatDuplicateStatus } from "@/lib/documents";
+import type { SupportedLocale } from "@/lib/i18n";
 import type { DuplicateStatus } from "@/lib/models";
 
-export function DocumentStatusPill({ status }: { status: DuplicateStatus }) {
+export function DocumentStatusPill({ status, locale = "en" }: { status: DuplicateStatus; locale?: SupportedLocale }) {
   const tone =
     status === "NEW"
       ? "border-green-200 bg-green-50 text-green-800"
@@ -13,7 +14,7 @@ export function DocumentStatusPill({ status }: { status: DuplicateStatus }) {
 
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
-      {formatDuplicateStatus(status)}
+      {formatDuplicateStatus(status, locale)}
     </span>
   );
 }
