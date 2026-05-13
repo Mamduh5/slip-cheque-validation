@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState, useTransition } from "react";
+import { ChangeEvent, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { supportedLocales, type SupportedLocale } from "@/lib/i18n";
 
@@ -11,17 +11,10 @@ const localeLabels: Record<SupportedLocale, string> = {
 
 export function LanguageSwitcher({ locale }: { locale: SupportedLocale }) {
   const router = useRouter();
-  const [selectedLocale, setSelectedLocale] = useState(locale);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setSelectedLocale(locale);
-  }, [locale]);
 
   async function handleLocaleChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextLocale = event.target.value as SupportedLocale;
-
-    setSelectedLocale(nextLocale);
 
     const response = await fetch("/api/locale", {
       method: "POST",
@@ -32,7 +25,6 @@ export function LanguageSwitcher({ locale }: { locale: SupportedLocale }) {
     });
 
     if (!response.ok) {
-      setSelectedLocale(locale);
       return;
     }
 
@@ -46,7 +38,7 @@ export function LanguageSwitcher({ locale }: { locale: SupportedLocale }) {
       <span className="hidden sm:inline">Language</span>
       <select
         className="focus-ring rounded-md border border-line bg-white px-2 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50"
-        value={selectedLocale}
+        value={locale}
         onChange={handleLocaleChange}
         disabled={isPending}
         aria-label="Language"

@@ -8,8 +8,10 @@ import {
   mapLocaleTagToSupportedLocale,
   resolveTranslation,
   resolveLocalePreference,
+  messages,
   supportedLocales,
   translate,
+  type MessageTree,
   type TranslationResources
 } from "../lib/i18n";
 
@@ -113,4 +115,22 @@ describe("i18n foundation", () => {
     });
     expect(resolveLocalePreference({ acceptLanguage: "fr-FR" })).toEqual({ locale: "en", source: "fallback" });
   });
+
+  it("has Thai public/auth translations for each English public/auth key", () => {
+    const publicKeys = collectLeafKeys(messages.en.public, "public");
+
+    expect(publicKeys.length).toBeGreaterThan(0);
+
+    for (const key of publicKeys) {
+      expect(resolveTranslation(messages, "th", key)).not.toBe(resolveTranslation(messages, "en", key));
+    }
+  });
 });
+
+function collectLeafKeys(tree: MessageTree, prefix: string): string[] {
+  return Object.entries(tree).flatMap(([key, value]) => {
+    const nextKey = `${prefix}.${key}`;
+
+    return typeof value === "string" ? [nextKey] : collectLeafKeys(value, nextKey);
+  });
+}

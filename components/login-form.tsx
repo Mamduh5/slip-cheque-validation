@@ -4,11 +4,13 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import { hasAuthFieldErrors, validateLoginFields, type AuthFieldErrors } from "@/lib/auth-form-validation";
 
-export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
+export function LoginForm({ googleEnabled, locale }: { googleEnabled: boolean; locale: SupportedLocale }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = createTranslator(locale);
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
@@ -21,7 +23,14 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email"));
     const password = String(formData.get("password"));
-    const nextFieldErrors = validateLoginFields({ email, password });
+    const nextFieldErrors = validateLoginFields(
+      { email, password },
+      {
+        emailRequired: t("public.login.errors.emailRequired"),
+        emailInvalid: t("public.login.errors.emailInvalid"),
+        passwordRequired: t("public.login.errors.passwordRequired")
+      }
+    );
 
     setFieldErrors(nextFieldErrors);
 
@@ -41,7 +50,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
     setIsSubmitting(false);
 
     if (result?.error) {
-      setError("Email and password did not match an account.");
+      setError(t("public.login.errors.credentials"));
       return;
     }
 
@@ -54,7 +63,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            Email
+            {t("public.login.fields.email")}
           </label>
           <input
             className="focus-ring w-full rounded-md border border-line px-3 py-2"
@@ -74,10 +83,10 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
         <div>
           <div className="mb-1 flex items-center justify-between gap-3">
             <label className="block text-sm font-medium" htmlFor="password">
-              Password
+              {t("public.login.fields.password")}
             </label>
             <Link className="text-xs font-medium text-accent hover:text-accent-dark" href="/forgot-password">
-              Forgot password?
+              {t("public.login.forgotPassword")}
             </Link>
           </div>
           <input
@@ -101,14 +110,14 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           </p>
         ) : null}
         <p className="sr-only" aria-live="polite">
-          {isSubmitting ? "Signing in. Please wait." : ""}
+          {isSubmitting ? t("public.login.submittingStatus") : ""}
         </p>
         <button
           className="focus-ring w-full rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Signing in..." : "Log in"}
+          {isSubmitting ? t("public.login.submitting") : t("public.login.title")}
         </button>
       </form>
       <div className="my-5 h-px bg-line" />
@@ -118,10 +127,10 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
         disabled={!googleEnabled}
         onClick={() => signIn("google", { callbackUrl })}
       >
-        Continue with Google
+        {t("public.login.continueWithGoogle")}
       </button>
       {!googleEnabled ? (
-        <p className="mt-2 text-xs text-slate-500">Google sign-in is disabled until OAuth env values are set.</p>
+        <p className="mt-2 text-xs text-slate-500">{t("public.login.googleDisabled")}</p>
       ) : null}
     </div>
   );

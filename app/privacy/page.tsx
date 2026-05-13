@@ -1,21 +1,20 @@
 import { PublicTrustLinks } from "@/components/public-trust-links";
+import { createTranslator } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const locale = await getRequestLocale();
+  const t = createTranslator(locale);
+
   return (
     <section className="mx-auto max-w-2xl px-4 py-12">
       <div className="rounded-lg border border-line bg-white p-5 shadow-sm">
-        <h1 className="text-3xl font-semibold">Privacy</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Document Registry Checker is intended for authorized document validation workflows. Only upload documents you
-          are permitted to process for your organization.
-        </p>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          A formal privacy notice is not configured in this application yet. Follow your organization&apos;s approved
-          policy for document handling, access, and reviewer accountability.
-        </p>
+        <h1 className="text-3xl font-semibold">{t("public.privacy.title")}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{t("public.privacy.body1")}</p>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{t("public.privacy.body2")}</p>
       </div>
       <div className="mt-5">
-        <PublicTrustLinks />
+        <PublicTrustLinks locale={locale} />
       </div>
     </section>
   );

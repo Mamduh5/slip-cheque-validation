@@ -3,10 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import { hasAuthFieldErrors, validateRegisterFields, type AuthFieldErrors } from "@/lib/auth-form-validation";
 
-export function RegisterForm() {
+export function RegisterForm({ locale }: { locale: SupportedLocale }) {
   const router = useRouter();
+  const t = createTranslator(locale);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [statusMessage, setStatusMessage] = useState("");
@@ -21,7 +23,16 @@ export function RegisterForm() {
     const name = String(formData.get("name"));
     const email = String(formData.get("email"));
     const password = String(formData.get("password"));
-    const nextFieldErrors = validateRegisterFields({ name, email, password });
+    const nextFieldErrors = validateRegisterFields(
+      { name, email, password },
+      {
+        nameTooLong: t("public.register.errors.nameTooLong"),
+        emailRequired: t("public.register.errors.emailRequired"),
+        emailInvalid: t("public.register.errors.emailInvalid"),
+        passwordRequired: t("public.register.errors.passwordRequired"),
+        passwordLength: t("public.register.errors.passwordLength")
+      }
+    );
 
     setFieldErrors(nextFieldErrors);
 
@@ -30,7 +41,7 @@ export function RegisterForm() {
     }
 
     setIsSubmitting(true);
-    setStatusMessage("Creating account. Please wait.");
+    setStatusMessage(t("public.register.creatingStatus"));
 
     const response = await fetch("/api/register", {
       method: "POST",
@@ -43,14 +54,14 @@ export function RegisterForm() {
     });
 
     if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(payload?.error ?? "Could not create the account.");
+      await response.json().catch(() => null);
+      setError(response.status === 409 ? t("public.register.errors.existingAccount") : t("public.register.errors.default"));
       setStatusMessage("");
       setIsSubmitting(false);
       return;
     }
 
-    setStatusMessage("Account created. Signing you in.");
+    setStatusMessage(t("public.register.createdStatus"));
 
     const loginResult = await signIn("credentials", {
       email: email.trim(),
@@ -75,7 +86,7 @@ export function RegisterForm() {
       <div className="space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="name">
-            Name
+            {t("public.register.fields.name")}
           </label>
           <input
             className="focus-ring w-full rounded-md border border-line px-3 py-2"
@@ -94,7 +105,7 @@ export function RegisterForm() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            Email
+            {t("public.register.fields.email")}
           </label>
           <input
             className="focus-ring w-full rounded-md border border-line px-3 py-2"
@@ -113,7 +124,7 @@ export function RegisterForm() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="password">
-            Password
+            {t("public.register.fields.password")}
           </label>
           <input
             className="focus-ring w-full rounded-md border border-line px-3 py-2"
@@ -127,7 +138,7 @@ export function RegisterForm() {
             aria-invalid={Boolean(fieldErrors.password)}
           />
           <p className="mt-1 text-xs leading-5 text-slate-500" id="password-rules">
-            Use 8 to 128 characters. Choose a password that is not reused for other systems.
+            {t("public.register.passwordRules")}
           </p>
           {fieldErrors.password ? (
             <p className="mt-1 text-sm text-red-700" id="register-password-error">
@@ -148,7 +159,7 @@ export function RegisterForm() {
           type="submit"
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Creating account..." : "Create account"}
+          {isSubmitting ? t("public.register.submitting") : t("public.register.title")}
         </button>
       </div>
     </form>

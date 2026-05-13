@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { AppHeader } from "@/components/app-header";
-import { localePreferenceCookieName, resolveLocalePreference } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Document Registry Checker",
@@ -14,12 +13,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const headerStore = await headers();
-  const { locale } = resolveLocalePreference({
-    savedLocale: cookieStore.get(localePreferenceCookieName)?.value,
-    acceptLanguage: headerStore.get("accept-language")
-  });
+  const locale = await getRequestLocale();
 
   return (
     <html lang={locale}>
