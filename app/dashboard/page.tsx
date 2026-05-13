@@ -255,46 +255,78 @@ export default async function DashboardPage({
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-line bg-white shadow-sm">
-          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line px-4 py-3 text-sm font-medium text-slate-600 sm:grid-cols-[1.2fr_0.6fr_0.6fr_0.7fr_auto]">
+          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-line px-4 py-3 text-sm font-medium text-slate-600 sm:grid-cols-[1.2fr_0.55fr_0.6fr_0.65fr_0.65fr_auto]">
             <span>Document</span>
             <span className="hidden sm:block">Type</span>
             <span className="hidden sm:block">Uploaded</span>
             <span className="hidden sm:block">Review</span>
-            <span>Machine</span>
+            <span className="hidden sm:block">Machine</span>
+            <span>Actions</span>
           </div>
           <div className="divide-y divide-line">
-            {documents.map((document) => (
-              <Link
-                className="grid grid-cols-[1fr_auto] gap-3 px-4 py-4 hover:bg-slate-50 sm:grid-cols-[1.2fr_0.6fr_0.6fr_0.7fr_auto]"
-                href={`/documents/${String(document._id)}`}
-                key={String(document._id)}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">{document.originalFilename}</span>
-                  <span className="block text-xs text-slate-500">{document.mimeType}</span>
-                  {(() => {
-                    const sublabel = dashboardDuplicateSublabel(document);
-                    if (!sublabel) return null;
-                    return (
-                      <span className="mt-1 inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
-                        {sublabel}
-                      </span>
-                    );
-                  })()}
-                  <span className="block text-xs text-slate-500 sm:hidden">
+            {documents.map((document) => {
+              const documentId = String(document._id);
+              const canReview = document.duplicateStatus === "LIKELY_DUPLICATE" && document.reviewStatus === "PENDING";
+
+              return (
+                <div
+                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 sm:grid-cols-[1.2fr_0.55fr_0.6fr_0.65fr_0.65fr_auto]"
+                  key={documentId}
+                >
+                  <div className="min-w-0">
+                    <Link
+                      className="block truncate font-medium text-accent hover:text-accent-dark"
+                      href={`/documents/${documentId}`}
+                    >
+                      {document.originalFilename}
+                    </Link>
+                    <span className="block text-xs text-slate-500">{document.mimeType}</span>
+                    {(() => {
+                      const sublabel = dashboardDuplicateSublabel(document);
+                      if (!sublabel) return null;
+                      return (
+                        <span className="mt-1 inline-block rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-800">
+                          {sublabel}
+                        </span>
+                      );
+                    })()}
+                    <span className="block text-xs text-slate-500 sm:hidden">
+                      {formatDocumentType(document.documentType)}
+                    </span>
+                    <span className="mt-2 flex flex-wrap gap-2 sm:hidden">
+                      <ReviewStatusPill status={document.reviewStatus} />
+                      <DocumentStatusPill status={document.duplicateStatus} />
+                    </span>
+                  </div>
+                  <span className="hidden text-sm text-slate-600 sm:block">
                     {formatDocumentType(document.documentType)}
                   </span>
-                </span>
-                <span className="hidden text-sm text-slate-600 sm:block">
-                  {formatDocumentType(document.documentType)}
-                </span>
-                <span className="hidden text-sm text-slate-600 sm:block">{formatDate(document.createdAt)}</span>
-                <span className="hidden sm:block">
-                  <ReviewStatusPill status={document.reviewStatus} />
-                </span>
-                <DocumentStatusPill status={document.duplicateStatus} />
-              </Link>
-            ))}
+                  <span className="hidden text-sm text-slate-600 sm:block">{formatDate(document.createdAt)}</span>
+                  <span className="hidden sm:block">
+                    <ReviewStatusPill status={document.reviewStatus} />
+                  </span>
+                  <span className="hidden sm:block">
+                    <DocumentStatusPill status={document.duplicateStatus} />
+                  </span>
+                  <span className="flex flex-col items-end gap-2 text-xs sm:flex-row sm:items-start">
+                    <Link
+                      className="rounded-md border border-line bg-white px-2.5 py-1.5 font-medium text-slate-700 hover:border-slate-400"
+                      href={`/documents/${documentId}`}
+                    >
+                      View
+                    </Link>
+                    {canReview ? (
+                      <Link
+                        className="rounded-md bg-accent px-2.5 py-1.5 font-medium text-white hover:bg-accent-dark"
+                        href={`/review/${documentId}`}
+                      >
+                        Review
+                      </Link>
+                    ) : null}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

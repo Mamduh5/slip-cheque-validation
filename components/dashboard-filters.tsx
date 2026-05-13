@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import Link from "next/link";
+import { getActiveDashboardFilterChips } from "@/lib/dashboard-filter-state";
 import { duplicateDecisionTypes, duplicateStatuses, documentTypes } from "@/lib/models";
 import { formatDocumentType } from "@/lib/document-types";
 import { formatDuplicateStatus, type DocumentReviewFilter } from "@/lib/formatters";
@@ -31,6 +32,13 @@ export function DashboardFilters({
 }: DashboardFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activeFilterChips = getActiveDashboardFilterChips({
+    review: reviewFilter,
+    documentType: documentTypeFilter,
+    duplicateStatus: duplicateStatusFilter,
+    duplicateDecisionType: duplicateDecisionTypeFilter,
+    searchQuery
+  });
 
   function buildSearchUrl(params: {
     review?: DocumentReviewFilter;
@@ -131,6 +139,32 @@ export function DashboardFilters({
 
   return (
     <div className="mb-5 space-y-3">
+      {activeFilterChips.length > 0 ? (
+        <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Active filters</span>
+              {activeFilterChips.map((chip) => (
+                <Link
+                  className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-400"
+                  href={chip.href}
+                  key={chip.key}
+                >
+                  {chip.label} <span aria-hidden="true">x</span>
+                  <span className="sr-only">Remove {chip.label} filter</span>
+                </Link>
+              ))}
+            </div>
+            <Link
+              className="text-xs font-medium text-accent hover:text-accent-dark"
+              href="/dashboard"
+            >
+              Clear all
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       <form onSubmit={handleSearchSubmit} className="rounded-lg border border-line bg-white p-3">
         <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="dashboard-search">
           Search extracted fields
