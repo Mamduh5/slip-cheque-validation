@@ -1,5 +1,5 @@
-import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
 import { translate, type SupportedLocale } from "@/lib/i18n";
+import type { DocumentRecord, DuplicateDecisionReason } from "@/lib/models";
 
 export interface ResultSummaryItem {
   label: string;
@@ -58,106 +58,172 @@ export function parseSuppressionReasons(note: string | null): string[] {
   });
 }
 
-function formatSuppressionReasons(reasons: string[]): string {
-  if (reasons.length === 0) return "Structured differences found";
-  if (reasons.length === 1) return `Suppressed because ${reasons[0]}`;
-  const last = reasons[reasons.length - 1];
-  const rest = reasons.slice(0, -1).join(", ");
-  return `Suppressed because ${rest} and ${last}`;
+function formatReasonList(reasons: string[], locale: SupportedLocale): string {
+  if (locale === "en" && reasons.length > 1) {
+    const last = reasons[reasons.length - 1];
+    const rest = reasons.slice(0, -1).join(", ");
+    return `${rest} and ${last}`;
+  }
+
+  return reasons.join(", ");
 }
 
-function getSuppressionReasons(document: DocumentRecord): string[] {
+function formatSuppressionReasons(reasons: string[], locale: SupportedLocale): string {
+  if (reasons.length === 0) return translate(locale, "documentDetail.results.structuredDifferencesFound");
+  return translate(locale, "documentDetail.results.suppressedBecause", { reasons: formatReasonList(reasons, locale) });
+}
+
+function getSuppressionReasons(document: DocumentRecord, locale: SupportedLocale): string[] {
   // Prefer structured reason codes for new records
   if (
     document.duplicateDecisionType === "SUPPRESSED_NEAR_DUPLICATE" &&
     document.duplicateDecisionReasons.length > 0
   ) {
-    return document.duplicateDecisionReasons.map(reasonCodeToLabel);
+    return document.duplicateDecisionReasons.map((reason) => reasonCodeToLabel(reason, locale));
   }
 
   // Legacy fallback for older records that only have note strings
   return parseSuppressionReasons(document.notes ?? null);
 }
 
-export function buildResultSummary(document: DocumentRecord): ResultSummaryItem[] {
+export function buildResultSummary(document: DocumentRecord, locale: SupportedLocale = "en"): ResultSummaryItem[] {
   const parts: ResultSummaryItem[] = [];
 
   // Duplicate outcome - prefer structured decision type when present
   const decisionType = document.duplicateDecisionType;
 
   if (decisionType === "EXACT_DUPLICATE" || document.duplicateStatus === "EXACT_DUPLICATE") {
-    parts.push({ label: "Duplicate check", value: "Exact duplicate found", tone: "info" });
-  } else if (decisionType === "LIKELY_DUPLICATE_REVIEW" || document.duplicateStatus === "LIKELY_DUPLICATE") {
-    parts.push({ label: "Duplicate check", value: "Likely duplicate — review needed", tone: "warning" });
-  } else if (decisionType === "SUPPRESSED_NEAR_DUPLICATE") {
-    const reasons = getSuppressionReasons(document);
     parts.push({
-      label: "Duplicate check",
-      value: "Near-duplicate review suppressed",
+      label: translate(locale, "documentDetail.results.duplicateCheck"),
+      value: translate(locale, "documentDetail.results.exactFound"),
+      tone: "info"
+    });
+  } else if (decisionType === "LIKELY_DUPLICATE_REVIEW" || document.duplicateStatus === "LIKELY_DUPLICATE") {
+    parts.push({
+      label: translate(locale, "documentDetail.results.duplicateCheck"),
+      value: locale === "en" ? "Likely duplicate — review needed" : translate(locale, "documentDetail.results.likelyReview"),
+      tone: "warning"
+    });
+  } else if (decisionType === "SUPPRESSED_NEAR_DUPLICATE") {
+    const reasons = getSuppressionReasons(document, locale);
+    parts.push({
+      label: translate(locale, "documentDetail.results.duplicateCheck"),
+      value: translate(locale, "documentDetail.results.suppressed"),
       tone: "info"
     });
     parts.push({
-      label: "Why",
-      value: formatSuppressionReasons(reasons),
+      label: translate(locale, "documentDetail.results.why"),
+      value: formatSuppressionReasons(reasons, locale),
       tone: "info"
     });
   } else if (document.notes?.startsWith("Suppressed near-duplicate")) {
     // Legacy fallback for records without structured decision type
     const reasons = parseSuppressionReasons(document.notes);
     parts.push({
-      label: "Duplicate check",
-      value: "Near-duplicate review suppressed",
+      label: translate(locale, "documentDetail.results.duplicateCheck"),
+      value: translate(locale, "documentDetail.results.suppressed"),
       tone: "info"
     });
     parts.push({
-      label: "Why",
-      value: formatSuppressionReasons(reasons),
+      label: translate(locale, "documentDetail.results.why"),
+      value: formatSuppressionReasons(reasons, locale),
       tone: "info"
     });
   } else {
-    parts.push({ label: "Duplicate check", value: "New upload", tone: "positive" });
+    parts.push({
+      label: translate(locale, "documentDetail.results.duplicateCheck"),
+      value: translate(locale, "documentDetail.results.newUpload"),
+      tone: "positive"
+    });
   }
 
   // Review status
   if (document.reviewStatus === "PENDING") {
-    parts.push({ label: "Review", value: "Pending your review", tone: "warning" });
+    parts.push({
+      label: translate(locale, "documentDetail.results.review"),
+      value: translate(locale, "documentDetail.results.pendingYourReview"),
+      tone: "warning"
+    });
   } else if (document.reviewStatus === "CONFIRMED_DUPLICATE") {
-    parts.push({ label: "Review", value: "Confirmed duplicate", tone: "info" });
+    parts.push({
+      label: translate(locale, "documentDetail.results.review"),
+      value: translate(locale, "documentDetail.results.confirmedDuplicate"),
+      tone: "info"
+    });
   } else if (document.reviewStatus === "CONFIRMED_DISTINCT") {
-    parts.push({ label: "Review", value: "Confirmed distinct", tone: "positive" });
+    parts.push({
+      label: translate(locale, "documentDetail.results.review"),
+      value: translate(locale, "documentDetail.results.confirmedDistinct"),
+      tone: "positive"
+    });
   }
 
   // Quality
   if (document.qualityStatus === "WARN" && document.qualityWarnings.length > 0) {
     parts.push({
-      label: "Quality",
-      value: `${document.qualityWarnings.length} warning${document.qualityWarnings.length === 1 ? "" : "s"} detected`,
+      label: translate(locale, "documentDetail.results.quality"),
+      value:
+        locale === "en"
+          ? `${document.qualityWarnings.length} warning${document.qualityWarnings.length === 1 ? "" : "s"} detected`
+          : translate(locale, "documentDetail.results.warningsDetected", { count: document.qualityWarnings.length }),
       tone: "warning"
     });
   } else if (document.qualityStatus === "FAIL") {
-    parts.push({ label: "Quality", value: "Image quality rejected", tone: "warning" });
+    parts.push({
+      label: translate(locale, "documentDetail.results.quality"),
+      value: translate(locale, "documentDetail.results.imageRejected"),
+      tone: "warning"
+    });
   }
 
   // Transfer-slip stages
   if (document.documentType === "BANK_TRANSFER_SLIP") {
     if (document.slipVerification?.result === "STRUCTURALLY_CONSISTENT") {
-      parts.push({ label: "Local check", value: "Structurally consistent", tone: "positive" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.localCheck"),
+        value: translate(locale, "documentDetail.results.structurallyConsistent"),
+        tone: "positive"
+      });
     } else if (document.slipVerification?.result === "STRUCTURALLY_INCONSISTENT") {
-      parts.push({ label: "Local check", value: "Structural inconsistency found", tone: "warning" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.localCheck"),
+        value: translate(locale, "documentDetail.results.structuralInconsistency"),
+        tone: "warning"
+      });
     }
 
     if (document.qrDecode?.result === "QR_DECODED") {
-      parts.push({ label: "QR decode", value: "Decoded", tone: "neutral" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.qrDecode"),
+        value: translate(locale, "documentDetail.results.decoded"),
+        tone: "neutral"
+      });
     } else if (document.qrDecode?.result === "NO_QR_DECODED") {
-      parts.push({ label: "QR decode", value: "No QR found", tone: "neutral" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.qrDecode"),
+        value: translate(locale, "documentDetail.results.noQrFound"),
+        tone: "neutral"
+      });
     }
 
     if (document.transferMetadata?.result === "PARSED") {
-      parts.push({ label: "Metadata", value: "Parsed", tone: "neutral" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.metadata"),
+        value: translate(locale, "documentDetail.results.parsed"),
+        tone: "neutral"
+      });
     } else if (document.transferMetadata?.result === "UNSUPPORTED_FORMAT") {
-      parts.push({ label: "Metadata", value: "Unsupported format", tone: "neutral" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.metadata"),
+        value: translate(locale, "documentDetail.results.unsupportedFormat"),
+        tone: "neutral"
+      });
     } else if (document.transferMetadata?.result === "PARSE_FAILED") {
-      parts.push({ label: "Metadata", value: "Parse failed", tone: "neutral" });
+      parts.push({
+        label: translate(locale, "documentDetail.results.metadata"),
+        value: translate(locale, "documentDetail.results.parseFailed"),
+        tone: "neutral"
+      });
     }
   }
 

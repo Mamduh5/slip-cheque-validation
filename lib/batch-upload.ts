@@ -1,4 +1,5 @@
 import type { DuplicateDecisionType, DuplicateStatus, QualityStatus, ReviewStatus } from "@/lib/models";
+import { translate, type SupportedLocale } from "@/lib/i18n";
 
 export type BatchUploadLifecycleStatus =
   | "waiting"
@@ -64,12 +65,12 @@ export function uploadLifecycleLabel(status: BatchUploadLifecycleStatus): string
   }
 }
 
-export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary {
+export function buildBatchOutcome(input: BatchOutcomeInput, locale: SupportedLocale = "en"): BatchOutcomeSummary {
   if (input.status === "waiting") {
     return {
       key: "waiting",
-      label: "Waiting",
-      description: "Ready to upload.",
+      label: translate(locale, "batchUpload.outcomes.waiting.label"),
+      description: translate(locale, "batchUpload.outcomes.waiting.description"),
       tone: "neutral",
       retryable: false
     };
@@ -78,8 +79,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.status === "uploading") {
     return {
       key: "uploading",
-      label: "Uploading",
-      description: "Sending the image.",
+      label: translate(locale, "batchUpload.outcomes.uploading.label"),
+      description: translate(locale, "batchUpload.outcomes.uploading.description"),
       tone: "info",
       retryable: false
     };
@@ -88,8 +89,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.status === "processing") {
     return {
       key: "processing",
-      label: "Processing",
-      description: "Checking quality and duplicates.",
+      label: translate(locale, "batchUpload.outcomes.processing.label"),
+      description: translate(locale, "batchUpload.outcomes.processing.description"),
       tone: "info",
       retryable: false
     };
@@ -98,8 +99,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.status === "rejected" || input.qualityStatus === "FAIL") {
     return {
       key: "qualityRejected",
-      label: "Image rejected due to quality issues",
-      description: input.error ?? "Retake or choose a clearer image.",
+      label: translate(locale, "batchUpload.outcomes.qualityRejected.label"),
+      description: input.error ?? translate(locale, "batchUpload.outcomes.qualityRejected.description"),
       tone: "warning",
       retryable: true
     };
@@ -108,8 +109,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.status === "failed") {
     return {
       key: "failed",
-      label: "Upload failed",
-      description: input.error ?? "Check the connection and try again.",
+      label: translate(locale, "batchUpload.outcomes.failed.label"),
+      description: input.error ?? translate(locale, "batchUpload.outcomes.failed.description"),
       tone: "danger",
       retryable: true
     };
@@ -118,8 +119,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.duplicateDecisionType === "EXACT_DUPLICATE" || input.duplicateStatus === "EXACT_DUPLICATE") {
     return {
       key: "exactDuplicate",
-      label: "Exact duplicate found",
-      description: "A byte-level duplicate exists in this account.",
+      label: translate(locale, "batchUpload.outcomes.exactDuplicate.label"),
+      description: translate(locale, "batchUpload.outcomes.exactDuplicate.description"),
       tone: "info",
       retryable: false
     };
@@ -128,8 +129,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.duplicateDecisionType === "LIKELY_DUPLICATE_REVIEW" || input.duplicateStatus === "LIKELY_DUPLICATE") {
     return {
       key: "reviewNeeded",
-      label: "Likely duplicate - review needed",
-      description: "Open compare/review for the side-by-side decision.",
+      label: translate(locale, "batchUpload.outcomes.reviewNeeded.label"),
+      description: translate(locale, "batchUpload.outcomes.reviewNeeded.description"),
       tone: "warning",
       retryable: false
     };
@@ -138,8 +139,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
   if (input.duplicateDecisionType === "SUPPRESSED_NEAR_DUPLICATE") {
     return {
       key: "suppressed",
-      label: "Near-duplicate review suppressed",
-      description: "Visual similarity was outweighed by structured differences.",
+      label: translate(locale, "batchUpload.outcomes.suppressed.label"),
+      description: translate(locale, "batchUpload.outcomes.suppressed.description"),
       tone: "info",
       retryable: false
     };
@@ -147,8 +148,8 @@ export function buildBatchOutcome(input: BatchOutcomeInput): BatchOutcomeSummary
 
   return {
     key: "newUpload",
-    label: "New upload",
-    description: "No duplicate review is required.",
+    label: translate(locale, "batchUpload.outcomes.newUpload.label"),
+    description: translate(locale, "batchUpload.outcomes.newUpload.description"),
     tone: "positive",
     retryable: false
   };
@@ -184,16 +185,30 @@ export function summarizeBatch(items: BatchOutcomeInput[]): BatchSummaryCounts {
   return counts;
 }
 
-export function formatBatchSummary(counts: BatchSummaryCounts): string[] {
-  const parts = [`${counts.total} file${counts.total === 1 ? "" : "s"} in batch`];
+export function formatBatchSummary(counts: BatchSummaryCounts, locale: SupportedLocale = "en"): string[] {
+  if (locale === "en") {
+    const parts = [`${counts.total} file${counts.total === 1 ? "" : "s"} in batch`];
 
-  if (counts.completed > 0) parts.push(`${counts.completed} completed`);
-  if (counts.exactDuplicates > 0) parts.push(`${counts.exactDuplicates} exact duplicate${counts.exactDuplicates === 1 ? "" : "s"}`);
-  if (counts.reviewNeeded > 0) parts.push(`${counts.reviewNeeded} need review`);
-  if (counts.newUploads > 0) parts.push(`${counts.newUploads} new upload${counts.newUploads === 1 ? "" : "s"}`);
-  if (counts.suppressed > 0) parts.push(`${counts.suppressed} suppressed near-duplicate${counts.suppressed === 1 ? "" : "s"}`);
-  if (counts.rejected > 0) parts.push(`${counts.rejected} quality rejected`);
-  if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+    if (counts.completed > 0) parts.push(`${counts.completed} completed`);
+    if (counts.exactDuplicates > 0) parts.push(`${counts.exactDuplicates} exact duplicate${counts.exactDuplicates === 1 ? "" : "s"}`);
+    if (counts.reviewNeeded > 0) parts.push(`${counts.reviewNeeded} need review`);
+    if (counts.newUploads > 0) parts.push(`${counts.newUploads} new upload${counts.newUploads === 1 ? "" : "s"}`);
+    if (counts.suppressed > 0) parts.push(`${counts.suppressed} suppressed near-duplicate${counts.suppressed === 1 ? "" : "s"}`);
+    if (counts.rejected > 0) parts.push(`${counts.rejected} quality rejected`);
+    if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+
+    return parts;
+  }
+
+  const parts = [translate(locale, "batchUpload.summary.files", { count: counts.total })];
+
+  if (counts.completed > 0) parts.push(translate(locale, "batchUpload.summary.completed", { count: counts.completed }));
+  if (counts.exactDuplicates > 0) parts.push(translate(locale, "batchUpload.summary.exactDuplicates", { count: counts.exactDuplicates }));
+  if (counts.reviewNeeded > 0) parts.push(translate(locale, "batchUpload.summary.reviewNeeded", { count: counts.reviewNeeded }));
+  if (counts.newUploads > 0) parts.push(translate(locale, "batchUpload.summary.newUploads", { count: counts.newUploads }));
+  if (counts.suppressed > 0) parts.push(translate(locale, "batchUpload.summary.suppressed", { count: counts.suppressed }));
+  if (counts.rejected > 0) parts.push(translate(locale, "batchUpload.summary.rejected", { count: counts.rejected }));
+  if (counts.failed > 0) parts.push(translate(locale, "batchUpload.summary.failed", { count: counts.failed }));
 
   return parts;
 }

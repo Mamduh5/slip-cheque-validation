@@ -46,12 +46,43 @@ export function formatDocumentType(type: DocumentType, locale: SupportedLocale =
   return translate(locale, `documentTypes.${type}`);
 }
 
-export function getDocumentTypeDescription(type: DocumentType) {
-  return documentTypeDescriptions[type];
+export function getDocumentTypeDescription(type: DocumentType, locale: SupportedLocale = "en") {
+  return translate(locale, `documentTypeDescriptions.${type}`);
 }
 
-export function getDocumentTypeGuidance(type: DocumentType) {
-  return documentTypeGuidance[type];
+export function getDocumentTypeGuidance(type: DocumentType, locale: SupportedLocale = "en") {
+  const keys: Record<DocumentType, {
+    title: `documentTypeGuidance.${DocumentType}.title`;
+    tip1: `documentTypeGuidance.${DocumentType}.tip1`;
+    tip2: `documentTypeGuidance.${DocumentType}.tip2`;
+  }> = {
+    BANK_TRANSFER_SLIP: {
+      title: "documentTypeGuidance.BANK_TRANSFER_SLIP.title",
+      tip1: "documentTypeGuidance.BANK_TRANSFER_SLIP.tip1",
+      tip2: "documentTypeGuidance.BANK_TRANSFER_SLIP.tip2"
+    },
+    DEPOSIT_PAYMENT_SLIP: {
+      title: "documentTypeGuidance.DEPOSIT_PAYMENT_SLIP.title",
+      tip1: "documentTypeGuidance.DEPOSIT_PAYMENT_SLIP.tip1",
+      tip2: "documentTypeGuidance.DEPOSIT_PAYMENT_SLIP.tip2"
+    },
+    CHEQUE: {
+      title: "documentTypeGuidance.CHEQUE.title",
+      tip1: "documentTypeGuidance.CHEQUE.tip1",
+      tip2: "documentTypeGuidance.CHEQUE.tip2"
+    },
+    UNKNOWN: {
+      title: "documentTypeGuidance.UNKNOWN.title",
+      tip1: "documentTypeGuidance.UNKNOWN.tip1",
+      tip2: "documentTypeGuidance.UNKNOWN.tip2"
+    }
+  };
+  const selectedKeys = keys[type];
+
+  return {
+    title: translate(locale, selectedKeys.title),
+    tips: [translate(locale, selectedKeys.tip1), translate(locale, selectedKeys.tip2)]
+  };
 }
 
 export function getDocumentTypeProcessingProfile(type: DocumentType) {

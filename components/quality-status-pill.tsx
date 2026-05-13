@@ -1,7 +1,8 @@
 import { formatQualityStatus } from "@/lib/documents";
+import type { SupportedLocale } from "@/lib/i18n";
 import type { QualityStatus } from "@/lib/models";
 
-export function QualityStatusPill({ status }: { status: QualityStatus }) {
+export function QualityStatusPill({ status, locale = "en" }: { status: QualityStatus; locale?: SupportedLocale }) {
   const tone =
     status === "PASS"
       ? "border-green-200 bg-green-50 text-green-800"
@@ -11,7 +12,7 @@ export function QualityStatusPill({ status }: { status: QualityStatus }) {
 
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
-      {formatQualityStatus(status)}
+      {formatQualityStatus(status, locale)}
     </span>
   );
 }

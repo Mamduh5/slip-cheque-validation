@@ -5,9 +5,10 @@ import {
   blurrySharpnessThreshold,
   darkLuminanceThreshold,
   minUsableDimension,
-  qualityWarningLabels,
+  formatQualityWarningLabel,
   recommendedMinDimension
 } from "@/lib/quality-thresholds";
+import type { SupportedLocale } from "@/lib/i18n";
 
 export interface ImageQualityAssessment {
   qualityStatus: QualityStatus;
@@ -130,6 +131,6 @@ export function calculateLaplacianVariance(pixels: Buffer, width: number, height
   return variance;
 }
 
-export function formatQualityWarning(code: QualityWarningCode) {
-  return qualityWarningLabels[code];
+export function formatQualityWarning(code: QualityWarningCode, locale: SupportedLocale = "en") {
+  return formatQualityWarningLabel(code, locale);
 }

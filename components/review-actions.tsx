@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import {
   getReviewKeyboardShortcutAction,
   isReviewKeyboardShortcutBlocked
@@ -15,15 +16,18 @@ export function ReviewActions({
   nextHref,
   queueNextHref,
   queuePreviousHref,
-  enableShortcuts = false
+  enableShortcuts = false,
+  locale = "en"
 }: {
   documentId: string;
   nextHref?: string | null;
   queueNextHref?: string | null;
   queuePreviousHref?: string | null;
   enableShortcuts?: boolean;
+  locale?: SupportedLocale;
 }) {
   const router = useRouter();
+  const t = createTranslator(locale);
   const [pendingAction, setPendingAction] = useState<ReviewActionId | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +48,7 @@ export function ReviewActions({
     setPendingAction(null);
 
     if (!response.ok) {
-      setError(payload?.error ?? "Review could not be saved.");
+      setError(payload?.error ?? t("reviewActions.error"));
       return;
     }
 
@@ -55,7 +59,7 @@ export function ReviewActions({
     }
 
     router.refresh();
-  }, [documentId, reviewNote, router]);
+  }, [documentId, reviewNote, router, t]);
 
   const isPending = pendingAction !== null;
 
@@ -106,26 +110,28 @@ export function ReviewActions({
     <div className="mt-4 rounded-md border border-line bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="font-semibold text-ink">Review this likely duplicate</h2>
+          <h2 className="font-semibold text-ink">{t("reviewActions.title")}</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            The system thinks these images may show the same document. Your review is stored separately.
+            {t("reviewActions.helper")}
           </p>
           {enableShortcuts ? (
             <p className="mt-2 text-xs text-slate-500">
-              Shortcuts: <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">1</kbd> duplicate,{" "}
-              <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">2</kbd> distinct.
+              {t("reviewActions.shortcuts")} <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">1</kbd>{" "}
+              {t("reviewActions.shortcutDuplicate")},{" "}
+              <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">2</kbd>{" "}
+              {t("reviewActions.shortcutDistinct")}.
             </p>
           ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 lg:max-w-md">
           <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor={`review-note-${documentId}`}>
-            Review note <span className="font-normal normal-case tracking-normal">(optional)</span>
+            {t("reviewActions.noteLabel")} <span className="font-normal normal-case tracking-normal">{t("reviewActions.optional")}</span>
           </label>
           <textarea
             className="min-h-16 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             id={`review-note-${documentId}`}
             maxLength={500}
-            placeholder="Add brief context for this decision"
+            placeholder={t("reviewActions.notePlaceholder")}
             value={reviewNote}
             onChange={(event) => setReviewNote(event.target.value)}
           />
@@ -136,7 +142,7 @@ export function ReviewActions({
               disabled={isPending}
               onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate")}
             >
-              {pendingAction === "duplicate" ? "Saving..." : <>Confirm duplicate {enableShortcuts ? <span className="ml-1 text-xs opacity-80">(1)</span> : null}</>}
+              {pendingAction === "duplicate" ? t("reviewActions.saving") : <>{t("reviewActions.confirmDuplicate")} {enableShortcuts ? <span className="ml-1 text-xs opacity-80">(1)</span> : null}</>}
             </button>
             <button
               className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
@@ -144,7 +150,7 @@ export function ReviewActions({
               disabled={isPending}
               onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct")}
             >
-              {pendingAction === "distinct" ? "Saving..." : <>Confirm distinct {enableShortcuts ? <span className="ml-1 text-xs opacity-70">(2)</span> : null}</>}
+              {pendingAction === "distinct" ? t("reviewActions.saving") : <>{t("reviewActions.confirmDistinct")} {enableShortcuts ? <span className="ml-1 text-xs opacity-70">(2)</span> : null}</>}
             </button>
           </div>
           {nextHref ? (
@@ -155,7 +161,7 @@ export function ReviewActions({
                 disabled={isPending}
                 onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate-next", nextHref)}
               >
-                {pendingAction === "duplicate-next" ? "Saving..." : "Confirm duplicate & next"}
+                {pendingAction === "duplicate-next" ? t("reviewActions.saving") : t("reviewActions.confirmDuplicateNext")}
               </button>
               <button
                 className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
@@ -163,12 +169,12 @@ export function ReviewActions({
                 disabled={isPending}
                 onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct-next", nextHref)}
               >
-                {pendingAction === "distinct-next" ? "Saving..." : "Confirm distinct & next"}
+                {pendingAction === "distinct-next" ? t("reviewActions.saving") : t("reviewActions.confirmDistinctNext")}
               </button>
             </div>
           ) : (
             <p className="rounded-md border border-line bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              End of queue for this view. Save this item, then return to the queue.
+              {t("reviewActions.endOfQueue")}
             </p>
           )}
         </div>

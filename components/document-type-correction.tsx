@@ -7,15 +7,18 @@ import {
   formatDocumentType,
   getDocumentTypeDescription
 } from "@/lib/document-types";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import type { DocumentType } from "@/lib/models";
 
 interface DocumentTypeCorrectionProps {
   documentId: string;
   currentDocumentType: DocumentType;
+  locale?: SupportedLocale;
 }
 
-export function DocumentTypeCorrection({ documentId, currentDocumentType }: DocumentTypeCorrectionProps) {
+export function DocumentTypeCorrection({ documentId, currentDocumentType, locale = "en" }: DocumentTypeCorrectionProps) {
   const router = useRouter();
+  const t = createTranslator(locale);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedType, setSelectedType] = useState<DocumentType>(currentDocumentType);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,11 +48,11 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
     setIsSaving(false);
 
     if (!response.ok) {
-      setError(payload?.error ?? "Document type could not be updated.");
+      setError(payload?.error ?? t("documentTypeCorrection.error"));
       return;
     }
 
-    setSuccess(`Document type updated to ${payload?.documentTypeLabel ?? formatDocumentType(selectedType)}.`);
+    setSuccess(t("documentTypeCorrection.success", { type: formatDocumentType(selectedType, locale) }));
     setIsEditing(false);
     router.refresh();
   }
@@ -58,11 +61,10 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
     <div className="mt-3 rounded-md border border-line bg-white p-3" data-testid="document-type-correction">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Document type</p>
-          <p className="mt-1 text-sm font-medium">{formatDocumentType(currentDocumentType)}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("documentTypeCorrection.title")}</p>
+          <p className="mt-1 text-sm font-medium">{formatDocumentType(currentDocumentType, locale)}</p>
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            This changes only the user-managed classification. It does not verify contents or recompute duplicate,
-            review, or quality status.
+            {t("documentTypeCorrection.helper")}
           </p>
         </div>
         {!isEditing ? (
@@ -75,7 +77,7 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
               setIsEditing(true);
             }}
           >
-            Change document type
+            {t("documentTypeCorrection.change")}
           </button>
         ) : null}
       </div>
@@ -101,8 +103,8 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
                   data-testid={`correct-document-type-${type}`}
                   onChange={() => setSelectedType(type)}
                 />
-                <span className="block font-medium">{formatDocumentType(type)}</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">{getDocumentTypeDescription(type)}</span>
+                <span className="block font-medium">{formatDocumentType(type, locale)}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">{getDocumentTypeDescription(type, locale)}</span>
               </label>
             ))}
           </div>
@@ -113,7 +115,7 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
               disabled={isSaving}
               onClick={saveDocumentType}
             >
-              {isSaving ? "Saving..." : "Save type"}
+              {isSaving ? t("documentTypeCorrection.saving") : t("documentTypeCorrection.save")}
             </button>
             <button
               className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
@@ -121,7 +123,7 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType }: Docu
               disabled={isSaving}
               onClick={cancelEdit}
             >
-              Cancel
+              {t("documentTypeCorrection.cancel")}
             </button>
           </div>
         </div>

@@ -11,12 +11,6 @@ export function formatReviewStatus(status: ReviewStatus, locale: SupportedLocale
   return translate(locale, `statuses.review.${status}`);
 }
 
-export function formatQualityStatus(status: "PASS" | "WARN" | "FAIL") {
-  const labels: Record<"PASS" | "WARN" | "FAIL", string> = {
-    PASS: "Good",
-    WARN: "Needs attention",
-    FAIL: "Unusable"
-  };
-
-  return labels[status];
+export function formatQualityStatus(status: "PASS" | "WARN" | "FAIL", locale: SupportedLocale = "en") {
+  return translate(locale, `quality.status.${status}`);
 }

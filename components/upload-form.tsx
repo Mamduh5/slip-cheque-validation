@@ -25,7 +25,8 @@ import type {
   ReviewStatus,
   SourceType
 } from "@/lib/models";
-import { qualityWarningLabels } from "@/lib/quality-thresholds";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
+import { formatQualityWarningLabel } from "@/lib/quality-thresholds";
 import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
 
 interface UploadResponse {
@@ -84,8 +85,9 @@ function isInFlight(status: BatchUploadLifecycleStatus) {
   return status === "uploading" || status === "processing";
 }
 
-export function UploadForm() {
+export function UploadForm({ locale = "en" }: { locale?: SupportedLocale }) {
   const router = useRouter();
+  const t = createTranslator(locale);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectionTokenRef = useRef(0);
   const selectedItemsRef = useRef<SelectedUploadItem[]>([]);
@@ -95,7 +97,7 @@ export function UploadForm() {
   const [formQualityWarnings, setFormQualityWarnings] = useState<QualityWarningCode[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedUploadItem[]>([]);
   const [isAnalyzingPreview, setIsAnalyzingPreview] = useState(false);
-  const selectedTypeGuidance = getDocumentTypeGuidance(documentType);
+  const selectedTypeGuidance = getDocumentTypeGuidance(documentType, locale);
   const isSubmitting = selectedItems.some((item) => isInFlight(item.status));
   const selectedPreview = selectedItems[0]?.preview ?? null;
   const batchSummary = useMemo(
@@ -111,16 +113,17 @@ export function UploadForm() {
                 qualityStatus: item.result?.qualityStatus,
                 error: item.error
               }))
-            )
+            ),
+            locale
           )
         : [],
-    [selectedItems]
+    [locale, selectedItems]
   );
   const retryableItems = selectedItems.filter((item) => buildBatchOutcome({
     status: item.status,
     qualityStatus: item.result?.qualityStatus,
     error: item.error
-  }).retryable);
+  }, locale).retryable);
 
   useEffect(() => {
     selectedItemsRef.current = selectedItems;
@@ -215,14 +218,14 @@ export function UploadForm() {
     setFormQualityWarnings([]);
 
     if (selectedItems.length === 0) {
-      setError("Take a photo or choose one or more images before uploading.");
+      setError(t("upload.form.noFilesError"));
       return;
     }
 
     const waitingIds = selectedItems.filter((item) => item.status === "waiting").map((item) => item.id);
 
     if (waitingIds.length === 0) {
-      setError("There are no waiting files to upload.");
+      setError(t("upload.form.noWaitingError"));
       return;
     }
 
@@ -283,13 +286,13 @@ export function UploadForm() {
         });
       } catch {
         if (selectedItems.length === 1) {
-          setError("Upload failed. Check your connection and try again.");
+          setError(t("upload.form.connectionError"));
           setFormQualityWarnings([]);
         }
         setSelectedItems((current) =>
           current.map((candidate) =>
             candidate.id === itemId
-              ? { ...candidate, status: "failed", error: "Upload failed. Check your connection and try again." }
+              ? { ...candidate, status: "failed", error: t("upload.form.connectionError") }
               : candidate
           )
         );
@@ -305,7 +308,7 @@ export function UploadForm() {
       if (!response.ok || !payload?.documentId) {
         const isQualityRejected = response.status === 422 || payload?.qualityStatus === "FAIL";
         if (selectedItems.length === 1) {
-          setError(payload?.error ?? "Upload failed.");
+          setError(payload?.error ?? t("upload.form.failedError"));
           setFormQualityWarnings(payload?.qualityWarnings ?? []);
         }
         setSelectedItems((current) =>
@@ -314,7 +317,7 @@ export function UploadForm() {
               ? {
                   ...candidate,
                   status: isQualityRejected ? "rejected" : "failed",
-                  error: payload?.error ?? "Upload failed.",
+                  error: payload?.error ?? t("upload.form.failedError"),
                   result: payload,
                   qualityWarnings: payload?.qualityWarnings ?? []
                 }
@@ -357,7 +360,7 @@ export function UploadForm() {
       onSubmit={handleSubmit}
     >
       <fieldset aria-describedby="document-type-guidance">
-        <legend className="mb-2 block text-sm font-medium">Document type</legend>
+        <legend className="mb-2 block text-sm font-medium">{t("upload.form.documentType")}</legend>
         <div className="grid gap-2 sm:grid-cols-2" data-testid="document-type-options">
           {documentTypeOptions.map((type) => (
             <label
@@ -377,8 +380,8 @@ export function UploadForm() {
                 data-testid={`document-type-${type}`}
                 onChange={() => setDocumentType(type)}
               />
-              <span className="block font-medium">{formatDocumentType(type)}</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500">{getDocumentTypeDescription(type)}</span>
+              <span className="block font-medium">{formatDocumentType(type, locale)}</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">{getDocumentTypeDescription(type, locale)}</span>
             </label>
           ))}
         </div>
@@ -397,7 +400,7 @@ export function UploadForm() {
       </fieldset>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="sourceType">
-          Source
+          {t("upload.form.source")}
         </label>
         <select
           className="focus-ring w-full rounded-md border border-line bg-white px-3 py-2"
@@ -407,16 +410,16 @@ export function UploadForm() {
           value={sourceType}
           onChange={(event) => setSourceType(event.target.value as SourceType)}
         >
-          <option value="CAMERA">Camera photo</option>
-          <option value="UPLOAD">Existing image file</option>
+          <option value="CAMERA">{t("upload.form.sourceCamera")}</option>
+          <option value="UPLOAD">{t("upload.form.sourceUpload")}</option>
         </select>
         <p className="mt-1 text-xs leading-5 text-slate-500" id="sourceType-help">
-          Choose whether reviewers should treat this as a new capture or an existing image.
+          {t("upload.form.sourceHelp")}
         </p>
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="file">
-          Take photos or choose images
+          {t("upload.form.fileLabel")}
         </label>
         <input
           ref={fileInputRef}
@@ -434,7 +437,7 @@ export function UploadForm() {
           required
         />
         <p className="mt-2 text-xs text-slate-500" id="file-help">
-          Use the camera on phones, or select one or more JPEG, PNG, or WebP images.
+          {t("upload.form.fileHelp")}
         </p>
       </div>
 
@@ -442,8 +445,8 @@ export function UploadForm() {
         <div className="rounded-md border border-line bg-white" data-testid="selected-files-panel" aria-live="polite">
           <div className="flex flex-col gap-1 border-b border-line px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium">Selected files</p>
-              <p className="text-xs text-slate-500">{selectedItems.length} file{selectedItems.length === 1 ? "" : "s"} ready</p>
+              <p className="text-sm font-medium">{t("upload.form.selectedFiles")}</p>
+              <p className="text-xs text-slate-500">{t("upload.form.filesReady", { count: selectedItems.length })}</p>
             </div>
             {retryableItems.length > 0 ? (
               <button
@@ -453,7 +456,7 @@ export function UploadForm() {
                 onClick={retryFailedItems}
                 disabled={isSubmitting}
               >
-                Retry failed/rejected
+                {t("upload.form.retryFailed")}
               </button>
             ) : null}
           </div>
@@ -466,7 +469,7 @@ export function UploadForm() {
                 reviewStatus: item.result?.reviewStatus,
                 qualityStatus: item.result?.qualityStatus,
                 error: item.error
-              });
+              }, locale);
               const canReview =
                 item.result?.documentId &&
                 (item.result.duplicateDecisionType === "LIKELY_DUPLICATE_REVIEW" ||
@@ -492,7 +495,7 @@ export function UploadForm() {
                         <ul className="mt-2 flex flex-wrap gap-2 text-xs text-orange-900">
                           {item.qualityWarnings.map((warning) => (
                             <li key={warning} className="rounded-full border border-orange-200 bg-orange-50 px-2 py-1">
-                              {qualityWarningLabels[warning]}
+                              {formatQualityWarningLabel(warning, locale)}
                             </li>
                           ))}
                         </ul>
@@ -504,7 +507,7 @@ export function UploadForm() {
                           className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400"
                           href={`/documents/${item.result.documentId}`}
                         >
-                          Open detail
+                          {t("upload.form.openDetail")}
                         </Link>
                       ) : null}
                       {canReview ? (
@@ -512,7 +515,7 @@ export function UploadForm() {
                           className="focus-ring rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
                           href={`/review/${item.result?.documentId}`}
                         >
-                          Compare/review
+                          {t("upload.form.compareReview")}
                         </Link>
                       ) : null}
                       {outcome.retryable ? (
@@ -523,7 +526,7 @@ export function UploadForm() {
                           onClick={() => retryItem(item.id)}
                           disabled={isSubmitting}
                         >
-                          Retry
+                          {t("upload.form.retry")}
                         </button>
                       ) : null}
                       <button
@@ -533,7 +536,7 @@ export function UploadForm() {
                         onClick={() => removeItem(item.id)}
                         disabled={isInFlight(item.status)}
                       >
-                        Remove
+                        {t("upload.form.remove")}
                       </button>
                     </div>
                   </div>
@@ -547,7 +550,7 @@ export function UploadForm() {
       {selectedPreview ? (
         <div className="overflow-hidden rounded-md border border-line bg-white" data-testid="selected-image-preview">
           <div className="border-b border-line px-3 py-2">
-            <p className="text-sm font-medium">Preview before upload</p>
+            <p className="text-sm font-medium">{t("upload.form.previewTitle")}</p>
             <p className="mt-1 truncate text-xs text-slate-500">
               {selectedPreview.fileName} | {selectedPreview.fileSizeLabel} | {selectedPreview.mimeType}
             </p>
@@ -558,7 +561,7 @@ export function UploadForm() {
               className="max-h-[420px] w-full object-contain"
               data-testid="selected-image-preview-img"
               src={selectedPreview.previewUrl}
-              alt="Selected document preview"
+              alt={t("upload.form.previewAlt")}
             />
             <div className="pointer-events-none absolute inset-3 rounded-sm border border-white/70 shadow-[0_0_0_9999px_rgba(15,23,42,0.08)]">
               <span className="absolute left-0 top-0 h-8 w-8 border-l-2 border-t-2 border-emerald-500" />
@@ -572,33 +575,33 @@ export function UploadForm() {
               className="rounded-md border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-950"
               data-testid="preview-checklist"
             >
-              <p className="font-medium">Before uploading, check the photo.</p>
+              <p className="font-medium">{t("upload.form.checklistTitle")}</p>
               <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-                <li>All corners are visible.</li>
-                <li>The paper fills most of the frame.</li>
-                <li>Text and edges look sharp.</li>
-                <li>There is no heavy glare or shadow.</li>
+                <li>{t("upload.form.checklist1")}</li>
+                <li>{t("upload.form.checklist2")}</li>
+                <li>{t("upload.form.checklist3")}</li>
+                <li>{t("upload.form.checklist4")}</li>
               </ul>
             </div>
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
-              <p className="font-medium text-slate-800">Advisory preview check</p>
+              <p className="font-medium text-slate-800">{t("upload.form.advisoryTitle")}</p>
               <p className="mt-1">
-                These local hints are only a preview. The server performs the final quality check after upload.
+                {t("upload.form.advisoryBody")}
               </p>
               {isAnalyzingPreview ? (
                 <p className="mt-2 text-xs text-slate-500" role="status" aria-live="polite">
-                  Checking the preview...
+                  {t("upload.form.checkingPreview")}
                 </p>
               ) : selectedPreview.advisoryWarnings.length > 0 ? (
                 <ul className="mt-2 flex flex-wrap gap-2 text-xs text-orange-900">
                   {selectedPreview.advisoryWarnings.map((warning) => (
                     <li key={warning} className="rounded-full border border-orange-200 bg-orange-50 px-2 py-1">
-                      {qualityWarningLabels[warning]}
+                      {formatQualityWarningLabel(warning, locale)}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-xs text-green-700">No obvious preview issues found.</p>
+                <p className="mt-2 text-xs text-green-700">{t("upload.form.noPreviewIssues")}</p>
               )}
             </div>
             <button
@@ -608,19 +611,19 @@ export function UploadForm() {
               onClick={chooseAnotherImage}
               disabled={isSubmitting}
             >
-              Retake or choose other images
+              {t("upload.form.replaceImages")}
             </button>
           </div>
         </div>
       ) : null}
 
       <div className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-600">
-        <p className="font-medium text-slate-800">Capture tips</p>
+        <p className="font-medium text-slate-800">{t("upload.form.captureTips")}</p>
         <ul className="mt-1 list-disc space-y-1 pl-5">
-          <li>Place the document on a flat surface.</li>
-          <li>Include all corners inside the image.</li>
-          <li>Avoid glare, deep shadows, and motion blur.</li>
-          <li>Retake if text or edges look soft.</li>
+          <li>{t("upload.form.tip1")}</li>
+          <li>{t("upload.form.tip2")}</li>
+          <li>{t("upload.form.tip3")}</li>
+          <li>{t("upload.form.tip4")}</li>
         </ul>
       </div>
 
@@ -630,7 +633,7 @@ export function UploadForm() {
           data-testid="batch-summary"
           aria-live="polite"
         >
-          <p className="font-medium text-slate-900">Batch summary</p>
+          <p className="font-medium text-slate-900">{t("upload.form.batchSummary")}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {batchSummary.map((part) => (
               <span key={part} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs">
@@ -649,18 +652,18 @@ export function UploadForm() {
           role="alert"
         >
           <p className="font-medium">
-            {formQualityWarnings.length > 0 ? "Image rejected due to quality issues" : "Upload failed"}
+            {formQualityWarnings.length > 0 ? t("upload.form.rejectedTitle") : t("upload.form.failedTitle")}
           </p>
           <p className="mt-1">{error}</p>
           {formQualityWarnings.length > 0 ? (
             <>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {formQualityWarnings.map((warning) => (
-                  <li key={warning}>{qualityWarningLabels[warning]}</li>
+                  <li key={warning}>{formatQualityWarningLabel(warning, locale)}</li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-red-700">
-                Retake or choose another image that meets the capture tips above.
+                {t("upload.form.retakeAdvice")}
               </p>
             </>
           ) : null}
@@ -676,9 +679,9 @@ export function UploadForm() {
         >
           <div className="flex items-center gap-3">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
-            <span className="font-medium">Uploading selected files</span>
+            <span className="font-medium">{t("upload.form.progressTitle")}</span>
           </div>
-          <p className="mt-2 text-xs text-sky-800">Each file is handled separately.</p>
+          <p className="mt-2 text-xs text-sky-800">{t("upload.form.progressBody")}</p>
         </div>
       ) : null}
 
@@ -689,12 +692,12 @@ export function UploadForm() {
         disabled={isSubmitting || selectedItems.length === 0 || selectedItems.every((item) => item.status !== "waiting")}
       >
         {isSubmitting
-          ? "Uploading selected files"
+          ? t("upload.form.progressTitle")
           : selectedItems.length === 0
-            ? "Choose images first"
+            ? t("upload.form.chooseFirst")
             : selectedItems.length === 1
-              ? "Upload selected image"
-              : `Upload ${selectedItems.filter((item) => item.status === "waiting").length} files`}
+              ? t("upload.form.uploadSelectedImage")
+              : t("upload.form.uploadFiles", { count: selectedItems.filter((item) => item.status === "waiting").length })}
       </button>
     </form>
   );
