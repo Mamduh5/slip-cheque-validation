@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   createTranslator,
   defaultLocale,
+  detectLocaleFromAcceptLanguage,
   ensureSupportedLocale,
   isSupportedLocale,
+  mapLocaleTagToSupportedLocale,
   resolveTranslation,
+  resolveLocalePreference,
   supportedLocales,
   translate,
   type TranslationResources
@@ -77,5 +80,37 @@ describe("i18n foundation", () => {
     };
 
     expect(resolveTranslation(resources, "th", "upload.selected", { count: 3 })).toBe("3 files selected");
+  });
+
+  it("maps browser locale tags to supported locales", () => {
+    expect(mapLocaleTagToSupportedLocale("th")).toBe("th");
+    expect(mapLocaleTagToSupportedLocale("th-TH")).toBe("th");
+    expect(mapLocaleTagToSupportedLocale("en-US")).toBe("en");
+    expect(mapLocaleTagToSupportedLocale("fr-FR")).toBeNull();
+  });
+
+  it("detects the first supported accept-language candidate by quality", () => {
+    expect(detectLocaleFromAcceptLanguage("fr-FR, th-TH;q=0.9, en-US;q=0.8")).toBe("th");
+    expect(detectLocaleFromAcceptLanguage("fr-FR, en-US;q=0.7, th-TH;q=0.9")).toBe("th");
+    expect(detectLocaleFromAcceptLanguage("fr-FR, de-DE;q=0.9")).toBeNull();
+  });
+
+  it("resolves locale precedence deterministically", () => {
+    expect(
+      resolveLocalePreference({
+        explicitLocale: "en",
+        savedLocale: "th",
+        acceptLanguage: "th-TH"
+      })
+    ).toEqual({ locale: "en", source: "explicit" });
+    expect(resolveLocalePreference({ savedLocale: "th", acceptLanguage: "en-US" })).toEqual({
+      locale: "th",
+      source: "saved"
+    });
+    expect(resolveLocalePreference({ savedLocale: "fr", acceptLanguage: "th-TH" })).toEqual({
+      locale: "th",
+      source: "detected"
+    });
+    expect(resolveLocalePreference({ acceptLanguage: "fr-FR" })).toEqual({ locale: "en", source: "fallback" });
   });
 });

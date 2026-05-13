@@ -3,8 +3,11 @@ import { thMessages } from "@/lib/i18n/messages/th";
 
 export const defaultLocale = "en";
 export const supportedLocales = ["en", "th"] as const;
+export const localePreferenceCookieName = "ui_locale";
+export const localePreferenceCookieMaxAge = 60 * 60 * 24 * 365;
 
 export type SupportedLocale = (typeof supportedLocales)[number];
+export type LocaleSource = "explicit" | "saved" | "detected" | "fallback";
 
 type MessageLeaf = string;
 export type MessageTree = {
@@ -35,6 +38,85 @@ export function isSupportedLocale(locale: string): locale is SupportedLocale {
 
 export function ensureSupportedLocale(locale: string | null | undefined): SupportedLocale {
   return locale && isSupportedLocale(locale) ? locale : defaultLocale;
+}
+
+export function mapLocaleTagToSupportedLocale(localeTag: string | null | undefined): SupportedLocale | null {
+  if (!localeTag) {
+    return null;
+  }
+
+  const normalized = localeTag.trim().toLowerCase();
+
+  if (normalized === "th" || normalized.startsWith("th-")) {
+    return "th";
+  }
+
+  if (normalized === "en" || normalized.startsWith("en-")) {
+    return "en";
+  }
+
+  return null;
+}
+
+export function detectLocaleFromAcceptLanguage(acceptLanguage: string | null | undefined): SupportedLocale | null {
+  if (!acceptLanguage) {
+    return null;
+  }
+
+  const candidates = acceptLanguage
+    .split(",")
+    .map((part, index) => {
+      const [localeTag, ...parameters] = part.trim().split(";");
+      const qValue = parameters
+        .map((parameter) => parameter.trim())
+        .find((parameter) => parameter.startsWith("q="))
+        ?.slice(2);
+      const quality = qValue ? Number(qValue) : 1;
+
+      return {
+        index,
+        localeTag,
+        quality: Number.isFinite(quality) ? quality : 0
+      };
+    })
+    .filter((candidate) => candidate.localeTag && candidate.quality > 0)
+    .sort((left, right) => right.quality - left.quality || left.index - right.index);
+
+  for (const candidate of candidates) {
+    const locale = mapLocaleTagToSupportedLocale(candidate.localeTag);
+
+    if (locale) {
+      return locale;
+    }
+  }
+
+  return null;
+}
+
+export function resolveLocalePreference({
+  explicitLocale,
+  savedLocale,
+  acceptLanguage
+}: {
+  explicitLocale?: string | null;
+  savedLocale?: string | null;
+  acceptLanguage?: string | null;
+}): { locale: SupportedLocale; source: LocaleSource } {
+  if (explicitLocale && isSupportedLocale(explicitLocale)) {
+    return { locale: explicitLocale, source: "explicit" };
+  }
+
+  if (savedLocale && isSupportedLocale(savedLocale)) {
+    return { locale: savedLocale, source: "saved" };
+  }
+
+  const detectedLocale = detectLocaleFromAcceptLanguage(acceptLanguage);
+
+  if (detectedLocale) {
+    return { locale: detectedLocale, source: "detected" };
+  }
+
+  return { locale: defaultLocale, source: "fallback" };
 }
 
 export function translate(locale: SupportedLocale, key: TranslationKey, values?: TranslationValues): string {
