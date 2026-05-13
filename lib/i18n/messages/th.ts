@@ -9,8 +9,11 @@ export const thMessages = {
       save: "บันทึก"
     },
     locales: {
-      en: "อังกฤษ",
+      en: "English",
       th: "ไทย"
+    },
+    localeSwitcher: {
+      label: "ภาษา"
     }
   },
   navigation: {

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { AuthNav } from "@/components/auth-nav";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import type { SupportedLocale } from "@/lib/i18n";
+import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/session";
 
 export async function AppHeader({ locale }: { locale: SupportedLocale }) {
   const user = await getCurrentUser();
+  const t = createTranslator(locale);
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
@@ -14,11 +15,11 @@ export async function AppHeader({ locale }: { locale: SupportedLocale }) {
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink text-sm font-bold text-white">
             DR
           </span>
-          <span className="truncate font-semibold">Document Registry Checker</span>
+          <span className="truncate font-semibold">{t("common.productName")}</span>
         </Link>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <LanguageSwitcher locale={locale} />
-          <AuthNav isSignedIn={Boolean(user)} userName={user?.name ?? user?.email} />
+          <AuthNav isSignedIn={Boolean(user)} userName={user?.name ?? user?.email} locale={locale} />
         </div>
       </div>
     </header>

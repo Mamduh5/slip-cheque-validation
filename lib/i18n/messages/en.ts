@@ -10,7 +10,10 @@ export const enMessages = {
     },
     locales: {
       en: "English",
-      th: "Thai"
+      th: "ไทย"
+    },
+    localeSwitcher: {
+      label: "Language"
     }
   },
   navigation: {
