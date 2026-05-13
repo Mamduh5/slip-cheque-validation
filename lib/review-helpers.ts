@@ -29,6 +29,14 @@ export function isLowConfidence(doc: DocumentRecord, key: ReviewFieldKey): boole
   return doc.slipImageRead?.extractedFields?.[key]?.confidence === "LOW";
 }
 
+export function getReviewFieldDisplayValue(doc: DocumentRecord, key: ReviewFieldKey) {
+  return {
+    value: getImageReadField(doc, key),
+    confidence: getImageReadConfidence(doc, key),
+    isLowConfidence: isLowConfidence(doc, key)
+  };
+}
+
 /**
  * Compare two OCR-derived field values for visual equality.
  * Null/null is treated as matching (both absent). One-sided null is treated as

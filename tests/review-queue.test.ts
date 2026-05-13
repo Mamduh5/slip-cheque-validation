@@ -5,6 +5,7 @@ import {
   reviewValuesMatch,
   getImageReadField,
   getImageReadConfidence,
+  getReviewFieldDisplayValue,
   isLowConfidence,
   REVIEW_FIELD_LABELS
 } from "../lib/review-helpers";
@@ -455,6 +456,14 @@ describe("review field helpers", () => {
     expect(isLowConfidence(doc, "senderName")).toBe(true);
     expect(isLowConfidence(doc, "amount")).toBe(false);
     expect(isLowConfidence(doc, "receiverName")).toBe(false);
+  });
+
+  it("keeps LOW confidence values available for compare display", () => {
+    expect(getReviewFieldDisplayValue(doc, "senderName")).toEqual({
+      value: "test sender",
+      confidence: "low",
+      isLowConfidence: true
+    });
   });
 
   it("returns null field values when slipImageRead is absent", () => {

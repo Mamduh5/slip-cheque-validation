@@ -10,9 +10,7 @@ import {
   type ReviewQueueContext
 } from "@/lib/review-queue-context";
 import {
-  getImageReadField,
-  getImageReadConfidence,
-  isLowConfidence,
+  getReviewFieldDisplayValue,
   reviewValuesMatch,
   REVIEW_FIELD_LABELS,
   type ReviewFieldKey
@@ -111,13 +109,17 @@ function FieldRow({
   aValue,
   bValue,
   aConf,
-  bConf
+  bConf,
+  aLow,
+  bLow
 }: {
   label: string;
   aValue: string | null;
   bValue: string | null;
   aConf: string | null;
   bConf: string | null;
+  aLow: boolean;
+  bLow: boolean;
 }) {
   const match = reviewValuesMatch(aValue, bValue);
   const hasBoth = aValue !== null || bValue !== null;
@@ -130,7 +132,14 @@ function FieldRow({
       <td className="py-2 pl-3 pr-4 text-xs font-medium text-slate-500">{label}</td>
       <td className="py-2 pr-3 text-xs">
         {aValue ? (
-          <span className="font-medium text-ink">{aValue}</span>
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span className="font-medium text-ink">{aValue}</span>
+            {aLow ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">
+                LOW CONF
+              </span>
+            ) : null}
+          </span>
         ) : (
           <span className="text-slate-400">—</span>
         )}
@@ -138,7 +147,14 @@ function FieldRow({
       </td>
       <td className="py-2 pr-3 text-xs">
         {bValue ? (
-          <span className="font-medium text-ink">{bValue}</span>
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span className="font-medium text-ink">{bValue}</span>
+            {bLow ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">
+                LOW CONF
+              </span>
+            ) : null}
+          </span>
         ) : (
           <span className="text-slate-400">—</span>
         )}
@@ -326,7 +342,7 @@ export default async function ReviewComparePage({
           <div className="border-b border-line px-3 py-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Structured field comparison</p>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              OCR-derived only — not bank-verified. Low-confidence fields excluded.
+              OCR-derived only; not bank-verified. Low-confidence values are shown with LOW CONF.
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -345,20 +361,18 @@ export default async function ReviewComparePage({
               </thead>
               <tbody>
                 {fieldKeys.map((key) => {
-                  const aVal = getImageReadField(document, key);
-                  const bVal = getImageReadField(matchedDocument, key);
-                  const aConf = getImageReadConfidence(document, key);
-                  const bConf = getImageReadConfidence(matchedDocument, key);
-                  const aLow = isLowConfidence(document, key);
-                  const bLow = isLowConfidence(matchedDocument, key);
+                  const aField = getReviewFieldDisplayValue(document, key);
+                  const bField = getReviewFieldDisplayValue(matchedDocument, key);
                   return (
                     <FieldRow
                       key={key}
                       label={REVIEW_FIELD_LABELS[key]}
-                      aValue={aLow ? null : aVal}
-                      bValue={bLow ? null : bVal}
-                      aConf={aLow ? null : aConf}
-                      bConf={bLow ? null : bConf}
+                      aValue={aField.value}
+                      bValue={bField.value}
+                      aConf={aField.confidence}
+                      bConf={bField.confidence}
+                      aLow={aField.isLowConfidence}
+                      bLow={bField.isLowConfidence}
                     />
                   );
                 })}
