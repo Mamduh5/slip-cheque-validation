@@ -1,24 +1,34 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
+import {
+  getReviewKeyboardShortcutAction,
+  isReviewKeyboardShortcutBlocked
+} from "@/lib/review-keyboard-shortcuts";
 
 type ReviewActionId = "duplicate" | "distinct" | "duplicate-next" | "distinct-next";
 
 export function ReviewActions({
   documentId,
-  nextHref
+  nextHref,
+  queueNextHref,
+  queuePreviousHref,
+  enableShortcuts = false
 }: {
   documentId: string;
   nextHref?: string | null;
+  queueNextHref?: string | null;
+  queuePreviousHref?: string | null;
+  enableShortcuts?: boolean;
 }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<ReviewActionId | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function submitReview(decision: ReviewPairDecision, actionId: ReviewActionId, redirectHref?: string | null) {
+  const submitReview = useCallback(async (decision: ReviewPairDecision, actionId: ReviewActionId, redirectHref?: string | null) => {
     setError(null);
     setPendingAction(actionId);
 
@@ -45,9 +55,52 @@ export function ReviewActions({
     }
 
     router.refresh();
-  }
+  }, [documentId, reviewNote, router]);
 
   const isPending = pendingAction !== null;
+
+  useEffect(() => {
+    if (!enableShortcuts) return;
+
+    function hasOpenDialog() {
+      return Boolean(document.querySelector("dialog[open], [role='dialog'], [aria-modal='true']"));
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const action = getReviewKeyboardShortcutAction(event.key);
+      if (!action || event.repeat || isPending) return;
+
+      if (
+        isReviewKeyboardShortcutBlocked({
+          target: event.target as Element | null,
+          hasOpenDialog: hasOpenDialog()
+        })
+      ) {
+        return;
+      }
+
+      if (action === "confirm-duplicate") {
+        event.preventDefault();
+        void submitReview("CONFIRMED_DUPLICATE", "duplicate");
+        return;
+      }
+
+      if (action === "confirm-distinct") {
+        event.preventDefault();
+        void submitReview("CONFIRMED_DISTINCT", "distinct");
+        return;
+      }
+
+      const href = action === "next-item" ? queueNextHref : queuePreviousHref;
+      if (href) {
+        event.preventDefault();
+        router.push(href);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enableShortcuts, isPending, queueNextHref, queuePreviousHref, router, submitReview]);
 
   return (
     <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-4">
@@ -57,6 +110,12 @@ export function ReviewActions({
           <p className="mt-1 text-sm leading-6 text-orange-900">
             The system thinks these images may show the same document. Your review is stored separately.
           </p>
+          {enableShortcuts ? (
+            <p className="mt-2 text-xs text-orange-900">
+              Shortcuts: <kbd className="rounded border border-orange-200 bg-white px-1 py-0.5">1</kbd> duplicate,{" "}
+              <kbd className="rounded border border-orange-200 bg-white px-1 py-0.5">2</kbd> distinct.
+            </p>
+          ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 lg:max-w-md">
           <label className="text-xs font-medium uppercase tracking-wide text-orange-900" htmlFor={`review-note-${documentId}`}>
@@ -77,7 +136,7 @@ export function ReviewActions({
               disabled={isPending}
               onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate")}
             >
-              {pendingAction === "duplicate" ? "Saving..." : "Confirm duplicate"}
+              {pendingAction === "duplicate" ? "Saving..." : <>Confirm duplicate {enableShortcuts ? <span className="ml-1 text-xs opacity-80">(1)</span> : null}</>}
             </button>
             <button
               className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
@@ -85,7 +144,7 @@ export function ReviewActions({
               disabled={isPending}
               onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct")}
             >
-              {pendingAction === "distinct" ? "Saving..." : "Confirm distinct"}
+              {pendingAction === "distinct" ? "Saving..." : <>Confirm distinct {enableShortcuts ? <span className="ml-1 text-xs opacity-70">(2)</span> : null}</>}
             </button>
           </div>
           {nextHref ? (

@@ -249,11 +249,11 @@ export default async function ReviewComparePage({
                 className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400"
                 href={queueNavigation.previousHref}
               >
-                Previous item
+                Previous item <span className="ml-1 text-xs text-slate-400">(Left Arrow)</span>
               </Link>
             ) : (
               <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-400">
-                Start of queue
+                Start of queue <span className="ml-1 text-xs">(Left Arrow)</span>
               </span>
             )}
             {queueNavigation.nextHref ? (
@@ -261,11 +261,11 @@ export default async function ReviewComparePage({
                 className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400"
                 href={queueNavigation.nextHref}
               >
-                Next item
+                Next item <span className="ml-1 text-xs text-slate-400">(Right Arrow)</span>
               </Link>
             ) : (
               <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500">
-                End of queue
+                End of queue <span className="ml-1 text-xs">(Right Arrow)</span>
               </span>
             )}
           </div>
@@ -385,7 +385,13 @@ export default async function ReviewComparePage({
       {/* Review actions */}
       {canReview && (
         <div className="mt-4">
-          <ReviewActions documentId={String(document._id)} nextHref={queueNavigation?.saveAndNextHref ?? null} />
+          <ReviewActions
+            documentId={String(document._id)}
+            enableShortcuts
+            nextHref={queueNavigation?.saveAndNextHref ?? null}
+            queueNextHref={queueNavigation?.nextHref ?? null}
+            queuePreviousHref={queueNavigation?.previousHref ?? null}
+          />
         </div>
       )}
 
