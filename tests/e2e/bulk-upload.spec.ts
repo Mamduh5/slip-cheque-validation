@@ -26,8 +26,8 @@ test("user can select multiple files and remove one before uploading", async ({ 
   ]);
 
   await expect(page.getByTestId("selected-files-panel")).toBeVisible();
-  await expect(page.getByText("first-slip.png")).toBeVisible();
-  await expect(page.getByText("second-slip.png")).toBeVisible();
+  await expect(page.getByTestId("selected-files-panel").getByText("first-slip.png")).toBeVisible();
+  await expect(page.getByTestId("selected-files-panel").getByText("second-slip.png")).toBeVisible();
   await expect(page.getByTestId("upload-submit-button")).toHaveText("Upload 2 files");
 
   await page
@@ -36,8 +36,8 @@ test("user can select multiple files and remove one before uploading", async ({ 
     .getByTestId("remove-file-button")
     .click();
 
-  await expect(page.getByText("first-slip.png")).toHaveCount(0);
-  await expect(page.getByText("second-slip.png")).toBeVisible();
+  await expect(page.getByTestId("selected-files-panel").getByText("first-slip.png")).toHaveCount(0);
+  await expect(page.getByTestId("selected-files-panel").getByText("second-slip.png")).toBeVisible();
   await expect(page.getByTestId("upload-submit-button")).toHaveText("Upload selected image");
 });
 

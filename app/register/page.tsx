@@ -8,7 +8,7 @@ export default function RegisterPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Create account</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Create access to Document Registry Checker for document upload, duplicate review, and audit-friendly decisions.
+          Create an account to upload documents, review duplicates, and record audit-ready decisions.
         </p>
       </div>
       <RegisterForm />

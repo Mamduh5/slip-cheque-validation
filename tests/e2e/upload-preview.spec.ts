@@ -39,7 +39,7 @@ test("authenticated user can preview and replace a selected image before upload"
   await expect(page.getByTestId("preview-checklist")).toContainText("All corners are visible");
   await expect(page.getByTestId("preview-checklist")).toContainText("The paper fills most of the frame");
   await expect(page.getByText("Preview before upload")).toBeVisible();
-  await expect(page.getByText("first-slip.png")).toBeVisible();
+  await expect(page.getByTestId("selected-image-preview").getByText("first-slip.png")).toBeVisible();
   await expect(page.getByText("Advisory preview check")).toBeVisible();
   await expect(page.getByText("Image is small. Retake closer if possible.")).toBeVisible();
   await expect(page.getByTestId("upload-submit-button")).toBeEnabled();
@@ -53,8 +53,8 @@ test("authenticated user can preview and replace a selected image before upload"
     buffer: bluePng
   });
 
-  await expect(page.getByText("replacement-slip.png")).toBeVisible();
-  await expect(page.getByText("first-slip.png")).toHaveCount(0);
+  await expect(page.getByTestId("selected-image-preview").getByText("replacement-slip.png")).toBeVisible();
+  await expect(page.getByTestId("selected-image-preview").getByText("first-slip.png")).toHaveCount(0);
 });
 
 test("server quality failure keeps the user in a recovery flow", async ({ page }) => {
@@ -87,7 +87,9 @@ test("server quality failure keeps the user in a recovery flow", async ({ page }
   await page.getByTestId("upload-submit-button").click();
 
   await expect(
-    page.getByText("The selected image is too small to be useful. Retake it closer and include the full document.")
+    page.getByTestId("upload-error-message").getByText(
+      "The selected image is too small to be useful. Retake it closer and include the full document."
+    )
   ).toBeVisible();
   await expect(
     page.getByTestId("upload-error-message").getByText("Image is small. Retake closer if possible.")
@@ -118,7 +120,7 @@ test.describe.serial("real-service upload completion", () => {
     });
 
     await expect(page.getByTestId("selected-image-preview")).toBeVisible();
-    await expect(page.getByText(filename)).toBeVisible();
+    await expect(page.getByTestId("selected-image-preview").getByText(filename)).toBeVisible();
 
     await page.getByTestId("upload-submit-button").click();
     await expect(page).toHaveURL(/\/documents\/[a-f0-9]{24}$/);

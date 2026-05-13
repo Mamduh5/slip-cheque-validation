@@ -10,7 +10,7 @@ export default function LoginPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Log in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Access Document Registry Checker to continue uploads, duplicate review, and document checks.
+          Log in to upload documents, review duplicates, and check statuses.
         </p>
       </div>
       <Suspense fallback={<div className="rounded-lg border border-line bg-white p-5 shadow-sm">Loading...</div>}>
