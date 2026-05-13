@@ -218,7 +218,7 @@ export function DashboardFilters({
             <option value="">All types</option>
             {documentTypes.map((type) => (
               <option key={type} value={type}>
-                {formatDocumentType(type)}
+                {type === "CHEQUE" ? "Paper check documents" : formatDocumentType(type)}
               </option>
             ))}
           </select>

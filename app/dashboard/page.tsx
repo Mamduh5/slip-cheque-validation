@@ -291,7 +291,7 @@ export default async function DashboardPage({
                       );
                     })()}
                     <span className="block text-xs text-slate-500 sm:hidden">
-                      {formatDocumentType(document.documentType)}
+                      {document.documentType === "CHEQUE" ? "Paper check" : formatDocumentType(document.documentType)}
                     </span>
                     <span className="mt-2 flex flex-wrap gap-2 sm:hidden">
                       <ReviewStatusPill status={document.reviewStatus} />

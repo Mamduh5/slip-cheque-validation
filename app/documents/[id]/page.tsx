@@ -239,9 +239,9 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
       <div className="flex items-center gap-3">
-        <Link className="text-sm font-medium text-accent hover:text-accent-dark" href="/dashboard">
-          Dashboard
-        </Link>
+        <a className="text-sm font-medium text-accent hover:text-accent-dark" href="/dashboard">
+          Back to dashboard
+        </a>
         {document.duplicateStatus === "LIKELY_DUPLICATE" && (
           <>
             <span className="text-slate-300">/</span>
@@ -286,6 +286,13 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                     <dd className="mt-0.5 font-medium">{item.value}</dd>
                   </div>
                 ))}
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-2.5 text-sm text-slate-800">
+                  <dt className="text-xs font-medium opacity-80">Processing profile</dt>
+                  <dd className="mt-0.5 font-medium">{processingProfile.label}</dd>
+                  <dd className="mt-1 text-xs text-slate-500">
+                    {processingProfile.plannedStages.map((stage) => stage.label).join(" | ")}
+                  </dd>
+                </div>
               </dl>
             </div>
           );

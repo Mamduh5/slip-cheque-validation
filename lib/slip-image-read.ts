@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import path from "path";
 import type {
   ImageReadField,
   ImageReadTransferFields,
@@ -7,6 +8,30 @@ import type {
 } from "@/lib/models";
 
 const algorithm = "slip-image-read-v1" as const;
+const tesseractNodeWorkerPath = path.join(
+  process.cwd(),
+  "node_modules",
+  "tesseract.js",
+  "src",
+  "worker-script",
+  "node",
+  "index.js"
+);
+const textOnlyOcrOutput = {
+  text: true,
+  blocks: false,
+  layoutBlocks: false,
+  hocr: false,
+  tsv: false,
+  box: false,
+  unlv: false,
+  osd: false,
+  pdf: false,
+  imageColor: false,
+  imageGrey: false,
+  imageBinary: false,
+  debug: false
+} as const;
 
 // Lazily import tesseract.js so tests can mock it without bundling issues.
 async function getTesseract() {
@@ -26,7 +51,24 @@ export async function attemptSlipImageRead(
   const readAt = input.readAt ?? new Date();
 
   try {
-    const ocrText = await runMultiVariantOcr(input.ocrBuffer ?? input.normalizedBuffer);
+    const readBuffer = input.ocrBuffer ?? input.normalizedBuffer;
+    const hasTextLikeDetail = await detectTextLikeDetail(readBuffer);
+
+    if (!hasTextLikeDetail) {
+      return {
+        stage: "SLIP_IMAGE_READ",
+        algorithm,
+        status: "SKIPPED",
+        result: "NONE",
+        readAt,
+        extractedFields: null,
+        rawOcrText: null,
+        notes: ["OCR skipped because the image does not contain enough text-like detail for a useful read."],
+        warnings: []
+      };
+    }
+
+    const ocrText = await runMultiVariantOcr(readBuffer);
 
     if (!ocrText || ocrText.trim().length === 0) {
       return {
@@ -85,9 +127,71 @@ export async function attemptSlipImageRead(
   }
 }
 
+async function detectTextLikeDetail(buffer: Buffer): Promise<boolean> {
+  const { data, info } = await sharp(buffer)
+    .resize({ width: 384, height: 384, fit: "inside", withoutEnlargement: true })
+    .grayscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const visited = new Uint8Array(width * height);
+  const stack: number[] = [];
+  let textLikeComponents = 0;
+
+  for (let start = 0; start < data.length; start += 1) {
+    if (visited[start] || data[start] >= 180) {
+      continue;
+    }
+
+    let area = 0;
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    visited[start] = 1;
+    stack.push(start);
+
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const x = current % width;
+      const y = Math.floor(current / width);
+      area += 1;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+
+      const neighbors = [current - 1, current + 1, current - width, current + width];
+      for (const next of neighbors) {
+        if (next < 0 || next >= data.length || visited[next] || data[next] >= 180) {
+          continue;
+        }
+        const nextX = next % width;
+        if (Math.abs(nextX - x) > 1) {
+          continue;
+        }
+        visited[next] = 1;
+        stack.push(next);
+      }
+    }
+
+    const componentWidth = maxX - minX + 1;
+    const componentHeight = maxY - minY + 1;
+    if (area >= 2 && area <= 260 && componentWidth <= 48 && componentHeight <= 48) {
+      textLikeComponents += 1;
+      if (textLikeComponents >= 12) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 async function runMultiVariantOcr(buffer: Buffer): Promise<string> {
   const { createWorker } = await getTesseract();
   const worker = await createWorker("eng+tha", 1, {
+    workerPath: tesseractNodeWorkerPath,
     logger: () => undefined,
     errorHandler: () => undefined
   });
@@ -103,7 +207,7 @@ async function runMultiVariantOcr(buffer: Buffer): Promise<string> {
   const candidateTexts: string[] = [];
   for (const variant of variants) {
     try {
-      const ret = await worker.recognize(variant);
+      const ret = await worker.recognize(variant, {}, textOnlyOcrOutput);
       const text = ret.data.text?.trim() ?? "";
       if (text.length > 10) {
         candidateTexts.push(text);

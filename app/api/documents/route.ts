@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { DocumentImageProcessingError } from "@/lib/document-processing";
-import { createUploadedDocument, formatDocumentType } from "@/lib/documents";
-import { ImageQualityFailureError } from "@/lib/image-quality";
+import { formatDocumentType } from "@/lib/document-types";
 import { getCurrentUser } from "@/lib/session";
 import { uploadFieldsSchema, validateUploadFile, validateUploadFileContent } from "@/lib/upload-validation";
 
@@ -45,7 +43,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: fileContentError }, { status: 400 });
     }
 
-    record = await createUploadedDocument({
+    const documentsModule = await import("@/lib/documents");
+
+    record = await documentsModule.createUploadedDocument({
       userId: user.id,
       documentType: parsedFields.data.documentType,
       sourceType: parsedFields.data.sourceType,
@@ -55,19 +55,27 @@ export async function POST(request: Request) {
       buffer
     });
   } catch (error) {
-    if (error instanceof ImageQualityFailureError) {
+    if (error instanceof Error && error.name === "ImageQualityFailureError" && "assessment" in error) {
+      const qualityError = error as Error & {
+        assessment: {
+          qualityStatus: unknown;
+          qualityWarnings: unknown;
+          qualityMetrics: unknown;
+        };
+      };
+
       return NextResponse.json(
         {
-          error: error.message,
-          qualityStatus: error.assessment.qualityStatus,
-          qualityWarnings: error.assessment.qualityWarnings,
-          qualityMetrics: error.assessment.qualityMetrics
+          error: qualityError.message,
+          qualityStatus: qualityError.assessment.qualityStatus,
+          qualityWarnings: qualityError.assessment.qualityWarnings,
+          qualityMetrics: qualityError.assessment.qualityMetrics
         },
         { status: 422 }
       );
     }
 
-    if (error instanceof DocumentImageProcessingError) {
+    if (error instanceof Error && error.name === "DocumentImageProcessingError") {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
