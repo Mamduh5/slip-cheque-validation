@@ -125,6 +125,23 @@ describe("i18n foundation", () => {
       expect(resolveTranslation(messages, "th", key)).not.toBe(resolveTranslation(messages, "en", key));
     }
   });
+
+  it("keeps critical shared workflow translations bilingual", () => {
+    const keys = [
+      "common.localeSwitcher.label",
+      "navigation.dashboard",
+      "reviewActions.confirmDuplicate",
+      "reviewHistory.title",
+      "upload.form.failedError",
+      "feedbackErrors.uploadFailed"
+    ] as const;
+
+    for (const key of keys) {
+      expect(translate("en", key)).toBeTruthy();
+      expect(translate("th", key)).toBeTruthy();
+      expect(translate("th", key)).not.toBe(translate("en", key));
+    }
+  });
 });
 
 function collectLeafKeys(tree: MessageTree, prefix: string): string[] {

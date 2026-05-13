@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReviewHistoryCard } from "../components/review-history-card";
 import type { ReviewHistoryEntry } from "../lib/documents";
+import { translate } from "../lib/i18n";
 
 function makeEntry(overrides: Partial<ReviewHistoryEntry> = {}): ReviewHistoryEntry {
   return {
@@ -55,5 +56,14 @@ describe("ReviewHistoryCard", () => {
     expect(markup).toContain("Confirmed distinct");
     expect(markup).toContain("No review note.");
     expect(markup).toContain("Bulk review batch");
+  });
+
+  it("renders authenticated review history labels in Thai", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewHistoryCard, { entries: [makeEntry()], locale: "th" }));
+
+    expect(markup).toContain(translate("th", "reviewHistory.title"));
+    expect(markup).toContain(translate("th", "statuses.review.CONFIRMED_DUPLICATE"));
+    expect(markup).toContain(translate("th", "reviewHistory.actor", { actor: "user-1" }));
+    expect(markup).toContain("Same visible reference.");
   });
 });

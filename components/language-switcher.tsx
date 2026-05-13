@@ -4,6 +4,18 @@ import { ChangeEvent, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createTranslator, supportedLocales, type SupportedLocale } from "@/lib/i18n";
 
+export async function persistLocalePreference(nextLocale: SupportedLocale) {
+  const response = await fetch("/api/locale", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ locale: nextLocale })
+  });
+
+  return response.ok;
+}
+
 export function LanguageSwitcher({ locale }: { locale: SupportedLocale }) {
   const router = useRouter();
   const t = createTranslator(locale);
@@ -12,15 +24,7 @@ export function LanguageSwitcher({ locale }: { locale: SupportedLocale }) {
   async function handleLocaleChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextLocale = event.target.value as SupportedLocale;
 
-    const response = await fetch("/api/locale", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ locale: nextLocale })
-    });
-
-    if (!response.ok) {
+    if (!(await persistLocalePreference(nextLocale))) {
       return;
     }
 

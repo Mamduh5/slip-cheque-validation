@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { POST } from "../app/api/locale/route";
-import { localePreferenceCookieName } from "../lib/i18n";
+import { localePreferenceCookieMaxAge, localePreferenceCookieName } from "../lib/i18n";
 
 function createLocaleRequest(body: unknown) {
   return new Request("http://localhost/api/locale", {
@@ -18,6 +18,8 @@ describe("locale preference route", () => {
     expect(body.locale).toBe("th");
     expect(response.headers.get("set-cookie")).toContain(`${localePreferenceCookieName}=th`);
     expect(response.headers.get("set-cookie")).toContain("Path=/");
+    expect(response.headers.get("set-cookie")).toContain(`Max-Age=${localePreferenceCookieMaxAge}`);
+    expect(response.headers.get("set-cookie")).toContain("SameSite=lax");
   });
 
   it("rejects unsupported locale preferences", async () => {
