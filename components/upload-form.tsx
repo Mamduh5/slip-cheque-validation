@@ -356,12 +356,12 @@ export function UploadForm() {
       data-testid="upload-form"
       onSubmit={handleSubmit}
     >
-      <fieldset>
+      <fieldset aria-describedby="document-type-guidance">
         <legend className="mb-2 block text-sm font-medium">Document type</legend>
         <div className="grid gap-2 sm:grid-cols-2" data-testid="document-type-options">
           {documentTypeOptions.map((type) => (
             <label
-              className={`cursor-pointer rounded-md border p-3 text-sm transition ${
+              className={`cursor-pointer rounded-md border p-3 text-sm outline-2 outline-offset-2 transition focus-within:outline focus-within:outline-accent ${
                 documentType === type
                   ? "border-accent bg-sky-50 text-slate-950"
                   : "border-line bg-white text-slate-700 hover:border-slate-400"
@@ -385,6 +385,7 @@ export function UploadForm() {
         <div
           className="mt-3 rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-600"
           data-testid="document-type-guidance"
+          id="document-type-guidance"
         >
           <p className="font-medium text-slate-800">{selectedTypeGuidance.title}</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
@@ -402,12 +403,16 @@ export function UploadForm() {
           className="focus-ring w-full rounded-md border border-line bg-white px-3 py-2"
           id="sourceType"
           name="sourceType"
+          aria-describedby="sourceType-help"
           value={sourceType}
           onChange={(event) => setSourceType(event.target.value as SourceType)}
         >
           <option value="CAMERA">Camera photo</option>
           <option value="UPLOAD">Existing image file</option>
         </select>
+        <p className="mt-1 text-xs leading-5 text-slate-500" id="sourceType-help">
+          Choose whether reviewers should treat this as a new capture or an existing image.
+        </p>
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="file">
@@ -421,18 +426,20 @@ export function UploadForm() {
           type="file"
           data-testid="document-file-input"
           accept="image/jpeg,image/png,image/webp"
+          aria-describedby={error ? "file-help upload-error-message" : "file-help"}
+          aria-invalid={Boolean(error && selectedItems.length === 0)}
           capture={sourceType === "CAMERA" ? "environment" : undefined}
           multiple
           onChange={handleFileChange}
           required
         />
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-slate-500" id="file-help">
           Use the camera on phones, or select one or more JPEG, PNG, or WebP images.
         </p>
       </div>
 
       {selectedItems.length > 0 ? (
-        <div className="rounded-md border border-line bg-white" data-testid="selected-files-panel">
+        <div className="rounded-md border border-line bg-white" data-testid="selected-files-panel" aria-live="polite">
           <div className="flex flex-col gap-1 border-b border-line px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">Selected files</p>
@@ -440,7 +447,7 @@ export function UploadForm() {
             </div>
             {retryableItems.length > 0 ? (
               <button
-                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 type="button"
                 data-testid="retry-failed-batch-button"
                 onClick={retryFailedItems}
@@ -494,7 +501,7 @@ export function UploadForm() {
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {item.result?.documentId ? (
                         <Link
-                          className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400"
+                          className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400"
                           href={`/documents/${item.result.documentId}`}
                         >
                           Open detail
@@ -502,7 +509,7 @@ export function UploadForm() {
                       ) : null}
                       {canReview ? (
                         <Link
-                          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
+                          className="focus-ring rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
                           href={`/review/${item.result?.documentId}`}
                         >
                           Compare/review
@@ -510,7 +517,7 @@ export function UploadForm() {
                       ) : null}
                       {outcome.retryable ? (
                         <button
-                          className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                           type="button"
                           data-testid="retry-file-button"
                           onClick={() => retryItem(item.id)}
@@ -520,7 +527,7 @@ export function UploadForm() {
                         </button>
                       ) : null}
                       <button
-                        className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="focus-ring rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                         type="button"
                         data-testid="remove-file-button"
                         onClick={() => removeItem(item.id)}
@@ -579,7 +586,9 @@ export function UploadForm() {
                 These local hints are only a preview. The server performs the final quality check after upload.
               </p>
               {isAnalyzingPreview ? (
-                <p className="mt-2 text-xs text-slate-500">Checking the preview...</p>
+                <p className="mt-2 text-xs text-slate-500" role="status" aria-live="polite">
+                  Checking the preview...
+                </p>
               ) : selectedPreview.advisoryWarnings.length > 0 ? (
                 <ul className="mt-2 flex flex-wrap gap-2 text-xs text-orange-900">
                   {selectedPreview.advisoryWarnings.map((warning) => (
@@ -593,7 +602,7 @@ export function UploadForm() {
               )}
             </div>
             <button
-              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400 sm:w-auto"
+              className="focus-ring w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium hover:border-slate-400 sm:w-auto"
               type="button"
               data-testid="replace-image-button"
               onClick={chooseAnotherImage}
@@ -619,6 +628,7 @@ export function UploadForm() {
         <div
           className="rounded-md border border-line bg-slate-50 p-3 text-sm text-slate-700"
           data-testid="batch-summary"
+          aria-live="polite"
         >
           <p className="font-medium text-slate-900">Batch summary</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -635,6 +645,8 @@ export function UploadForm() {
         <div
           className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
           data-testid="upload-error-message"
+          id="upload-error-message"
+          role="alert"
         >
           <p className="font-medium">
             {formQualityWarnings.length > 0 ? "Image rejected due to quality issues" : "Upload failed"}
@@ -659,6 +671,8 @@ export function UploadForm() {
         <div
           className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
           data-testid="upload-progress-indicator"
+          role="status"
+          aria-live="polite"
         >
           <div className="flex items-center gap-3">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
