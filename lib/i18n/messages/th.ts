@@ -71,6 +71,28 @@ export const thMessages = {
       TOO_BRIGHT: "ภาพสว่างเกินไป หลีกเลี่ยงแสงสะท้อนและแสงตรง"
     }
   },
+  feedbackErrors: {
+    authRequired: "เข้าสู่ระบบอีกครั้งเพื่อดำเนินการต่อ",
+    documentNotFound: "ไม่พบเอกสาร",
+    invalidDocumentType: "เลือกประเภทเอกสารที่ถูกต้อง",
+    invalidReviewDecision: "เลือกการตัดสินตรวจทานที่ถูกต้อง",
+    invalidBulkReview: "เลือกรายการที่รอตรวจทานและการตัดสินที่ถูกต้อง",
+    reviewNotPending: "ตรวจทานได้เฉพาะรายการที่อาจซ้ำและรอดำเนินการเท่านั้น",
+    reviewNeedsMatch: "การตรวจทานต้องมีเอกสารที่ตรงกัน",
+    matchedDocumentNotFound: "ไม่พบเอกสารที่ตรงกัน",
+    uploadInvalidMetadata: "ตรวจประเภทเอกสารและแหล่งที่มา แล้วลองอีกครั้ง",
+    uploadImageRequired: "อัปโหลดไฟล์ภาพ",
+    uploadUnsupportedFileType: "ไม่รองรับชนิดไฟล์นี้ ใช้ JPEG, PNG หรือ WebP",
+    uploadEmptyFile: "ไฟล์ที่เลือกว่างเปล่า",
+    uploadFileTooLarge: "ไฟล์ใหญ่เกินไป ขนาดสูงสุดคือ {maxMb} MB",
+    uploadContentMismatch: "เนื้อหาไฟล์ที่เลือกไม่ตรงกับภาพ JPEG, PNG หรือ WebP ที่รองรับ",
+    uploadQualityTooSmall: "ภาพที่เลือกเล็กเกินไป ถ่ายใหม่ให้ใกล้ขึ้นและให้เห็นเอกสารครบทั้งใบ",
+    uploadDecodeFailed: "ไม่สามารถถอดรหัสภาพที่อัปโหลดได้ เลือกภาพอื่นแล้วลองอีกครั้ง",
+    uploadFailed: "อัปโหลดไม่สำเร็จ",
+    reviewFailed: "ไม่สามารถบันทึกการตรวจทานได้",
+    bulkReviewFailed: "ไม่สามารถบันทึกการตรวจทานแบบกลุ่มได้",
+    documentTypeFailed: "ไม่สามารถอัปเดตประเภทเอกสารได้"
+  },
   documentTypeDescriptions: {
     BANK_TRANSFER_SLIP: "ใบเสร็จหรือหลักฐานยืนยันการโอน",
     DEPOSIT_PAYMENT_SLIP: "สลิปฝากเงิน ชำระบิล หรือชำระเงินที่เคาน์เตอร์",

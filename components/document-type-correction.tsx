@@ -9,6 +9,7 @@ import {
 } from "@/lib/document-types";
 import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import type { DocumentType } from "@/lib/models";
+import { localizeKnownUserMessage } from "@/lib/user-message-localization";
 
 interface DocumentTypeCorrectionProps {
   documentId: string;
@@ -48,7 +49,7 @@ export function DocumentTypeCorrection({ documentId, currentDocumentType, locale
     setIsSaving(false);
 
     if (!response.ok) {
-      setError(payload?.error ?? t("documentTypeCorrection.error"));
+      setError(localizeKnownUserMessage(payload?.error, locale, "feedbackErrors.documentTypeFailed"));
       return;
     }
 

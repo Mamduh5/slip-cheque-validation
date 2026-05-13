@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
 import { getSelectedPageItems } from "@/lib/review-selection";
 import { createTranslator, type SupportedLocale } from "@/lib/i18n";
+import { localizeKnownUserMessage } from "@/lib/user-message-localization";
 
 export interface ReviewQueueListItem {
   documentId: string;
@@ -82,7 +83,6 @@ export function ReviewQueueList({ items, locale }: { items: ReviewQueueListItem[
     const selectedPageIds = selectedItems.map((item) => item.documentId);
     if (selectedPageIds.length === 0) return;
 
-    const label = decisionLabel(decision, locale).toLowerCase();
     const hasNote = reviewNote.trim().length > 0;
 
     setError(null);
@@ -106,7 +106,7 @@ export function ReviewQueueList({ items, locale }: { items: ReviewQueueListItem[
     setPendingDecision(null);
 
     if (!response.ok) {
-      setError(payload?.error ?? t("reviewQueue.bulk.error", { decision: label }));
+      setError(localizeKnownUserMessage(payload?.error, locale, "feedbackErrors.bulkReviewFailed"));
       return;
     }
 

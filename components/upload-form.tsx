@@ -28,6 +28,7 @@ import type {
 import { createTranslator, type SupportedLocale } from "@/lib/i18n";
 import { formatQualityWarningLabel } from "@/lib/quality-thresholds";
 import { buildLocalPreviewState, getClientAdvisoryWarnings, type LocalPreviewState } from "@/lib/upload-preview";
+import { localizeKnownUserMessage } from "@/lib/user-message-localization";
 
 interface UploadResponse {
   documentId?: string;
@@ -307,8 +308,10 @@ export function UploadForm({ locale = "en" }: { locale?: SupportedLocale }) {
 
       if (!response.ok || !payload?.documentId) {
         const isQualityRejected = response.status === 422 || payload?.qualityStatus === "FAIL";
+        const localizedError = localizeKnownUserMessage(payload?.error, locale, "feedbackErrors.uploadFailed");
+
         if (selectedItems.length === 1) {
-          setError(payload?.error ?? t("upload.form.failedError"));
+          setError(localizedError);
           setFormQualityWarnings(payload?.qualityWarnings ?? []);
         }
         setSelectedItems((current) =>
@@ -317,7 +320,7 @@ export function UploadForm({ locale = "en" }: { locale?: SupportedLocale }) {
               ? {
                   ...candidate,
                   status: isQualityRejected ? "rejected" : "failed",
-                  error: payload?.error ?? t("upload.form.failedError"),
+                  error: localizedError,
                   result: payload,
                   qualityWarnings: payload?.qualityWarnings ?? []
                 }

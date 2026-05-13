@@ -71,6 +71,28 @@ export const enMessages = {
       TOO_BRIGHT: "Image is bright. Avoid glare and direct reflections."
     }
   },
+  feedbackErrors: {
+    authRequired: "Sign in again to continue.",
+    documentNotFound: "Document could not be found.",
+    invalidDocumentType: "Choose a valid document type.",
+    invalidReviewDecision: "Choose a valid review decision.",
+    invalidBulkReview: "Choose pending review items and a valid review decision.",
+    reviewNotPending: "Only pending likely duplicates can be reviewed.",
+    reviewNeedsMatch: "Review requires a matched document.",
+    matchedDocumentNotFound: "Matched document could not be found.",
+    uploadInvalidMetadata: "Check the document type and source, then try again.",
+    uploadImageRequired: "Upload an image file.",
+    uploadUnsupportedFileType: "Unsupported file type. Use JPEG, PNG, or WebP.",
+    uploadEmptyFile: "The selected file is empty.",
+    uploadFileTooLarge: "File is too large. Maximum size is {maxMb} MB.",
+    uploadContentMismatch: "The selected file content does not match a supported JPEG, PNG, or WebP image.",
+    uploadQualityTooSmall: "The selected image is too small to be useful. Retake it closer and include the full document.",
+    uploadDecodeFailed: "The uploaded image could not be decoded. Choose another image and try again.",
+    uploadFailed: "Upload failed.",
+    reviewFailed: "Review could not be saved.",
+    bulkReviewFailed: "Bulk review could not be saved.",
+    documentTypeFailed: "Document type could not be updated."
+  },
   documentTypeDescriptions: {
     BANK_TRANSFER_SLIP: "Transfer receipt or confirmation slip.",
     DEPOSIT_PAYMENT_SLIP: "Deposit, bill payment, or counter payment slip.",

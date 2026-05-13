@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
 import { createTranslator, type SupportedLocale } from "@/lib/i18n";
+import { localizeKnownUserMessage } from "@/lib/user-message-localization";
 import {
   getReviewKeyboardShortcutAction,
   isReviewKeyboardShortcutBlocked
@@ -48,7 +49,7 @@ export function ReviewActions({
     setPendingAction(null);
 
     if (!response.ok) {
-      setError(payload?.error ?? t("reviewActions.error"));
+      setError(localizeKnownUserMessage(payload?.error, locale, "feedbackErrors.reviewFailed"));
       return;
     }
 
@@ -59,7 +60,7 @@ export function ReviewActions({
     }
 
     router.refresh();
-  }, [documentId, reviewNote, router, t]);
+  }, [documentId, locale, reviewNote, router]);
 
   const isPending = pendingAction !== null;
 
