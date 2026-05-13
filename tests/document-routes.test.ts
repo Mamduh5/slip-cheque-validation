@@ -223,16 +223,32 @@ function setSession(userId: string | null) {
   testState.session = userId ? { user: { id: userId, email: `${userId}@example.test` } } : null;
 }
 
+function createJpegUploadBytes(bytes: string) {
+  return Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(bytes)]);
+}
+
 function createUploadRequest(bytes = "same image bytes", documentType: DocumentType = "CHEQUE") {
   const formData = new FormData();
   formData.set("documentType", documentType);
   formData.set("sourceType", "UPLOAD");
   formData.set(
     "file",
-    new File([Buffer.from(bytes)], "cheque.jpg", {
+    new File([createJpegUploadBytes(bytes)], "cheque.jpg", {
       type: "image/jpeg"
     })
   );
+
+  return new Request("http://localhost/api/documents", {
+    method: "POST",
+    body: formData
+  });
+}
+
+function createUploadRequestWithFile(file: File) {
+  const formData = new FormData();
+  formData.set("documentType", "CHEQUE");
+  formData.set("sourceType", "UPLOAD");
+  formData.set("file", file);
 
   return new Request("http://localhost/api/documents", {
     method: "POST",
@@ -1414,6 +1430,24 @@ describe("document API integration boundaries", () => {
     expect(body.error).toContain("too small");
     expect(body.qualityStatus).toBe("FAIL");
     expect(body.qualityWarnings).toEqual(["IMAGE_TOO_SMALL"]);
+    expect(testState.documents).toHaveLength(0);
+  });
+
+  it("rejects mismatched upload content before image processing", async () => {
+    setSession("user-1");
+
+    const response = await uploadDocument(
+      createUploadRequestWithFile(
+        new File([Buffer.from("not actually an image")], "cheque.jpg", {
+          type: "image/jpeg"
+        })
+      )
+    );
+    const body = (await response.json()) as { error?: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain("does not match");
+    expect(testState.processUploadedDocumentImage).not.toHaveBeenCalled();
     expect(testState.documents).toHaveLength(0);
   });
 

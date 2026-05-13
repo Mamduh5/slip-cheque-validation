@@ -3,7 +3,7 @@ import { DocumentImageProcessingError } from "@/lib/document-processing";
 import { createUploadedDocument, formatDocumentType } from "@/lib/documents";
 import { ImageQualityFailureError } from "@/lib/image-quality";
 import { getCurrentUser } from "@/lib/session";
-import { uploadFieldsSchema, validateUploadFile } from "@/lib/upload-validation";
+import { uploadFieldsSchema, validateUploadFile, validateUploadFileContent } from "@/lib/upload-validation";
 
 export const runtime = "nodejs";
 
@@ -39,6 +39,12 @@ export async function POST(request: Request) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
+    const fileContentError = validateUploadFileContent(buffer, file.type);
+
+    if (fileContentError) {
+      return NextResponse.json({ error: fileContentError }, { status: 400 });
+    }
+
     record = await createUploadedDocument({
       userId: user.id,
       documentType: parsedFields.data.documentType,

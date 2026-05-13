@@ -123,6 +123,17 @@ describe("document helpers", () => {
     ).toBe("documents/user-1/document-1/original.jpg");
   });
 
+  it("sanitizes storage path segments and uses the declared upload MIME extension", () => {
+    expect(
+      buildDocumentObjectKey({
+        userId: "../user:1",
+        documentId: "document/1",
+        originalFilename: "receipt.exe",
+        mimeType: "image/png"
+      })
+    ).toBe("documents/___user_1/document_1/original.png");
+  });
+
   it("builds a new document record from a non-duplicate decision", () => {
     const id = new ObjectId();
     const now = new Date("2026-05-08T10:00:00.000Z");

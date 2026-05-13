@@ -31,6 +31,7 @@ import type {
   SourceType
 } from "@/lib/models";
 import { putOriginalDocumentObject } from "@/lib/object-storage";
+import { getUploadExtensionForMimeType } from "@/lib/upload-validation";
 import type { DuplicateDecision } from "@/lib/duplicate-detection";
 import type { DocumentReviewFilter } from "@/lib/formatters";
 
@@ -156,15 +157,24 @@ export function calculateSha256(buffer: Buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
+function safeObjectKeySegment(value: string) {
+  const normalized = value.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  return normalized || "unknown";
+}
+
 export function buildDocumentObjectKey(input: {
   userId: string;
   documentId: string;
   originalFilename: string;
+  mimeType?: string;
 }) {
-  const extension = input.originalFilename.split(".").pop()?.toLowerCase();
-  const suffix = extension ? `.${extension.replace(/[^a-z0-9]/g, "")}` : "";
+  const uploadExtension = input.mimeType ? getUploadExtensionForMimeType(input.mimeType) : null;
+  const filenameExtension = input.originalFilename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const extension = uploadExtension ?? filenameExtension;
+  const suffix = extension ? `.${extension}` : "";
 
-  return `documents/${input.userId}/${input.documentId}/original${suffix}`;
+  return `documents/${safeObjectKeySegment(input.userId)}/${safeObjectKeySegment(input.documentId)}/original${suffix}`;
 }
 
 export function buildUploadedDocumentRecord(input: {
@@ -454,7 +464,8 @@ export async function createUploadedDocument(input: {
   const objectKey = buildDocumentObjectKey({
     userId: input.userId,
     documentId: String(documentId),
-    originalFilename: input.originalFilename
+    originalFilename: input.originalFilename,
+    mimeType: input.mimeType
   });
 
   const processedImage = await processUploadedDocumentImage({
