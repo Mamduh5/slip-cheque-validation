@@ -4,15 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
 
-export function ReviewActions({ documentId }: { documentId: string }) {
+type ReviewActionId = "duplicate" | "distinct" | "duplicate-next" | "distinct-next";
+
+export function ReviewActions({
+  documentId,
+  nextHref
+}: {
+  documentId: string;
+  nextHref?: string | null;
+}) {
   const router = useRouter();
-  const [pendingDecision, setPendingDecision] = useState<ReviewPairDecision | null>(null);
+  const [pendingAction, setPendingAction] = useState<ReviewActionId | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function submitReview(decision: ReviewPairDecision) {
+  async function submitReview(decision: ReviewPairDecision, actionId: ReviewActionId, redirectHref?: string | null) {
     setError(null);
-    setPendingDecision(decision);
+    setPendingAction(actionId);
 
     const response = await fetch(`/api/documents/${documentId}/review`, {
       method: "POST",
@@ -23,15 +31,23 @@ export function ReviewActions({ documentId }: { documentId: string }) {
     });
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
-    setPendingDecision(null);
+    setPendingAction(null);
 
     if (!response.ok) {
       setError(payload?.error ?? "Review could not be saved.");
       return;
     }
 
+    if (redirectHref) {
+      router.push(redirectHref);
+      router.refresh();
+      return;
+    }
+
     router.refresh();
   }
+
+  const isPending = pendingAction !== null;
 
   return (
     <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-4">
@@ -58,20 +74,44 @@ export function ReviewActions({ documentId }: { documentId: string }) {
             <button
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
-              disabled={pendingDecision !== null}
-              onClick={() => submitReview("CONFIRMED_DUPLICATE")}
+              disabled={isPending}
+              onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate")}
             >
-              {pendingDecision === "CONFIRMED_DUPLICATE" ? "Saving..." : "Confirm duplicate"}
+              {pendingAction === "duplicate" ? "Saving..." : "Confirm duplicate"}
             </button>
             <button
               className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
-              disabled={pendingDecision !== null}
-              onClick={() => submitReview("CONFIRMED_DISTINCT")}
+              disabled={isPending}
+              onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct")}
             >
-              {pendingDecision === "CONFIRMED_DISTINCT" ? "Saving..." : "Confirm distinct"}
+              {pendingAction === "distinct" ? "Saving..." : "Confirm distinct"}
             </button>
           </div>
+          {nextHref ? (
+            <div className="flex flex-col gap-2 border-t border-orange-200 pt-2 sm:flex-row">
+              <button
+                className="rounded-md bg-orange-900 px-4 py-2 text-sm font-medium text-white hover:bg-orange-950 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                disabled={isPending}
+                onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate-next", nextHref)}
+              >
+                {pendingAction === "duplicate-next" ? "Saving..." : "Confirm duplicate & next"}
+              </button>
+              <button
+                className="rounded-md border border-orange-300 bg-white px-4 py-2 text-sm font-medium text-orange-950 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                disabled={isPending}
+                onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct-next", nextHref)}
+              >
+                {pendingAction === "distinct-next" ? "Saving..." : "Confirm distinct & next"}
+              </button>
+            </div>
+          ) : (
+            <p className="rounded-md border border-orange-200 bg-white px-3 py-2 text-xs text-orange-900">
+              End of queue for this view. Save this item, then return to the queue.
+            </p>
+          )}
         </div>
       </div>
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}

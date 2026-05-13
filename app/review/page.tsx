@@ -3,6 +3,12 @@ import { ReviewQueueList, type ReviewQueueListItem } from "@/components/review-q
 import { WorkflowPresetRow } from "@/components/workflow-preset-row";
 import { getReviewQueueForUser, type ReviewQueueSort } from "@/lib/documents";
 import { reasonCodeToLabel } from "@/lib/document-result-summary";
+import {
+  buildReviewCompareUrl,
+  buildReviewQueueUrl,
+  parseReviewQueuePage,
+  parseReviewQueueSort
+} from "@/lib/review-queue-context";
 import { resolveActiveReviewPreset, reviewPresetHref, reviewPresets } from "@/lib/workflow-presets";
 import { requireUser } from "@/lib/session";
 import type { DocumentRecord } from "@/lib/models";
@@ -35,28 +41,6 @@ function getReasonSummary(document: DocumentRecord) {
   return `${labels[0]}, ${labels[1]}+`;
 }
 
-function parseSort(value: string | undefined): ReviewQueueSort {
-  if (value === "oldest" || value === "highest-similarity" || value === "lowest-similarity") {
-    return value;
-  }
-
-  return "newest";
-}
-
-function parsePage(value: string | undefined) {
-  const page = Number(value);
-  return Number.isInteger(page) && page > 0 ? page : 1;
-}
-
-function buildReviewUrl(params: { q: string; sort: ReviewQueueSort; page: number }) {
-  const searchParams = new URLSearchParams();
-  if (params.q) searchParams.set("q", params.q);
-  if (params.sort !== "newest") searchParams.set("sort", params.sort);
-  if (params.page > 1) searchParams.set("page", String(params.page));
-  const query = searchParams.toString();
-  return query ? `/review?${query}` : "/review";
-}
-
 function buildReviewExportUrl(params: { q: string; sort: ReviewQueueSort }) {
   const searchParams = new URLSearchParams();
   if (params.q) searchParams.set("q", params.q);
@@ -67,13 +51,16 @@ function buildReviewExportUrl(params: { q: string; sort: ReviewQueueSort }) {
 
 function toReviewQueueListItem({
   document,
-  matchedDocument
+  matchedDocument,
+  reviewHref
 }: {
   document: DocumentRecord;
   matchedDocument: DocumentRecord | null;
+  reviewHref: string;
 }): ReviewQueueListItem {
   return {
     documentId: String(document._id),
+    reviewHref,
     filename: document.originalFilename,
     uploadedAt: formatDate(document.createdAt),
     amount: getKeyField(document, "amount"),
@@ -94,8 +81,8 @@ export default async function ReviewQueuePage({
   const user = await requireUser();
   const resolvedSearchParams = await searchParams;
   const searchQuery = (resolvedSearchParams?.q ?? "").trim();
-  const sort = parseSort(resolvedSearchParams?.sort);
-  const page = parsePage(resolvedSearchParams?.page);
+  const sort = parseReviewQueueSort(resolvedSearchParams?.sort);
+  const page = parseReviewQueuePage(resolvedSearchParams?.page);
   const queue = await getReviewQueueForUser(user.id, { searchQuery, sort, page, pageSize: 10 });
   const hasSearchOrSort = searchQuery || sort !== "newest";
   const activePresetId = resolveActiveReviewPreset(sort);
@@ -194,14 +181,26 @@ export default async function ReviewQueuePage({
           <p className="text-sm text-slate-500">
             Showing {queue.items.length} of {queue.total} item{queue.total === 1 ? "" : "s"} pending review
           </p>
-          <ReviewQueueList items={queue.items.map(toReviewQueueListItem)} />
+          <ReviewQueueList
+            items={queue.items.map((item) =>
+              toReviewQueueListItem({
+                ...item,
+                reviewHref: buildReviewCompareUrl({
+                  documentId: String(item.document._id),
+                  q: searchQuery,
+                  sort,
+                  page: queue.page
+                })
+              })
+            )}
+          />
           {queue.totalPages > 1 ? (
             <nav className="mt-2 flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-sm">
               <Link
                 className={`rounded-md border border-line px-3 py-1.5 ${
                   queue.page <= 1 ? "pointer-events-none text-slate-300" : "text-slate-700 hover:border-slate-400"
                 }`}
-                href={buildReviewUrl({ q: searchQuery, sort, page: Math.max(1, queue.page - 1) })}
+                href={buildReviewQueueUrl({ q: searchQuery, sort, page: Math.max(1, queue.page - 1) })}
               >
                 Previous
               </Link>
@@ -212,7 +211,7 @@ export default async function ReviewQueuePage({
                 className={`rounded-md border border-line px-3 py-1.5 ${
                   queue.page >= queue.totalPages ? "pointer-events-none text-slate-300" : "text-slate-700 hover:border-slate-400"
                 }`}
-                href={buildReviewUrl({ q: searchQuery, sort, page: Math.min(queue.totalPages, queue.page + 1) })}
+                href={buildReviewQueueUrl({ q: searchQuery, sort, page: Math.min(queue.totalPages, queue.page + 1) })}
               >
                 Next
               </Link>

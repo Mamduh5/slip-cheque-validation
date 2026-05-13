@@ -7,6 +7,7 @@ import type { ReviewPairDecision } from "@/lib/models";
 
 export interface ReviewQueueListItem {
   documentId: string;
+  reviewHref: string;
   filename: string;
   uploadedAt: string;
   amount: string | null;
@@ -270,7 +271,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
 
               <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                 <Link
-                  href={`/review/${item.documentId}`}
+                  href={item.reviewHref}
                   className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-dark"
                 >
                   Compare &amp; review

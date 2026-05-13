@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReviewActions } from "@/components/review-actions";
-import { getDocumentForUser } from "@/lib/documents";
+import { getDocumentForUser, getReviewQueueForUser } from "@/lib/documents";
+import {
+  buildReviewCompareUrl,
+  buildReviewQueueUrl,
+  parseReviewQueuePage,
+  parseReviewQueueSort,
+  type ReviewQueueContext
+} from "@/lib/review-queue-context";
 import {
   getImageReadField,
   getImageReadConfidence,
@@ -19,6 +26,84 @@ function formatDate(date: Date) {
 function formatSimilarity(score: number | null) {
   if (score === null) return "—";
   return `${Math.round(score * 100)}%`;
+}
+
+async function getQueueNavigation(input: {
+  userId: string;
+  documentId: string;
+  context: ReviewQueueContext;
+}) {
+  const queue = await getReviewQueueForUser(input.userId, {
+    searchQuery: input.context.q,
+    sort: input.context.sort,
+    page: input.context.page,
+    pageSize: 10
+  });
+  const currentIndex = queue.items.findIndex((item) => String(item.document._id) === input.documentId);
+
+  if (currentIndex === -1) {
+    return {
+      total: queue.total,
+      position: null,
+      previousHref: null,
+      nextHref: null,
+      saveAndNextHref: null
+    };
+  }
+
+  const previousFromCurrentPage = currentIndex > 0 ? queue.items[currentIndex - 1] : null;
+  const nextFromCurrentPage = currentIndex < queue.items.length - 1 ? queue.items[currentIndex + 1] : null;
+  const [previousPageQueue, nextPageQueue] = await Promise.all([
+    previousFromCurrentPage === null && queue.page > 1
+      ? getReviewQueueForUser(input.userId, {
+          searchQuery: input.context.q,
+          sort: input.context.sort,
+          page: queue.page - 1,
+          pageSize: queue.pageSize
+        })
+      : null,
+    nextFromCurrentPage === null && queue.page < queue.totalPages
+      ? getReviewQueueForUser(input.userId, {
+          searchQuery: input.context.q,
+          sort: input.context.sort,
+          page: queue.page + 1,
+          pageSize: queue.pageSize
+        })
+      : null
+  ]);
+
+  const previousItem =
+    previousFromCurrentPage ?? previousPageQueue?.items[previousPageQueue.items.length - 1] ?? null;
+  const nextItem = nextFromCurrentPage ?? nextPageQueue?.items[0] ?? null;
+  const previousPage = previousFromCurrentPage ? queue.page : queue.page - 1;
+  const nextPage = nextFromCurrentPage ? queue.page : queue.page + 1;
+  const position = (queue.page - 1) * queue.pageSize + currentIndex + 1;
+
+  return {
+    total: queue.total,
+    position,
+    previousHref: previousItem
+      ? buildReviewCompareUrl({
+          ...input.context,
+          documentId: String(previousItem.document._id),
+          page: previousPage
+        })
+      : null,
+    nextHref: nextItem
+      ? buildReviewCompareUrl({
+          ...input.context,
+          documentId: String(nextItem.document._id),
+          page: nextPage
+        })
+      : null,
+    saveAndNextHref: nextItem
+      ? buildReviewCompareUrl({
+          ...input.context,
+          documentId: String(nextItem.document._id),
+          page: queue.page
+        })
+      : null
+  };
 }
 
 function FieldRow({
@@ -74,9 +159,21 @@ function FieldRow({
   );
 }
 
-export default async function ReviewComparePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReviewComparePage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ q?: string; sort?: string; page?: string }>;
+}) {
   const user = await requireUser();
   const { id } = await params;
+  const resolvedSearchParams = await searchParams;
+  const queueContext: ReviewQueueContext = {
+    q: (resolvedSearchParams?.q ?? "").trim(),
+    sort: parseReviewQueueSort(resolvedSearchParams?.sort),
+    page: parseReviewQueuePage(resolvedSearchParams?.page)
+  };
   const document = await getDocumentForUser(id, user.id);
 
   if (!document) {
@@ -94,6 +191,14 @@ export default async function ReviewComparePage({ params }: { params: Promise<{ 
 
   const canReview = document.reviewStatus === "PENDING" && matchedDocument !== null;
   const alreadyReviewed = document.reviewStatus !== "PENDING" && document.reviewStatus !== "NOT_REQUIRED";
+  const queueHref = buildReviewQueueUrl(queueContext);
+  const queueNavigation = canReview
+    ? await getQueueNavigation({
+        userId: user.id,
+        documentId: String(document._id),
+        context: queueContext
+      })
+    : null;
 
   const fieldKeys: ReviewFieldKey[] = ["amount", "receiverName", "senderName", "dateTime", "transactionReference"];
 
@@ -102,13 +207,54 @@ export default async function ReviewComparePage({ params }: { params: Promise<{ 
       <div className="mb-4 flex items-center gap-3">
         <Link
           className="text-sm font-medium text-accent hover:text-accent-dark"
-          href="/review"
+          href={queueHref}
         >
           ← Review queue
         </Link>
         <span className="text-slate-300">/</span>
         <span className="truncate text-sm text-slate-500">{document.originalFilename}</span>
       </div>
+
+      {queueNavigation ? (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium text-ink">
+              {queueNavigation.position !== null
+                ? `Item ${queueNavigation.position} of ${queueNavigation.total}`
+                : "Queue position unavailable"}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Queue context is preserved from the current search, sort, and page.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {queueNavigation.previousHref ? (
+              <Link
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400"
+                href={queueNavigation.previousHref}
+              >
+                Previous item
+              </Link>
+            ) : (
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-400">
+                Start of queue
+              </span>
+            )}
+            {queueNavigation.nextHref ? (
+              <Link
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400"
+                href={queueNavigation.nextHref}
+              >
+                Next item
+              </Link>
+            ) : (
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500">
+                End of queue
+              </span>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Status banner */}
       {alreadyReviewed ? (
@@ -225,7 +371,7 @@ export default async function ReviewComparePage({ params }: { params: Promise<{ 
       {/* Review actions */}
       {canReview && (
         <div className="mt-4">
-          <ReviewActions documentId={String(document._id)} />
+          <ReviewActions documentId={String(document._id)} nextHref={queueNavigation?.saveAndNextHref ?? null} />
         </div>
       )}
 
