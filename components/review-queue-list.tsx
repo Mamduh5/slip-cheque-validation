@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { ReviewPairDecision } from "@/lib/models";
+import { getSelectedPageItems } from "@/lib/review-selection";
 
 export interface ReviewQueueListItem {
   documentId: string;
@@ -35,10 +36,13 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pendingDecision, setPendingDecision] = useState<ReviewPairDecision | null>(null);
+  const [confirmationDecision, setConfirmationDecision] = useState<ReviewPairDecision | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedItems = useMemo(() => getSelectedPageItems(items, selectedIds), [items, selectedIds]);
+  const sampleItems = selectedItems.slice(0, 3);
 
   function toggleItem(documentId: string) {
     setFeedback(null);
@@ -58,22 +62,27 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
     setSelectedIds([]);
     setReviewNote("");
     setError(null);
+    setConfirmationDecision(null);
+  }
+
+  function requestBulkReview(decision: ReviewPairDecision) {
+    if (selectedItems.length === 0) return;
+    setError(null);
+    setFeedback(null);
+    setConfirmationDecision(decision);
   }
 
   async function submitBulkReview(decision: ReviewPairDecision) {
-    if (selectedIds.length === 0) return;
+    const selectedPageIds = selectedItems.map((item) => item.documentId);
+    if (selectedPageIds.length === 0) return;
 
     const label = decisionLabel(decision).toLowerCase();
     const hasNote = reviewNote.trim().length > 0;
-    const confirmed = window.confirm(
-      `${decisionLabel(decision)} for ${selectedIds.length} selected item${selectedIds.length === 1 ? "" : "s"}? This records the same review decision${hasNote ? " and review note" : ""} for each eligible pending item.`
-    );
-
-    if (!confirmed) return;
 
     setError(null);
     setFeedback(null);
     setPendingDecision(decision);
+    setConfirmationDecision(null);
 
     const response = await fetch("/api/review/bulk", {
       method: "POST",
@@ -82,7 +91,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
       },
       body: JSON.stringify({
         decision,
-        documentIds: selectedIds,
+        documentIds: selectedPageIds,
         reviewNote
       })
     });
@@ -107,14 +116,14 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
         <span className="text-slate-600">
-          {selectedIds.length} selected on this page
+          {selectedItems.length} selected on this page
         </span>
         <div className="flex flex-wrap gap-2">
           <button
             className="rounded-md border border-line px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-300"
             data-testid="review-select-all"
             type="button"
-            disabled={selectedIds.length === items.length}
+            disabled={selectedItems.length === items.length}
             onClick={selectAllOnPage}
           >
             Select all on page
@@ -123,7 +132,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
             className="rounded-md border border-line px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:text-slate-300"
             data-testid="review-clear-selection"
             type="button"
-            disabled={selectedIds.length === 0}
+            disabled={selectedItems.length === 0}
             onClick={clearSelection}
           >
             Clear selection
@@ -131,16 +140,16 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
         </div>
       </div>
 
-      {selectedIds.length > 0 ? (
+      {selectedItems.length > 0 ? (
         <div
           className="sticky top-2 z-10 flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm lg:flex-row lg:items-end lg:justify-between"
           data-testid="review-bulk-action-bar"
         >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-orange-950">
-              {selectedIds.length} pending item{selectedIds.length === 1 ? "" : "s"} selected
+              {selectedItems.length} pending item{selectedItems.length === 1 ? "" : "s"} selected
             </p>
-            <p className="text-xs text-orange-900">Bulk actions apply only to eligible pending review items.</p>
+            <p className="text-xs text-orange-900">Selection is page-scoped. Bulk actions apply only to selected visible pending items.</p>
             <label className="mt-2 block text-xs font-medium uppercase tracking-wide text-orange-900" htmlFor="bulk-review-note">
               Review note <span className="font-normal normal-case tracking-normal">(optional)</span>
             </label>
@@ -160,7 +169,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
               data-testid="bulk-confirm-duplicate"
               type="button"
               disabled={pendingDecision !== null}
-              onClick={() => submitBulkReview("CONFIRMED_DUPLICATE")}
+              onClick={() => requestBulkReview("CONFIRMED_DUPLICATE")}
             >
               {pendingDecision === "CONFIRMED_DUPLICATE" ? "Saving..." : "Confirm duplicate"}
             </button>
@@ -169,7 +178,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
               data-testid="bulk-confirm-distinct"
               type="button"
               disabled={pendingDecision !== null}
-              onClick={() => submitBulkReview("CONFIRMED_DISTINCT")}
+              onClick={() => requestBulkReview("CONFIRMED_DISTINCT")}
             >
               {pendingDecision === "CONFIRMED_DISTINCT" ? "Saving..." : "Confirm distinct"}
             </button>
@@ -181,6 +190,82 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
             >
               Clear
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmationDecision && selectedItems.length > 0 ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 px-4 py-6" data-testid="bulk-review-modal-backdrop">
+          <div
+            aria-labelledby="bulk-review-confirm-title"
+            aria-modal="true"
+            className="w-full max-w-lg rounded-lg border border-line bg-white p-4 shadow-xl"
+            role="dialog"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-ink" id="bulk-review-confirm-title">
+                  Confirm bulk review
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {decisionLabel(confirmationDecision)} for {selectedItems.length} selected item{selectedItems.length === 1 ? "" : "s"}.
+                </p>
+              </div>
+              <button
+                aria-label="Close bulk review confirmation"
+                className="rounded-md border border-line px-2 py-1 text-sm text-slate-600 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pendingDecision !== null}
+                type="button"
+                onClick={() => setConfirmationDecision(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <p>
+                Selection is page-scoped. This action only affects selected items visible on the current review queue page.
+              </p>
+              <p className="mt-2">
+                The same review decision{reviewNote.trim() ? " and note" : ""} will be submitted for each eligible pending item.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Sample affected items</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                {sampleItems.map((item) => (
+                  <li className="truncate rounded border border-slate-200 px-2 py-1" key={item.documentId}>
+                    {item.filename}
+                  </li>
+                ))}
+              </ul>
+              {selectedItems.length > sampleItems.length ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  +{selectedItems.length - sampleItems.length} more selected on this page.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pendingDecision !== null}
+                type="button"
+                onClick={() => setConfirmationDecision(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
+                data-testid="bulk-review-modal-confirm"
+                disabled={pendingDecision !== null}
+                type="button"
+                onClick={() => submitBulkReview(confirmationDecision)}
+              >
+                {pendingDecision === confirmationDecision ? "Saving..." : decisionLabel(confirmationDecision)}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

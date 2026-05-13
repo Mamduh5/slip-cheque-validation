@@ -182,6 +182,7 @@ export default async function ReviewQueuePage({
             Showing {queue.items.length} of {queue.total} item{queue.total === 1 ? "" : "s"} pending review
           </p>
           <ReviewQueueList
+            key={queue.items.map((item) => String(item.document._id)).join("|")}
             items={queue.items.map((item) =>
               toReviewQueueListItem({
                 ...item,
