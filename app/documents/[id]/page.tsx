@@ -191,6 +191,50 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     matchedDocument !== null;
   const documentTypeGuidance = getDocumentTypeGuidance(document.documentType);
   const processingProfile = document.processingProfile ?? getDocumentProcessingProfile(document.documentType);
+  const likelyDuplicateEvidence =
+    document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
+      <div className="mt-4" data-testid="likely-duplicate-evidence">
+        <div className="mb-3 flex flex-col gap-2 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            System flagged as likely duplicate. Review status:{" "}
+            <strong>{formatReviewStatus(document.reviewStatus)}</strong>.
+          </span>
+          {document.reviewStatus === "PENDING" && (
+            <Link
+              href={`/review/${String(document._id)}`}
+              className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-dark"
+            >
+              Compare &amp; review â†’
+            </Link>
+          )}
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <figure className="overflow-hidden rounded-md border border-line bg-slate-50">
+            <figcaption className="border-b border-line bg-white px-3 py-2 text-sm font-medium">
+              This upload
+            </figcaption>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="max-h-[400px] w-full object-contain"
+              src={`/api/documents/${String(document._id)}/original`}
+              alt="Current uploaded financial document preview"
+            />
+          </figure>
+          <figure className="overflow-hidden rounded-md border border-line bg-slate-50">
+            <figcaption className="border-b border-line bg-white px-3 py-2 text-sm font-medium">
+              Matched document
+            </figcaption>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="max-h-[400px] w-full object-contain"
+              src={`/api/documents/${String(matchedDocument._id)}/original`}
+              alt="Matched financial document preview"
+            />
+          </figure>
+        </div>
+        {canReview ? <ReviewActions documentId={String(document._id)} /> : null}
+      </div>
+    ) : null;
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
@@ -219,6 +263,8 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             <QualityStatusPill status={document.qualityStatus} />
           </div>
         </div>
+
+        {canReview ? likelyDuplicateEvidence : null}
 
         {/* Upload result summary — derived from stored fields, redirect-safe */}
         {(() => {
@@ -280,7 +326,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
         <ReviewHistoryCard entries={reviewHistory} />
 
-        {document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
+        {!canReview ? (document.duplicateStatus === "LIKELY_DUPLICATE" && matchedDocument ? (
           <div className="mt-4">
             <div className="mb-3 flex flex-col gap-2 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 sm:flex-row sm:items-center sm:justify-between">
               <span>
@@ -320,7 +366,6 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                 />
               </figure>
             </div>
-            {canReview ? <ReviewActions documentId={String(document._id)} /> : null}
           </div>
         ) : (
           <div className="mt-4 overflow-hidden rounded-md border border-line bg-slate-50">
@@ -331,7 +376,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
               alt="Uploaded financial document preview"
             />
           </div>
-        )}
+        )) : null}
 
         {document.qualityWarnings.length > 0 ? (
           <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-3">
