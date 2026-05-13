@@ -31,7 +31,14 @@ function ReviewHistoryItem({ entry, compact = false }: { entry: ReviewHistoryEnt
 
 export function ReviewHistoryCard({ entries }: { entries: ReviewHistoryEntry[] }) {
   if (entries.length === 0) {
-    return null;
+    return (
+      <div className="mt-4 rounded-lg border border-line bg-white p-4 shadow-sm" data-testid="review-history-card">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Review history</p>
+        <p className="mt-2 text-sm text-slate-600">
+          No review actions have been recorded for this document yet.
+        </p>
+      </div>
+    );
   }
 
   const [latest, ...older] = entries;

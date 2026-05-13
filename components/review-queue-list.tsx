@@ -142,19 +142,19 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
 
       {selectedItems.length > 0 ? (
         <div
-          className="sticky top-2 z-10 flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm lg:flex-row lg:items-end lg:justify-between"
+          className="sticky top-2 z-10 flex flex-col gap-3 rounded-lg border border-line bg-white p-3 shadow-sm lg:flex-row lg:items-end lg:justify-between"
           data-testid="review-bulk-action-bar"
         >
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-orange-950">
+            <p className="text-sm font-medium text-ink">
               {selectedItems.length} pending item{selectedItems.length === 1 ? "" : "s"} selected
             </p>
-            <p className="text-xs text-orange-900">Selection is page-scoped. Bulk actions apply only to selected visible pending items.</p>
-            <label className="mt-2 block text-xs font-medium uppercase tracking-wide text-orange-900" htmlFor="bulk-review-note">
+            <p className="text-xs text-slate-500">Selection is page-scoped. Bulk actions apply only to selected visible pending items.</p>
+            <label className="mt-2 block text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor="bulk-review-note">
               Review note <span className="font-normal normal-case tracking-normal">(optional)</span>
             </label>
             <input
-              className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
               id="bulk-review-note"
               maxLength={500}
               placeholder="Apply one note to this batch"
@@ -174,7 +174,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
               {pendingDecision === "CONFIRMED_DUPLICATE" ? "Saving..." : "Confirm duplicate"}
             </button>
             <button
-              className="rounded-md border border-orange-200 bg-white px-3 py-1.5 text-sm font-medium text-orange-950 hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="bulk-confirm-distinct"
               type="button"
               disabled={pendingDecision !== null}
@@ -183,7 +183,7 @@ export function ReviewQueueList({ items }: { items: ReviewQueueListItem[] }) {
               {pendingDecision === "CONFIRMED_DISTINCT" ? "Saving..." : "Confirm distinct"}
             </button>
             <button
-              className="rounded-md border border-orange-200 bg-white px-3 py-1.5 text-sm text-orange-950 hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               disabled={pendingDecision !== null}
               onClick={clearSelection}

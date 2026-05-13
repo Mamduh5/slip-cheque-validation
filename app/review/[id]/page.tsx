@@ -281,7 +281,7 @@ export default async function ReviewComparePage({
           </strong>.
         </div>
       ) : canReview ? (
-        <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+        <div className="mb-4 rounded-lg border border-line bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           <strong>Pending review</strong> — visual similarity{" "}
           {formatSimilarity(document.similarityScore)}. Compare the images and structured fields, then record your decision below.
         </div>

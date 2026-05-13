@@ -4,7 +4,7 @@ import type { ReviewStatus } from "@/lib/models";
 export function ReviewStatusPill({ status }: { status: ReviewStatus }) {
   const tone =
     status === "PENDING"
-      ? "border-orange-200 bg-orange-50 text-orange-800"
+      ? "border-sky-200 bg-sky-50 text-sky-800"
       : status === "CONFIRMED_DUPLICATE"
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : status === "CONFIRMED_DISTINCT"

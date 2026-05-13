@@ -103,26 +103,26 @@ export function ReviewActions({
   }, [enableShortcuts, isPending, queueNextHref, queuePreviousHref, router, submitReview]);
 
   return (
-    <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-4">
+    <div className="mt-4 rounded-md border border-line bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="font-semibold text-orange-950">Review this likely duplicate</h2>
-          <p className="mt-1 text-sm leading-6 text-orange-900">
+          <h2 className="font-semibold text-ink">Review this likely duplicate</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
             The system thinks these images may show the same document. Your review is stored separately.
           </p>
           {enableShortcuts ? (
-            <p className="mt-2 text-xs text-orange-900">
-              Shortcuts: <kbd className="rounded border border-orange-200 bg-white px-1 py-0.5">1</kbd> duplicate,{" "}
-              <kbd className="rounded border border-orange-200 bg-white px-1 py-0.5">2</kbd> distinct.
+            <p className="mt-2 text-xs text-slate-500">
+              Shortcuts: <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">1</kbd> duplicate,{" "}
+              <kbd className="rounded border border-line bg-slate-50 px-1 py-0.5">2</kbd> distinct.
             </p>
           ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 lg:max-w-md">
-          <label className="text-xs font-medium uppercase tracking-wide text-orange-900" htmlFor={`review-note-${documentId}`}>
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500" htmlFor={`review-note-${documentId}`}>
             Review note <span className="font-normal normal-case tracking-normal">(optional)</span>
           </label>
           <textarea
-            className="min-h-16 rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="min-h-16 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             id={`review-note-${documentId}`}
             maxLength={500}
             placeholder="Add brief context for this decision"
@@ -148,9 +148,9 @@ export function ReviewActions({
             </button>
           </div>
           {nextHref ? (
-            <div className="flex flex-col gap-2 border-t border-orange-200 pt-2 sm:flex-row">
+            <div className="flex flex-col gap-2 border-t border-line pt-2 sm:flex-row">
               <button
-                className="rounded-md bg-orange-900 px-4 py-2 text-sm font-medium text-white hover:bg-orange-950 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
                 type="button"
                 disabled={isPending}
                 onClick={() => submitReview("CONFIRMED_DUPLICATE", "duplicate-next", nextHref)}
@@ -158,7 +158,7 @@ export function ReviewActions({
                 {pendingAction === "duplicate-next" ? "Saving..." : "Confirm duplicate & next"}
               </button>
               <button
-                className="rounded-md border border-orange-300 bg-white px-4 py-2 text-sm font-medium text-orange-950 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 type="button"
                 disabled={isPending}
                 onClick={() => submitReview("CONFIRMED_DISTINCT", "distinct-next", nextHref)}
@@ -167,7 +167,7 @@ export function ReviewActions({
               </button>
             </div>
           ) : (
-            <p className="rounded-md border border-orange-200 bg-white px-3 py-2 text-xs text-orange-900">
+            <p className="rounded-md border border-line bg-slate-50 px-3 py-2 text-xs text-slate-600">
               End of queue for this view. Save this item, then return to the queue.
             </p>
           )}

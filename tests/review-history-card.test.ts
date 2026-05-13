@@ -18,6 +18,13 @@ function makeEntry(overrides: Partial<ReviewHistoryEntry> = {}): ReviewHistoryEn
 }
 
 describe("ReviewHistoryCard", () => {
+  it("renders a calm empty state when there is no history", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewHistoryCard, { entries: [] }));
+
+    expect(markup).toContain("Review history");
+    expect(markup).toContain("No review actions have been recorded");
+  });
+
   it("renders the latest review note compactly", () => {
     const markup = renderToStaticMarkup(createElement(ReviewHistoryCard, { entries: [makeEntry()] }));
 
