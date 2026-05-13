@@ -92,8 +92,13 @@ export function RegisterForm() {
             autoComplete="new-password"
             type="password"
             minLength={8}
+            maxLength={128}
+            aria-describedby="password-rules"
             required
           />
+          <p className="mt-1 text-xs leading-5 text-slate-500" id="password-rules">
+            Use 8 to 128 characters. Choose a password that is not reused for other systems.
+          </p>
         </div>
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
         <button

@@ -45,8 +45,8 @@ export default async function UploadPage() {
           </p>
         </div>
         <div className="rounded-lg border border-line bg-white p-4 text-sm leading-6 text-slate-600">
-          Duplicate matching is active within your account. The app compares exact file hashes first, then uses a
-          normalized image fingerprint to mark likely duplicates.
+          Duplicate matching is active within your account. Document Registry Checker identifies exact matches and
+          flags visually similar uploads for reviewer confirmation.
         </div>
       </div>
       <UploadForm />

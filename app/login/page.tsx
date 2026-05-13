@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { LoginForm } from "@/components/login-form";
+import { PublicTrustLinks } from "@/components/public-trust-links";
 import { isGoogleAuthConfigured } from "@/lib/env";
 
 export default function LoginPage() {
@@ -9,7 +10,7 @@ export default function LoginPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Log in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Access your document dashboard and upload history.
+          Access Document Registry Checker to continue uploads, duplicate review, and document checks.
         </p>
       </div>
       <Suspense fallback={<div className="rounded-lg border border-line bg-white p-5 shadow-sm">Loading...</div>}>
@@ -21,6 +22,9 @@ export default function LoginPage() {
           Register
         </Link>
       </p>
+      <div className="mt-5">
+        <PublicTrustLinks />
+      </div>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PublicTrustLinks } from "@/components/public-trust-links";
 import { RegisterForm } from "@/components/register-form";
 
 export default function RegisterPage() {
@@ -7,7 +8,7 @@ export default function RegisterPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-semibold">Create account</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Email/password accounts are stored in MongoDB for this v1 scaffold.
+          Create access to Document Registry Checker for document upload, duplicate review, and audit-friendly decisions.
         </p>
       </div>
       <RegisterForm />
@@ -17,6 +18,9 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
+      <div className="mt-5">
+        <PublicTrustLinks />
+      </div>
     </section>
   );
 }

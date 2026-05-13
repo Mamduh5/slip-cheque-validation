@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
@@ -52,9 +53,14 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="password">
-            Password
-          </label>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium" htmlFor="password">
+              Password
+            </label>
+            <Link className="text-xs font-medium text-accent hover:text-accent-dark" href="/forgot-password">
+              Forgot password?
+            </Link>
+          </div>
           <input
             className="focus-ring w-full rounded-md border border-line px-3 py-2"
             id="password"

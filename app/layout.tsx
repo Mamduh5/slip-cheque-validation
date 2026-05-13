@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/app-header";
 
 export const metadata: Metadata = {
   title: "Document Registry Checker",
-  description: "Duplicate registry scaffold for paper financial document images"
+  description: "Document validation and duplicate review for slips, cheques, and financial documents"
 };
 
 export default function RootLayout({
